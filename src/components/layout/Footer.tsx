@@ -10,7 +10,7 @@ export function Footer() {
             <Wordmark />
             <p className="mt-3 text-sm leading-relaxed text-ink-500">
               WSL is the evidence infrastructure connecting universities, students, and organizations —
-              turning real-world learning into verified, demonstrated skill.
+              turning real-world learning into rated, demonstrated skill.
             </p>
           </div>
           <div className="grid grid-cols-2 gap-8 sm:grid-cols-3">

@@ -53,7 +53,8 @@ export default function Landing() {
           <div className="text-xs font-semibold tracking-wide text-teal-600 uppercase">The WSL Loop</div>
           <h2 className="mt-2 text-2xl font-bold text-ink-950 sm:text-3xl">From Learning → Doing → Proving</h2>
           <p className="mx-auto mt-2 max-w-2xl text-ink-500">
-            Real problem → learning project → student work → evidence → verified skills → opportunities.
+            Company submits → WSL screens it automatically → university assigns it → a student solves it solo →
+            WSL rates it → university confirms it → company rates it.
           </p>
         </div>
         <FlowLoop />
@@ -66,7 +67,7 @@ export default function Landing() {
             <div className="mb-3 text-xs font-semibold tracking-wide text-teal-600 uppercase">For Students</div>
             <h3 className="text-lg font-bold text-ink-950">Turn your work into evidence of what you can do.</h3>
             <p className="mt-2 text-sm leading-relaxed text-ink-500">
-              Every real project you complete becomes verified, evidence-backed proof — not just another line on a CV.
+              Every real project you complete becomes rated, evidence-backed proof — not just another line on a CV.
             </p>
             <Link to="/for-students" className="mt-4 inline-block text-sm font-semibold text-teal-600 hover:underline">
               Learn more →
@@ -76,7 +77,7 @@ export default function Landing() {
             <div className="mb-3 text-xs font-semibold tracking-wide text-teal-600 uppercase">For Universities</div>
             <h3 className="text-lg font-bold text-ink-950">Connect learning with authentic real-world challenges.</h3>
             <p className="mt-2 text-sm leading-relaxed text-ink-500">
-              Map real company problems onto existing courses, and keep verification where it belongs — with faculty.
+              Assign real company problems to your students, and confirm their work before it ever reaches the company.
             </p>
             <Link to="/for-universities" className="mt-4 inline-block text-sm font-semibold text-teal-600 hover:underline">
               Learn more →
@@ -112,7 +113,7 @@ export default function Landing() {
             </p>
             <p className="mt-4 leading-relaxed text-ink-600">
               WSL creates the missing evidence layer: real problems become learning projects, learning
-              projects produce evidence, and evidence becomes verified, living proof of capability.
+              projects produce evidence, and evidence becomes rated, living proof of capability.
             </p>
             <div className="mt-6 rounded-xl border border-teal-500/30 bg-teal-50 px-5 py-4">
               <p className="font-semibold text-ink-900">
@@ -123,34 +124,25 @@ export default function Landing() {
           <div className="rounded-2xl border border-ink-200 bg-white p-5 shadow-sm">
             <div className="mb-3 flex items-center justify-between">
               <span className="text-sm font-semibold text-ink-800">Cafeteria Demand Prediction</span>
-              <StatusBadge status="Evidence Under Review" />
+              <StatusBadge status="Submissions Under Review" />
             </div>
             <p className="mb-4 text-xs text-ink-400">Jordan Tech Solutions · Data Science / Machine Learning</p>
             <div className="space-y-3">
               <div>
-                <div className="mb-1 flex items-center justify-between text-sm">
-                  <span className="font-medium text-ink-800">Python</span>
-                  <span className="text-xs font-semibold text-teal-700">Advanced</span>
-                </div>
-                <ConfidenceMeter value={94} />
+                <div className="mb-1 text-sm font-medium text-ink-800">Python</div>
+                <ConfidenceMeter value={94} label="AI rating" />
               </div>
               <div>
-                <div className="mb-1 flex items-center justify-between text-sm">
-                  <span className="font-medium text-ink-800">Data Analysis</span>
-                  <span className="text-xs font-semibold text-teal-700">Advanced</span>
-                </div>
-                <ConfidenceMeter value={91} />
+                <div className="mb-1 text-sm font-medium text-ink-800">Data Analysis</div>
+                <ConfidenceMeter value={91} label="AI rating" />
               </div>
               <div>
-                <div className="mb-1 flex items-center justify-between text-sm">
-                  <span className="font-medium text-ink-800">Machine Learning</span>
-                  <span className="text-xs font-semibold text-teal-700">Intermediate</span>
-                </div>
-                <ConfidenceMeter value={88} />
+                <div className="mb-1 text-sm font-medium text-ink-800">Machine Learning</div>
+                <ConfidenceMeter value={88} label="AI rating" />
               </div>
             </div>
             <p className="mt-4 text-xs text-ink-400">
-              Evidence confidence reflects how strongly submitted work supports a skill signal — not proficiency.
+              WSL rates each skill automatically the moment evidence is submitted — informational only, it never blocks anything.
             </p>
           </div>
         </div>
@@ -162,11 +154,10 @@ export default function Landing() {
           <h2 className="text-2xl font-bold text-white sm:text-3xl">Don't just tell employers what you know.</h2>
           <h2 className="text-2xl font-bold text-teal-300 sm:text-3xl">Show them what you've done.</h2>
           <div className="mx-auto mt-8 flex max-w-xl flex-wrap justify-center gap-2">
-            <SkillChip skill="Python" level="Advanced" verified />
-            <SkillChip skill="Data Analysis" level="Advanced" verified />
-            <SkillChip skill="Machine Learning" level="Intermediate" verified />
-            <SkillChip skill="Data Visualization" level="Intermediate" verified />
-            <SkillChip skill="Problem Solving" level="Demonstrated" verified />
+            <SkillChip skill="Python" rating={94} />
+            <SkillChip skill="Data Analysis" rating={91} />
+            <SkillChip skill="Machine Learning" rating={88} />
+            <SkillChip skill="Data Visualization" rating={85} />
           </div>
           <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
             <Link to="/login" className="rounded-full bg-teal-500 px-6 py-3 text-sm font-semibold text-ink-950 hover:bg-teal-400">

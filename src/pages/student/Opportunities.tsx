@@ -2,28 +2,30 @@ import { Link } from "react-router-dom"
 import { useDemoUser } from "../../state/demoUser"
 import { useStore } from "../../state/store"
 import { PageHeader } from "../../components/ui/PageHeader"
-import { getOrg, verifiedSignals } from "../../lib/selectors"
+import { bestRating, getOrg, studentSignals } from "../../lib/selectors"
 import { opportunities } from "../../data/seed"
+
+const MATCH_THRESHOLD = 75
 
 export default function Opportunities() {
   const { student } = useDemoUser()
   const { skillSignals } = useStore()
   if (!student) return null
 
-  const verifiedNames = new Set(verifiedSignals(skillSignals, student.id).map((s) => s.skill))
+  const ratedNames = new Set(studentSignals(skillSignals, student.id).filter((s) => bestRating(s) >= MATCH_THRESHOLD).map((s) => s.skill))
 
   return (
     <div>
       <PageHeader
         eyebrow="Opportunities"
-        title="Opportunities matched to your verified skills"
-        subtitle="Matching is based on overlap with skills you've actually had verified — not a hidden compatibility score."
+        title="Opportunities matched to your rated skills"
+        subtitle="Matching is based on overlap with skills WSL or a company has actually rated — not a hidden compatibility score."
       />
 
       <div className="grid gap-5 sm:grid-cols-2">
         {opportunities.map((o) => {
           const org = getOrg(o.organizationId)
-          const matched = o.requiredSkills.filter((s) => verifiedNames.has(s))
+          const matched = o.requiredSkills.filter((s) => ratedNames.has(s))
           return (
             <Link key={o.id} to={`/student/opportunities/${o.id}`} className="rounded-2xl border border-ink-200 bg-white p-5 hover:border-teal-400">
               <div className="flex items-start justify-between gap-2">
@@ -40,10 +42,10 @@ export default function Opportunities() {
                   <span
                     key={s}
                     className={`rounded-md px-2 py-1 text-[11px] font-medium ${
-                      verifiedNames.has(s) ? "bg-teal-600 text-white" : "bg-ink-50 text-ink-500"
+                      ratedNames.has(s) ? "bg-teal-600 text-white" : "bg-ink-50 text-ink-500"
                     }`}
                   >
-                    {verifiedNames.has(s) ? "✓ " : ""}{s}
+                    {ratedNames.has(s) ? "✓ " : ""}{s}
                   </span>
                 ))}
               </div>

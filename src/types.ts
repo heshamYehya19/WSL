@@ -1,7 +1,5 @@
 export type Role = "guest" | "student" | "university" | "company"
 
-export type SkillLevel = "Foundational" | "Intermediate" | "Advanced" | "Demonstrated"
-
 export type EvidenceType =
   | "Project Report"
   | "GitHub Repository"
@@ -13,18 +11,18 @@ export type EvidenceType =
   | "Dataset / Model"
   | "Video / Demo Link"
 
+// A lean, linear pipeline: company submits -> WSL's private-data screen (automatic,
+// invisible) -> university assigns it college-wide -> a student works it solo ->
+// WSL rates the submission automatically -> university reviews and confirms it to
+// the company -> the company reviews and rates it too.
 export type ChallengeStatus =
   | "Draft"
-  | "Submitted"
-  | "Under WSL Review"
-  | "Approved"
   | "Sent to University"
-  | "University Accepted"
-  | "Open to Students"
+  | "University Assigned"
   | "In Progress"
-  | "Completed"
-  | "Evidence Under Review"
-  | "Verified"
+  | "Submissions Under Review"
+  | "Confirmed to Company"
+  | "Company Reviewed"
 
 export type ChallengeVisibility = "Public" | "University Only" | "Restricted"
 
@@ -49,13 +47,6 @@ export interface Organization {
   about: string
 }
 
-export interface CourseMapping {
-  course: string
-  program: string
-  semester: string
-  studentGroup: string
-}
-
 export interface Challenge {
   id: string
   title: string
@@ -69,7 +60,6 @@ export interface Challenge {
   learningOutcomes: string[]
   datasetAvailability: string
   dataSensitivity: DataSensitivity
-  numTeams: number
   deadline: string
   preferredUniversityId: string | null
   contactPerson: string
@@ -77,7 +67,8 @@ export interface Challenge {
   visibility: ChallengeVisibility
   submissionRequirements: string[]
   status: ChallengeStatus
-  courseMapping: CourseMapping | null
+  /** The college/program the university assigned this to — not a specific course. */
+  assignedProgram: string | null
   submittedAt: string | null
   history: { status: ChallengeStatus; at: string; note?: string }[]
 }
@@ -85,7 +76,7 @@ export interface Challenge {
 export interface Evidence {
   id: string
   projectId: string
-  contributorId: string
+  studentId: string
   type: EvidenceType
   title: string
   description: string
@@ -98,13 +89,12 @@ export interface SkillSignal {
   projectId: string
   studentId: string
   skill: string
-  level: SkillLevel
-  confidence: number
+  /** WSL's automatic rating (0-100). Generated the moment evidence is submitted — informational only, never blocks anything. */
+  aiRating: number
+  /** The company's own rating (0-100), given after the university confirms the submission. */
+  companyRating?: number
+  companyRatedAt?: string
   evidenceIds: string[]
-  status: "Pending Verification" | "Verified" | "More Evidence Requested" | "Rejected"
-  verifiedBy?: string
-  verifiedAt?: string
-  reviewerNotes?: string
   analyzedAt: string
 }
 
@@ -119,21 +109,12 @@ export interface Project {
   challengeId: string
   title: string
   organizationId: string
-  teamStudentIds: string[]
+  /** Solo work only — one student per project. */
+  studentId: string
   status: ChallengeStatus
   startedAt: string
   tasks: ProjectTask[]
-  individualContributions: Record<string, string[]>
   feedback: { author: string; role: string; note: string; at: string }[]
-}
-
-export interface VerifiedSkillRecord {
-  skill: string
-  level: SkillLevel
-  evidenceConfidence: number
-  projectId: string
-  verifiedBy: string
-  verifiedAt: string
 }
 
 export interface Student {

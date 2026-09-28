@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Link, useNavigate, useParams } from "react-router-dom"
+import { Link, useParams } from "react-router-dom"
 import { useDemoUser } from "../../state/demoUser"
 import { useStore } from "../../state/store"
 import { PageHeader } from "../../components/ui/PageHeader"
@@ -9,15 +9,11 @@ import { formatRelative } from "../../lib/format"
 
 export default function ChallengeReview() {
   const { id } = useParams()
-  const navigate = useNavigate()
   const { university } = useDemoUser()
-  const { challenges, universityDecision } = useStore()
+  const { challenges, assignChallenge } = useStore()
   const challenge = challenges.find((c) => c.id === id)
 
-  const [course, setCourse] = useState(challenge?.courseMapping?.course ?? (university?.programs[0] ? `${university.programs[0]} — Capstone` : ""))
-  const [program, setProgram] = useState(challenge?.courseMapping?.program ?? university?.programs[0] ?? "")
-  const [semester, setSemester] = useState(challenge?.courseMapping?.semester ?? "Fall 2026")
-  const [studentGroup, setStudentGroup] = useState(challenge?.courseMapping?.studentGroup ?? "Section A")
+  const [program, setProgram] = useState(university?.programs[0] ?? "")
 
   if (!challenge || !university) {
     return (
@@ -29,18 +25,7 @@ export default function ChallengeReview() {
   }
 
   const org = getOrg(challenge.organizationId)
-  const canDecide = challenge.status === "Sent to University"
-
-  const accept = () => {
-    universityDecision(challenge.id, "accept", { course, program, semester, studentGroup })
-  }
-  const requestChanges = () => {
-    universityDecision(challenge.id, "changes", undefined, "University requested clarification on data sensitivity before accepting.")
-  }
-  const reject = () => {
-    universityDecision(challenge.id, "reject", undefined, "Not a fit for current course offerings this term.")
-    navigate("/university/challenges")
-  }
+  const canAssign = challenge.status === "Sent to University"
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -73,10 +58,11 @@ export default function ChallengeReview() {
             <h3 className="mb-2 text-xs font-semibold tracking-wide text-teal-600 uppercase">Data Sensitivity &amp; Expected Output</h3>
             <p className="text-sm text-ink-700"><strong>{challenge.dataSensitivity}</strong> · {challenge.datasetAvailability}</p>
             <p className="mt-2 text-sm text-ink-700">{challenge.expectedOutput}</p>
+            <p className="mt-2 text-xs text-ink-400">WSL already screened this challenge automatically for private or confidential data.</p>
           </div>
 
           <div className="rounded-2xl border border-ink-200 bg-white p-5">
-            <h3 className="mb-3 text-xs font-semibold tracking-wide text-teal-600 uppercase">Review Timeline</h3>
+            <h3 className="mb-3 text-xs font-semibold tracking-wide text-teal-600 uppercase">Timeline</h3>
             <ul className="space-y-2">
               {challenge.history.map((h, i) => (
                 <li key={i} className="flex items-start gap-3 text-sm">
@@ -94,55 +80,38 @@ export default function ChallengeReview() {
 
         <div>
           <div className="sticky top-24 rounded-2xl border border-ink-200 bg-white p-5">
-            <h3 className="mb-3 font-semibold text-ink-900">Course Mapping</h3>
-            {canDecide ? (
+            <h3 className="mb-3 font-semibold text-ink-900">Assign to Students</h3>
+            {canAssign ? (
               <div className="space-y-3">
-                <Field label="Course" value={course} onChange={setCourse} />
-                <Field label="Program" value={program} onChange={setProgram} />
-                <Field label="Semester" value={semester} onChange={setSemester} />
-                <Field label="Student Group" value={studentGroup} onChange={setStudentGroup} />
-                <div className="space-y-2 pt-2">
-                  <button onClick={accept} className="w-full rounded-lg bg-ink-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-600">
-                    Accept &amp; Map to Course
-                  </button>
-                  <button onClick={requestChanges} className="w-full rounded-lg border border-ink-200 px-4 py-2.5 text-sm font-semibold text-ink-700 hover:border-amber-400">
-                    Request Changes
-                  </button>
-                  <button onClick={reject} className="w-full rounded-lg border border-danger-100 px-4 py-2.5 text-sm font-semibold text-danger-600 hover:bg-danger-100">
-                    Reject
-                  </button>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-ink-500">College / program</label>
+                  <select
+                    value={program}
+                    onChange={(e) => setProgram(e.target.value)}
+                    className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-teal-400"
+                  >
+                    {university.programs.map((p) => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                  <p className="mt-1 text-xs text-ink-400">Opens this challenge to every student in that program — not tied to a specific course.</p>
                 </div>
+                <button
+                  onClick={() => assignChallenge(challenge.id, program)}
+                  className="w-full rounded-lg bg-ink-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-600"
+                >
+                  Assign to Students
+                </button>
               </div>
-            ) : challenge.courseMapping ? (
-              <dl className="space-y-2.5 text-sm">
-                <div><dt className="text-xs text-ink-400">Course</dt><dd className="font-medium text-ink-800">{challenge.courseMapping.course}</dd></div>
-                <div><dt className="text-xs text-ink-400">Program</dt><dd className="font-medium text-ink-800">{challenge.courseMapping.program}</dd></div>
-                <div><dt className="text-xs text-ink-400">Semester</dt><dd className="font-medium text-ink-800">{challenge.courseMapping.semester}</dd></div>
-                <div><dt className="text-xs text-ink-400">Student Group</dt><dd className="font-medium text-ink-800">{challenge.courseMapping.studentGroup}</dd></div>
-              </dl>
+            ) : challenge.assignedProgram ? (
+              <div>
+                <p className="text-xs text-ink-400">Assigned to</p>
+                <p className="font-medium text-ink-800">{challenge.assignedProgram}</p>
+              </div>
             ) : (
-              <p className="text-sm text-ink-400">
-                {challenge.status === "Under WSL Review" || challenge.status === "Submitted"
-                  ? "WSL is still structuring this challenge — it hasn't been sent to a university yet."
-                  : "This challenge hasn't been mapped to a course."}
-              </p>
+              <p className="text-sm text-ink-400">This challenge hasn't reached your university yet.</p>
             )}
           </div>
         </div>
       </div>
-    </div>
-  )
-}
-
-function Field({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
-  return (
-    <div>
-      <label className="mb-1 block text-xs font-medium text-ink-500">{label}</label>
-      <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-teal-400"
-      />
     </div>
   )
 }

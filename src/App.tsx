@@ -15,7 +15,6 @@ import ChallengeDiscovery from "./pages/student/ChallengeDiscovery"
 import ChallengeDetails from "./pages/student/ChallengeDetails"
 import MyProjects from "./pages/student/MyProjects"
 import ProjectWorkspace from "./pages/student/ProjectWorkspace"
-import MySkills from "./pages/student/MySkills"
 import MyProfile from "./pages/student/MyProfile"
 import Opportunities from "./pages/student/Opportunities"
 import OpportunityDetail from "./pages/student/OpportunityDetail"
@@ -25,9 +24,7 @@ import UniversityChallenges from "./pages/university/UniversityChallenges"
 import ChallengeReview from "./pages/university/ChallengeReview"
 import StudentProjects from "./pages/university/StudentProjects"
 import ProjectMonitoring from "./pages/university/ProjectMonitoring"
-import EvidenceReview from "./pages/university/EvidenceReview"
-import VerificationQueue from "./pages/university/VerificationQueue"
-import VerificationDetail from "./pages/university/VerificationDetail"
+import SubmissionsQueue from "./pages/university/SubmissionsQueue"
 import SkillsOverview from "./pages/university/SkillsOverview"
 import UniversityStudentDetail from "./pages/university/UniversityStudentDetail"
 
@@ -37,7 +34,7 @@ import MyChallenges from "./pages/company/MyChallenges"
 import ChallengeStatus from "./pages/company/ChallengeStatus"
 import TalentDiscovery from "./pages/company/TalentDiscovery"
 import CandidateProfile from "./pages/company/CandidateProfile"
-import CompanyEvidenceView from "./pages/company/CompanyEvidenceView"
+import CompanySubmission from "./pages/company/CompanySubmission"
 
 import NotFound from "./pages/NotFound"
 
@@ -60,7 +57,6 @@ export default function App() {
         <Route path="challenges/:id" element={<ChallengeDetails />} />
         <Route path="projects" element={<MyProjects />} />
         <Route path="projects/:id" element={<ProjectWorkspace />} />
-        <Route path="skills" element={<MySkills />} />
         <Route path="opportunities" element={<Opportunities />} />
         <Route path="opportunities/:id" element={<OpportunityDetail />} />
         <Route path="profile" element={<MyProfile />} />
@@ -72,9 +68,7 @@ export default function App() {
         <Route path="challenges/:id" element={<ChallengeReview />} />
         <Route path="projects" element={<StudentProjects />} />
         <Route path="projects/:id" element={<ProjectMonitoring />} />
-        <Route path="evidence" element={<EvidenceReview />} />
-        <Route path="verification" element={<VerificationQueue />} />
-        <Route path="verification/:signalId" element={<VerificationDetail />} />
+        <Route path="submissions" element={<SubmissionsQueue />} />
         <Route path="students" element={<SkillsOverview />} />
         <Route path="students/:id" element={<UniversityStudentDetail />} />
       </Route>
@@ -86,7 +80,7 @@ export default function App() {
         <Route path="challenges/:id" element={<ChallengeStatus />} />
         <Route path="talent" element={<TalentDiscovery />} />
         <Route path="talent/:id" element={<CandidateProfile />} />
-        <Route path="evidence/:projectId/:studentId" element={<CompanyEvidenceView />} />
+        <Route path="submissions/:projectId" element={<CompanySubmission />} />
       </Route>
 
       <Route path="*" element={<NotFound />} />

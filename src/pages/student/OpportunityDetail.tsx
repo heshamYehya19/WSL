@@ -3,8 +3,10 @@ import { useDemoUser } from "../../state/demoUser"
 import { useStore } from "../../state/store"
 import { PageHeader } from "../../components/ui/PageHeader"
 import { SkillChip } from "../../components/ui/SkillChip"
-import { getOrg, verifiedSignals } from "../../lib/selectors"
+import { bestRating, getOrg, studentSignals } from "../../lib/selectors"
 import { opportunities } from "../../data/seed"
+
+const MATCH_THRESHOLD = 75
 
 export default function OpportunityDetail() {
   const { id } = useParams()
@@ -22,9 +24,9 @@ export default function OpportunityDetail() {
   }
 
   const org = getOrg(opportunity.organizationId)
-  const verified = verifiedSignals(skillSignals, student.id)
-  const verifiedNames = new Set(verified.map((s) => s.skill))
-  const matched = opportunity.requiredSkills.filter((s) => verifiedNames.has(s))
+  const rated = studentSignals(skillSignals, student.id).filter((s) => bestRating(s) >= MATCH_THRESHOLD)
+  const ratedNames = new Set(rated.map((s) => s.skill))
+  const matched = opportunity.requiredSkills.filter((s) => ratedNames.has(s))
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -37,16 +39,16 @@ export default function OpportunityDetail() {
         <h3 className="mt-6 mb-2 text-xs font-semibold tracking-wide text-teal-600 uppercase">Requested Skills</h3>
         <div className="flex flex-wrap gap-1.5">
           {opportunity.requiredSkills.map((s) => (
-            <span key={s} className={`rounded-md px-2.5 py-1 text-xs font-medium ${verifiedNames.has(s) ? "bg-teal-600 text-white" : "bg-ink-50 text-ink-500"}`}>
-              {verifiedNames.has(s) ? "✓ " : ""}{s}
+            <span key={s} className={`rounded-md px-2.5 py-1 text-xs font-medium ${ratedNames.has(s) ? "bg-teal-600 text-white" : "bg-ink-50 text-ink-500"}`}>
+              {ratedNames.has(s) ? "✓ " : ""}{s}
             </span>
           ))}
         </div>
 
         <div className="mt-5 rounded-xl border border-teal-500/30 bg-teal-50 px-4 py-3 text-sm text-ink-800">
           {matched.length > 0
-            ? `Your verified skills overlap with ${matched.length} of ${opportunity.requiredSkills.length} skills requested for this opportunity.`
-            : "None of your currently verified skills overlap with this opportunity yet."}
+            ? `Your rated skills overlap with ${matched.length} of ${opportunity.requiredSkills.length} skills requested for this opportunity.`
+            : "None of your currently rated skills overlap with this opportunity yet."}
         </div>
 
         {matched.length > 0 && (
@@ -54,10 +56,10 @@ export default function OpportunityDetail() {
             <h3 className="mb-2 text-xs font-semibold tracking-wide text-ink-400 uppercase">Supporting Evidence</h3>
             <div className="flex flex-wrap gap-2">
               {matched.map((skillName) => {
-                const sig = verified.find((s) => s.skill === skillName)
+                const sig = rated.find((s) => s.skill === skillName)
                 return (
                   <Link key={skillName} to={`/student/projects/${sig?.projectId}`} className="flex items-center gap-2 rounded-lg border border-ink-200 px-3 py-2 text-sm hover:border-teal-400">
-                    <SkillChip skill={skillName} verified size="sm" />
+                    <SkillChip skill={skillName} rating={sig ? bestRating(sig) : undefined} size="sm" />
                     <span className="text-xs text-teal-600">View Evidence →</span>
                   </Link>
                 )

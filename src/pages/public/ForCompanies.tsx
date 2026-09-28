@@ -25,7 +25,7 @@ export default function ForCompanies() {
             Discover talent through demonstrated capability.
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-ink-500">
-            Submit a real problem, not confidential data. WSL structures it into a safe learning challenge before any student sees it.
+            Submit a real problem, not confidential data. WSL automatically screens it before any student sees it.
           </p>
         </div>
       </section>
@@ -33,7 +33,7 @@ export default function ForCompanies() {
       <section className="mx-auto max-w-5xl px-4 py-14 sm:px-6">
         <div className="rounded-2xl border border-teal-500/30 bg-teal-50 px-6 py-5 text-center">
           <p className="font-semibold text-ink-900">
-            “WSL converts business challenges into safe, structured learning challenges before students access them.”
+            “WSL automatically checks every challenge for private data before students ever see it — nobody watches that happen.”
           </p>
         </div>
 
@@ -56,13 +56,13 @@ export default function ForCompanies() {
             <h3 className="font-semibold text-ink-900">No confidential data required</h3>
             <p className="mt-1.5 text-sm leading-relaxed text-ink-500">
               You describe the problem — dataset availability and sensitivity are declared upfront, and WSL
-              structures the challenge before it reaches any student.
+              automatically screens the challenge before it reaches any student.
             </p>
           </div>
           <div className="rounded-2xl border border-ink-200 bg-white p-5">
             <h3 className="font-semibold text-ink-900">Evidence, not an opaque score</h3>
             <p className="mt-1.5 text-sm leading-relaxed text-ink-500">
-              Talent Discovery never ranks candidates with a mystery score. You see verified skills and the exact evidence behind them.
+              Talent Discovery never ranks candidates with a mystery score. You see WSL's automatic rating, the exact evidence behind it, and can add your own rating too.
             </p>
           </div>
         </div>

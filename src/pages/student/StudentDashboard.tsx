@@ -7,8 +7,10 @@ import { StatusBadge } from "../../components/ui/StatusBadge"
 import { SkillChip } from "../../components/ui/SkillChip"
 import { EmptyState } from "../../components/ui/EmptyState"
 import { formatRelative } from "../../lib/format"
-import { challengeFor, contributorEvidence, getOrg, pendingSignals, studentProjects, studentSignals, verifiedSignals } from "../../lib/selectors"
+import { bestRating, challengeFor, getOrg, skillsForProject, studentProjects, studentSignals } from "../../lib/selectors"
 import { opportunities } from "../../data/seed"
+
+const MATCH_THRESHOLD = 75
 
 export default function StudentDashboard() {
   const { student } = useDemoUser()
@@ -16,19 +18,19 @@ export default function StudentDashboard() {
   if (!student) return null
 
   const myProjects = studentProjects(projects, student.id)
-  const myVerified = verifiedSignals(skillSignals, student.id)
-  const myPending = pendingSignals(skillSignals, student.id)
-  const myEvidence = evidence.filter((e) => e.contributorId === student.id)
-  const verifiedSkillNames = new Set(myVerified.map((s) => s.skill))
-  const matchedOpportunities = opportunities.filter((o) => o.requiredSkills.some((s) => verifiedSkillNames.has(s)))
+  const mySignals = studentSignals(skillSignals, student.id)
+  const myEvidence = evidence.filter((e) => e.studentId === student.id)
+  const ratedNames = new Set(mySignals.filter((s) => bestRating(s) >= MATCH_THRESHOLD).map((s) => s.skill))
+  const matchedOpportunities = opportunities.filter((o) => o.requiredSkills.some((s) => ratedNames.has(s)))
+  const avgAiRating = mySignals.length ? Math.round(mySignals.reduce((sum, s) => sum + s.aiRating, 0) / mySignals.length) : 0
+  const companyRatedCount = mySignals.filter((s) => s.companyRating !== undefined).length
+
+  const latestAiFeedback = [...mySignals].sort((a, b) => new Date(b.analyzedAt).getTime() - new Date(a.analyzedAt).getTime()).slice(0, 5)
 
   const activity = [
     ...myProjects.map((p) => ({ at: p.startedAt, text: `Started project "${p.title}"` })),
-    ...studentSignals(skillSignals, student.id).map((s) => ({
-      at: s.analyzedAt,
-      text: `AI identified a "${s.skill}" skill signal (${s.confidence}% confidence)`,
-    })),
-    ...myVerified.map((s) => ({ at: s.verifiedAt!, text: `"${s.skill}" verified by ${s.verifiedBy}` })),
+    ...mySignals.map((s) => ({ at: s.analyzedAt, text: `WSL rated your "${s.skill}" evidence: ${s.aiRating}%` })),
+    ...mySignals.filter((s) => s.companyRating !== undefined).map((s) => ({ at: s.companyRatedAt!, text: `Company rated your "${s.skill}" work: ${s.companyRating}%` })),
   ]
     .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
     .slice(0, 6)
@@ -42,12 +44,12 @@ export default function StudentDashboard() {
       />
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-        <StatTile label="Active Projects" value={myProjects.filter((p) => p.status !== "Verified" && p.status !== "Completed").length} />
-        <StatTile label="Verified Skills" value={myVerified.length} />
-        <StatTile label="Pending Verification" value={myPending.length} />
+        <StatTile label="Active Projects" value={myProjects.filter((p) => p.status === "In Progress").length} />
+        <StatTile label="Skills Rated" value={mySignals.length} />
+        <StatTile label="Avg. AI Rating" value={mySignals.length ? `${avgAiRating}%` : "—"} />
+        <StatTile label="Company Ratings" value={companyRatedCount} />
         <StatTile label="Evidence Submitted" value={myEvidence.length} />
         <StatTile label="Opportunities Matched" value={matchedOpportunities.length} />
-        <StatTile label="Skill Signals Found" value={studentSignals(skillSignals, student.id).length} />
       </div>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-3">
@@ -59,7 +61,7 @@ export default function StudentDashboard() {
           {myProjects.length === 0 ? (
             <EmptyState
               title="No projects yet"
-              description="Browse challenges approved by your university and start your first project."
+              description="Browse challenges assigned by your university and start your first project."
               action={<Link to="/student/challenges" className="rounded-full bg-ink-950 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-600">Discover Challenges</Link>}
             />
           ) : (
@@ -67,8 +69,8 @@ export default function StudentDashboard() {
               {myProjects.map((p) => {
                 const org = getOrg(p.organizationId)
                 const challenge = challengeFor(challenges, p)
-                const contribSkills = p.individualContributions[student.id] ?? []
-                const myEv = contributorEvidence(evidence, p.id, student.id)
+                const projectSignals = skillsForProject(skillSignals, p.id)
+                const myEv = evidence.filter((e) => e.projectId === p.id)
                 return (
                   <Link
                     key={p.id}
@@ -83,14 +85,33 @@ export default function StudentDashboard() {
                       <StatusBadge status={p.status} />
                     </div>
                     <div className="mt-3 flex flex-wrap gap-1.5">
-                      {contribSkills.map((s) => (
-                        <SkillChip key={s} skill={s} size="sm" />
+                      {projectSignals.map((s) => (
+                        <SkillChip key={s.id} skill={s.skill} rating={s.companyRating ?? s.aiRating} size="sm" />
                       ))}
                     </div>
                     <p className="mt-3 text-xs text-ink-400">{myEv.length} evidence item{myEv.length === 1 ? "" : "s"} submitted</p>
                   </Link>
                 )
               })}
+            </div>
+          )}
+
+          <div className="mt-8 mb-3 flex items-center justify-between">
+            <h2 className="font-semibold text-ink-900">Latest AI Feedback</h2>
+          </div>
+          {latestAiFeedback.length === 0 ? (
+            <EmptyState title="No AI feedback yet" description="Submit evidence on a project to get WSL's automatic rating — it appears here right away." />
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {latestAiFeedback.map((s) => (
+                <div key={s.id} className="rounded-2xl border border-ink-200 bg-white p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-ink-900">{s.skill}</span>
+                    <span className="text-sm font-bold text-teal-600">{s.aiRating}%</span>
+                  </div>
+                  <p className="mt-1 text-xs text-ink-400">Rated {formatRelative(s.analyzedAt)}</p>
+                </div>
+              ))}
             </div>
           )}
         </div>

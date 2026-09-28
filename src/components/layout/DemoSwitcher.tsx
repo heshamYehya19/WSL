@@ -1,11 +1,13 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useDemoUser } from "../../state/demoUser"
+import { useStore } from "../../state/store"
 import { organizations, students, universities } from "../../data/seed"
 
 export function DemoSwitcher() {
   const [open, setOpen] = useState(false)
   const { session, student, university, company, signInAs, signOut } = useDemoUser()
+  const { resetDemo } = useStore()
   const navigate = useNavigate()
 
   const currentLabel =
@@ -84,6 +86,17 @@ export function DemoSwitcher() {
             </div>
 
             <div className="border-t border-ink-100 pt-2">
+              <button
+                onClick={() => {
+                  if (confirm("Reset all demo data back to its original state? Anything you've submitted, rated, or advanced will be lost.")) {
+                    resetDemo()
+                    setOpen(false)
+                  }
+                }}
+                className="w-full rounded-lg px-2 py-1.5 text-left text-sm text-ink-500 hover:bg-ink-50"
+              >
+                ↺ Reset demo data
+              </button>
               <button
                 onClick={() => {
                   signOut()

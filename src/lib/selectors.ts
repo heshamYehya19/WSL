@@ -6,27 +6,20 @@ export const getUniversity = (id: string) => universities.find((u) => u.id === i
 export const getStudent = (id: string) => students.find((s) => s.id === id)
 
 export function studentProjects(projects: Project[], studentId: string) {
-  return projects.filter((p) => p.teamStudentIds.includes(studentId))
+  return projects.filter((p) => p.studentId === studentId)
 }
 
 export function studentSignals(signals: SkillSignal[], studentId: string) {
   return signals.filter((s) => s.studentId === studentId)
 }
 
-export function verifiedSignals(signals: SkillSignal[], studentId: string) {
-  return signals.filter((s) => s.studentId === studentId && s.status === "Verified")
-}
-
-export function pendingSignals(signals: SkillSignal[], studentId: string) {
-  return signals.filter((s) => s.studentId === studentId && s.status === "Pending Verification")
+/** The best available rating for a signal — the company's own rating once given, otherwise WSL's automatic one. */
+export function bestRating(signal: SkillSignal): number {
+  return signal.companyRating ?? signal.aiRating
 }
 
 export function projectEvidence(evidence: Evidence[], projectId: string) {
   return evidence.filter((e) => e.projectId === projectId)
-}
-
-export function contributorEvidence(evidence: Evidence[], projectId: string, studentId: string) {
-  return evidence.filter((e) => e.projectId === projectId && e.contributorId === studentId)
 }
 
 export function challengeFor(challenges: Challenge[], project: Project) {

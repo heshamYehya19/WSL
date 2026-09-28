@@ -24,10 +24,10 @@ export default function CandidateProfile() {
       <PageHeader eyebrow={uni?.name} title={student.name} subtitle={`${student.field} · ${student.year} · ${student.availability}`} />
 
       <div className="mb-8 rounded-xl border border-ink-200 bg-ink-50 px-5 py-4 text-sm text-ink-600">
-        Every skill below was AI-identified from submitted evidence, then verified by a university mentor. Open a project to see the exact evidence behind it — this is not a self-reported CV.
+        Every skill below was rated by WSL's automatic AI review from submitted evidence, and confirmed by a university before reaching you. Open a project to see the exact evidence behind it and give your own rating — this is not a self-reported CV.
       </div>
 
-      <SkillRecordBody studentId={student.id} projectHref={(pid) => `/company/evidence/${pid}/${student.id}`} />
+      <SkillRecordBody studentId={student.id} projectHref={(pid) => `/company/submissions/${pid}`} />
     </div>
   )
 }

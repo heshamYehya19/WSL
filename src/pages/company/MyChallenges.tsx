@@ -23,7 +23,7 @@ export default function MyChallenges() {
       />
 
       {mine.length === 0 ? (
-        <EmptyState title="No challenges yet" description="Submit your first real-world challenge for WSL to structure and route to a university." />
+        <EmptyState title="No challenges yet" description="Submit your first real-world challenge for WSL to screen and route to a university." />
       ) : (
         <div className="space-y-3">
           {mine.map((c) => {

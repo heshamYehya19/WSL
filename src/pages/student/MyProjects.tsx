@@ -5,7 +5,7 @@ import { PageHeader } from "../../components/ui/PageHeader"
 import { StatusBadge } from "../../components/ui/StatusBadge"
 import { EmptyState } from "../../components/ui/EmptyState"
 import { SkillChip } from "../../components/ui/SkillChip"
-import { challengeFor, contributorEvidence, getOrg, skillsForProject } from "../../lib/selectors"
+import { challengeFor, getOrg, skillsForProject } from "../../lib/selectors"
 import { formatDate } from "../../lib/format"
 
 export default function MyProjects() {
@@ -13,11 +13,11 @@ export default function MyProjects() {
   const { projects, challenges, evidence, skillSignals } = useStore()
   if (!student) return null
 
-  const myProjects = projects.filter((p) => p.teamStudentIds.includes(student.id))
+  const myProjects = projects.filter((p) => p.studentId === student.id)
 
   return (
     <div>
-      <PageHeader eyebrow="My Projects" title="Your project workspaces" subtitle="Everything you've built through WSL, from kickoff to verified skill." />
+      <PageHeader eyebrow="My Projects" title="Your project workspaces" subtitle="Everything you've built through WSL, from kickoff to rated submission." />
 
       {myProjects.length === 0 ? (
         <EmptyState
@@ -30,9 +30,8 @@ export default function MyProjects() {
           {myProjects.map((p) => {
             const org = getOrg(p.organizationId)
             const challenge = challengeFor(challenges, p)
-            const myEv = contributorEvidence(evidence, p.id, student.id)
-            const mySignals = skillsForProject(skillSignals, p.id).filter((s) => s.studentId === student.id)
-            const verifiedCount = mySignals.filter((s) => s.status === "Verified").length
+            const myEv = evidence.filter((e) => e.projectId === p.id)
+            const mySignals = skillsForProject(skillSignals, p.id)
             return (
               <Link key={p.id} to={`/student/projects/${p.id}`} className="block rounded-2xl border border-ink-200 bg-white p-5 hover:border-teal-400">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -48,9 +47,8 @@ export default function MyProjects() {
                   ))}
                 </div>
                 <div className="mt-3 flex gap-5 text-xs text-ink-400">
-                  <span>{p.teamStudentIds.length} teammate{p.teamStudentIds.length > 1 ? "s" : ""}</span>
                   <span>{myEv.length} evidence submitted</span>
-                  <span>{mySignals.length} skill signals · {verifiedCount} verified</span>
+                  <span>{mySignals.length} skills rated by WSL</span>
                 </div>
               </Link>
             )

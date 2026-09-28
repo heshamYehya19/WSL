@@ -25,7 +25,6 @@ const NAV: Record<Exclude<Role, "guest">, NavItem[]> = {
     { to: "/student", label: "Dashboard", icon: <Icon d="M3 12l9-9 9 9M5 10v10h14V10" /> },
     { to: "/student/challenges", label: "Challenges", icon: <Icon d="M9 3h6l1 4H8l1-4zM4 21l3-11h10l3 11H4z" /> },
     { to: "/student/projects", label: "Projects", icon: <Icon d="M4 6h16M4 12h16M4 18h10" /> },
-    { to: "/student/skills", label: "Skills", icon: <Icon d="M12 2l2.6 6.6L21 9l-5 4.4L17.4 21 12 17.3 6.6 21 8 13.4 3 9l6.4-.4z" /> },
     { to: "/student/opportunities", label: "Opportunities", icon: <Icon d="M5 12h14M13 6l6 6-6 6" /> },
     { to: "/student/profile", label: "Profile", icon: <Icon d="M12 12a4 4 0 100-8 4 4 0 000 8zM4 21c1.5-4 5-6 8-6s6.5 2 8 6" /> },
   ],
@@ -33,8 +32,7 @@ const NAV: Record<Exclude<Role, "guest">, NavItem[]> = {
     { to: "/university", label: "Dashboard", icon: <Icon d="M3 12l9-9 9 9M5 10v10h14V10" /> },
     { to: "/university/challenges", label: "Challenges", icon: <Icon d="M9 3h6l1 4H8l1-4zM4 21l3-11h10l3 11H4z" /> },
     { to: "/university/projects", label: "Projects", icon: <Icon d="M4 6h16M4 12h16M4 18h10" /> },
-    { to: "/university/evidence", label: "Evidence", icon: <Icon d="M6 2h9l5 5v15H6zM14 2v6h6" /> },
-    { to: "/university/verification", label: "Verification", icon: <Icon d="M9 12l2 2 4-4M12 21c4-1.5 8-4.5 8-10V5l-8-3-8 3v6c0 5.5 4 8.5 8 10z" /> },
+    { to: "/university/submissions", label: "Submissions", icon: <Icon d="M9 12l2 2 4-4M12 21c4-1.5 8-4.5 8-10V5l-8-3-8 3v6c0 5.5 4 8.5 8 10z" /> },
     { to: "/university/students", label: "Students", icon: <Icon d="M16 11a4 4 0 10-8 0 4 4 0 008 0zM2 21c1.5-5 6-7 10-7s8.5 2 10 7" /> },
   ],
   company: [
@@ -118,12 +116,12 @@ export function AppShell({ role }: { role: Exclude<Role, "guest"> }) {
                   <div className="fixed inset-0 z-40" onClick={() => setNotifOpen(false)} />
                   <div className="absolute right-0 z-50 mt-2 w-72 rounded-xl border border-ink-200 bg-white p-2 shadow-xl">
                     <div className="rounded-lg px-3 py-2 text-sm hover:bg-ink-50">
-                      <div className="font-medium text-ink-800">AI analysis complete</div>
-                      <div className="text-xs text-ink-500">New evidence-backed skill signals are ready for review.</div>
+                      <div className="font-medium text-ink-800">WSL rated a new submission</div>
+                      <div className="text-xs text-ink-500">A student's evidence was rated automatically and is ready for your review.</div>
                     </div>
                     <div className="rounded-lg px-3 py-2 text-sm hover:bg-ink-50">
-                      <div className="font-medium text-ink-800">Challenge accepted</div>
-                      <div className="text-xs text-ink-500">A university accepted a submitted challenge.</div>
+                      <div className="font-medium text-ink-800">Challenge assigned</div>
+                      <div className="text-xs text-ink-500">A university assigned a submitted challenge to its students.</div>
                     </div>
                   </div>
                 </>

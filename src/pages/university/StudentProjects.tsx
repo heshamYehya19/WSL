@@ -12,22 +12,22 @@ export default function StudentProjects() {
   const { projects, challenges, evidence, skillSignals } = useStore()
   if (!university) return null
 
-  const uniProjects = projects.filter((p) => p.teamStudentIds.some((sid) => isUniversityStudent(sid, university.id)))
+  const uniProjects = projects.filter((p) => isUniversityStudent(p.studentId, university.id))
 
   return (
     <div>
-      <PageHeader eyebrow="Student Projects" title="Projects in progress at your university" subtitle="Monitor team composition, evidence, and skill signals for every active challenge." />
+      <PageHeader eyebrow="Student Projects" title="Individual submissions at your university" subtitle="Every project is one student working solo — monitor their evidence and WSL's automatic ratings." />
 
       {uniProjects.length === 0 ? (
-        <EmptyState title="No student projects yet" description="Once students start a project, it will appear here." />
+        <EmptyState title="No student projects yet" description="Once a student starts a project, it will appear here." />
       ) : (
         <div className="space-y-3">
           {uniProjects.map((p) => {
             const org = getOrg(p.organizationId)
             const challenge = challengeFor(challenges, p)
+            const student = getStudent(p.studentId)
             const evCount = evidence.filter((e) => e.projectId === p.id).length
             const signals = skillsForProject(skillSignals, p.id)
-            const verifiedCount = signals.filter((s) => s.status === "Verified").length
             return (
               <Link key={p.id} to={`/university/projects/${p.id}`} className="block rounded-2xl border border-ink-200 bg-white p-5 hover:border-teal-400">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -37,20 +37,13 @@ export default function StudentProjects() {
                   </div>
                   <StatusBadge status={p.status} />
                 </div>
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  {p.teamStudentIds.map((sid) => {
-                    const s = getStudent(sid)
-                    return (
-                      <span key={sid} className="flex items-center gap-1.5 rounded-full bg-ink-50 py-1 pr-2.5 pl-1">
-                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-ink-950 text-[9px] font-bold text-teal-300">{s?.initials}</span>
-                        <span className="text-xs font-medium text-ink-700">{s?.name}</span>
-                      </span>
-                    )
-                  })}
+                <div className="mt-3 flex items-center gap-2">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-ink-950 text-[9px] font-bold text-teal-300">{student?.initials}</span>
+                  <span className="text-xs font-medium text-ink-700">{student?.name}</span>
                 </div>
                 <div className="mt-3 flex gap-5 text-xs text-ink-400">
                   <span>{evCount} evidence items</span>
-                  <span>{signals.length} skill signals · {verifiedCount} verified</span>
+                  <span>{signals.length} skills rated</span>
                 </div>
               </Link>
             )

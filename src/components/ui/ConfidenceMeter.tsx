@@ -1,4 +1,4 @@
-export function ConfidenceMeter({ value, label = "Evidence confidence" }: { value: number; label?: string }) {
+export function ConfidenceMeter({ value, label = "Rating" }: { value: number; label?: string }) {
   return (
     <div className="w-full">
       <div className="mb-1 flex items-center justify-between text-xs">

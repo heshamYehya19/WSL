@@ -4,23 +4,23 @@ import { SkillChip } from "../../components/ui/SkillChip"
 const POINTS = [
   {
     title: "Work on real problems, not hypotheticals",
-    body: "Challenges come from real Jordanian companies, structured and reviewed before you ever see them.",
+    body: "Challenges come from real Jordanian companies, automatically screened and assigned by a university before you ever see them.",
   },
   {
     title: "Every submission becomes evidence",
     body: "Reports, repositories, presentations, and datasets aren't just graded — they're analyzed for skill signals.",
   },
   {
-    title: "Your contribution is attributed to you",
-    body: "On team projects, WSL tracks what you individually produced — not a shared, generic team grade.",
+    title: "Every project is entirely your own",
+    body: "You work solo — no team grade, no shared credit. What lands on your profile is what you actually built.",
   },
   {
-    title: "A human always verifies",
-    body: "AI finds the signal. Your university mentor verifies it. Nothing on your profile is AI-certified alone.",
+    title: "AI feedback never blocks you",
+    body: "WSL rates your evidence automatically and shows it on your dashboard right away — it's informational, not a gate.",
   },
   {
     title: "A living record that grows with you",
-    body: "Every verified project adds to a permanent, evidence-backed skill profile employers can actually inspect.",
+    body: "Every rated project adds to a permanent, evidence-backed skill profile employers can actually inspect.",
   },
 ]
 
@@ -34,7 +34,7 @@ export default function ForStudents() {
             Turn your work into evidence of what you can do.
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-ink-500">
-            Stop describing your skills. Start proving them — with real projects, real evidence, and real verification.
+            Stop describing your skills. Start proving them — with real projects, real evidence, and real feedback.
           </p>
         </div>
       </section>
@@ -53,9 +53,9 @@ export default function ForStudents() {
           <p className="text-xs font-semibold tracking-wide text-teal-300 uppercase">Example: living skill record</p>
           <h3 className="mt-1 text-lg font-bold text-white">Lina Qasem — Human-Computer Interaction, Jordan Institute of Technology</h3>
           <div className="mt-4 flex flex-wrap gap-2">
-            <SkillChip skill="UI/UX Design" level="Advanced" verified />
-            <SkillChip skill="Frontend Development" level="Advanced" verified />
-            <SkillChip skill="Research" level="Demonstrated" verified />
+            <SkillChip skill="UI/UX Design" rating={95} />
+            <SkillChip skill="Frontend Development" rating={92} />
+            <SkillChip skill="Research" rating={85} />
           </div>
           <p className="mt-4 text-sm text-ink-300">
             This is not what a student claims they know. This is what their work has demonstrated.

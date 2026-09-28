@@ -2,8 +2,7 @@ import { Link } from "react-router-dom"
 import { useStore } from "../../state/store"
 import { SkillChip } from "../ui/SkillChip"
 import { StatusBadge } from "../ui/StatusBadge"
-import { challengeFor, getOrg, skillsForProject, studentProjects, verifiedSignals } from "../../lib/selectors"
-import { formatDate } from "../../lib/format"
+import { bestRating, challengeFor, getOrg, skillsForProject, studentProjects, studentSignals } from "../../lib/selectors"
 
 export function SkillRecordBody({
   studentId,
@@ -13,19 +12,25 @@ export function SkillRecordBody({
   projectHref: (projectId: string) => string
 }) {
   const { projects, challenges, evidence, skillSignals } = useStore()
-  const myVerified = verifiedSignals(skillSignals, studentId)
+  const mySignals = studentSignals(skillSignals, studentId)
   const myProjects = studentProjects(projects, studentId).sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
+
+  const topSkills = new Map<string, number>()
+  mySignals.forEach((s) => {
+    const r = bestRating(s)
+    if ((topSkills.get(s.skill) ?? -1) < r) topSkills.set(s.skill, r)
+  })
 
   return (
     <div>
       <div>
-        <h3 className="mb-3 font-semibold text-ink-900">Verified Skills</h3>
-        {myVerified.length === 0 ? (
-          <p className="text-sm text-ink-400">No verified skills yet — evidence is under mentor review.</p>
+        <h3 className="mb-3 font-semibold text-ink-900">Skill Ratings</h3>
+        {topSkills.size === 0 ? (
+          <p className="text-sm text-ink-400">No rated skills yet — submit evidence on a project to get WSL's automatic rating.</p>
         ) : (
           <div className="flex flex-wrap gap-2">
-            {myVerified.map((s) => (
-              <SkillChip key={s.id} skill={s.skill} level={s.level} verified />
+            {Array.from(topSkills, ([skill, rating]) => (
+              <SkillChip key={skill} skill={skill} rating={rating} />
             ))}
           </div>
         )}
@@ -38,8 +43,7 @@ export function SkillRecordBody({
             const org = getOrg(p.organizationId)
             const challenge = challengeFor(challenges, p)
             const signals = skillsForProject(skillSignals, p.id).filter((s) => s.studentId === studentId)
-            const verified = signals.filter((s) => s.status === "Verified")
-            const myEv = evidence.filter((e) => e.projectId === p.id && e.contributorId === studentId)
+            const myEv = evidence.filter((e) => e.projectId === p.id && e.studentId === studentId)
             const year = new Date(p.startedAt).getFullYear()
             return (
               <div key={p.id} className="relative">
@@ -54,11 +58,16 @@ export function SkillRecordBody({
                     <StatusBadge status={p.status} />
                   </div>
 
-                  <p className="mt-3 text-xs font-semibold tracking-wide text-ink-400 uppercase">Skills demonstrated</p>
-                  <div className="mt-1.5 flex flex-wrap gap-1.5">
-                    {signals.length === 0 && <span className="text-xs text-ink-400">Analysis not yet run.</span>}
+                  <p className="mt-3 text-xs font-semibold tracking-wide text-ink-400 uppercase">Skills rated</p>
+                  <div className="mt-1.5 space-y-1.5">
+                    {signals.length === 0 && <span className="text-xs text-ink-400">No evidence submitted yet.</span>}
                     {signals.map((s) => (
-                      <SkillChip key={s.id} skill={s.skill} level={s.level} verified={s.status === "Verified"} size="sm" />
+                      <div key={s.id} className="flex flex-wrap items-center gap-2">
+                        <SkillChip skill={s.skill} rating={s.companyRating ?? s.aiRating} size="sm" />
+                        {s.companyRating !== undefined && (
+                          <span className="text-[11px] text-ink-400">AI {s.aiRating}% · Company {s.companyRating}%</span>
+                        )}
+                      </div>
                     ))}
                   </div>
 
@@ -66,17 +75,11 @@ export function SkillRecordBody({
                   <div className="mt-1.5 flex flex-wrap gap-2">
                     {myEv.length === 0 && <span className="text-xs text-ink-400">No evidence submitted yet.</span>}
                     {myEv.map((e) => (
-                      <a key={e.id} href="#" onClick={(ev) => ev.preventDefault()} className="rounded-md border border-ink-200 px-2 py-1 text-xs font-medium text-ink-600 hover:border-teal-400">
+                      <span key={e.id} className="rounded-md border border-ink-200 px-2 py-1 text-xs font-medium text-ink-600">
                         {e.type}: {e.title}
-                      </a>
+                      </span>
                     ))}
                   </div>
-
-                  {verified.length > 0 ? (
-                    <p className="mt-3 text-xs text-verified-600">✓ Verified by {verified[0].verifiedBy} on {formatDate(verified[0].verifiedAt)}</p>
-                  ) : signals.length > 0 ? (
-                    <p className="mt-3 text-xs text-amber-600">Awaiting university mentor verification.</p>
-                  ) : null}
                 </div>
               </div>
             )

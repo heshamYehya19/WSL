@@ -8,7 +8,7 @@ import { EmptyState } from "../../components/ui/EmptyState"
 import { getOrg } from "../../lib/selectors"
 import { formatDate } from "../../lib/format"
 
-const TABS = ["Incoming", "Approved", "All"] as const
+const TABS = ["Incoming", "Assigned", "All"] as const
 
 export default function UniversityChallenges() {
   const { university } = useDemoUser()
@@ -20,13 +20,13 @@ export default function UniversityChallenges() {
 
   const list = relevant.filter((c) => {
     if (tab === "Incoming") return c.status === "Sent to University"
-    if (tab === "Approved") return ["University Accepted", "Open to Students", "In Progress", "Evidence Under Review", "Completed", "Verified"].includes(c.status)
+    if (tab === "Assigned") return ["University Assigned", "In Progress", "Submissions Under Review", "Confirmed to Company", "Company Reviewed"].includes(c.status)
     return true
   })
 
   return (
     <div>
-      <PageHeader eyebrow="Challenges" title="Company challenges" subtitle="Review structured challenges from WSL, then accept and map them to a course." />
+      <PageHeader eyebrow="Challenges" title="Company challenges" subtitle="Every challenge here already passed WSL's automatic private-data screen — assign it to a college's students." />
 
       <div className="mb-6 flex gap-1 border-b border-ink-200">
         {TABS.map((t) => (
