@@ -3,11 +3,9 @@ import { Link, useParams } from "react-router-dom"
 import { useDemoUser } from "../../state/demoUser"
 import { useStore } from "../../state/store"
 import { StatusBadge } from "../../components/ui/StatusBadge"
-import { SkillChip } from "../../components/ui/SkillChip"
-import { LevelBadge } from "../../components/ui/LevelBadge"
 import { ConfidenceMeter } from "../../components/ui/ConfidenceMeter"
 import { EmptyState } from "../../components/ui/EmptyState"
-import { challengeFor, contributorEvidence, getOrg, getStudent, projectEvidence, skillsForProject } from "../../lib/selectors"
+import { challengeFor, getOrg, projectEvidence, skillsForProject } from "../../lib/selectors"
 import { formatDate, formatRelative } from "../../lib/format"
 import type { EvidenceType } from "../../types"
 
@@ -23,12 +21,12 @@ const EVIDENCE_TYPES: EvidenceType[] = [
   "Video / Demo Link",
 ]
 
-const TABS = ["Overview", "Evidence & AI Analysis", "Team", "Skills", "Feedback"] as const
+const TABS = ["Overview", "Evidence & AI Rating", "Feedback"] as const
 
 export default function ProjectWorkspace() {
   const { id } = useParams()
   const { student } = useDemoUser()
-  const { projects, challenges, evidence, skillSignals, addEvidence, runAIAnalysis } = useStore()
+  const { projects, challenges, evidence, skillSignals, addEvidence, runAIReview } = useStore()
   const [tab, setTab] = useState<(typeof TABS)[number]>("Overview")
   const [analyzing, setAnalyzing] = useState(false)
   const [form, setForm] = useState({ type: "Project Report" as EvidenceType, title: "", description: "", link: "" })
@@ -45,9 +43,8 @@ export default function ProjectWorkspace() {
 
   const org = getOrg(project.organizationId)
   const challenge = challengeFor(challenges, project)
-  const allProjectEvidence = projectEvidence(evidence, project.id)
-  const myEvidence = contributorEvidence(evidence, project.id, student.id)
-  const mySignals = skillsForProject(skillSignals, project.id).filter((s) => s.studentId === student.id)
+  const myEvidence = projectEvidence(evidence, project.id)
+  const mySignals = skillsForProject(skillSignals, project.id)
   const doneTasks = project.tasks.filter((t) => t.done).length
   const progressPct = project.tasks.length ? Math.round((doneTasks / project.tasks.length) * 100) : 0
 
@@ -61,7 +58,7 @@ export default function ProjectWorkspace() {
   const handleAnalyze = () => {
     setAnalyzing(true)
     setTimeout(() => {
-      runAIAnalysis(project.id, student.id)
+      runAIReview(project.id, student.id)
       setAnalyzing(false)
     }, 1400)
   }
@@ -129,31 +126,26 @@ export default function ProjectWorkspace() {
               <p className="mt-2 text-xs text-ink-500">{doneTasks} of {project.tasks.length} tasks complete</p>
               <dl className="mt-4 space-y-2 text-sm">
                 <div className="flex justify-between"><dt className="text-ink-400">Started</dt><dd className="text-ink-800">{formatDate(project.startedAt)}</dd></div>
-                <div className="flex justify-between"><dt className="text-ink-400">Evidence</dt><dd className="text-ink-800">{allProjectEvidence.length} items</dd></div>
-                <div className="flex justify-between"><dt className="text-ink-400">Your skill signals</dt><dd className="text-ink-800">{mySignals.length}</dd></div>
+                <div className="flex justify-between"><dt className="text-ink-400">Evidence</dt><dd className="text-ink-800">{myEvidence.length} items</dd></div>
+                <div className="flex justify-between"><dt className="text-ink-400">Skills rated</dt><dd className="text-ink-800">{mySignals.length}</dd></div>
               </dl>
             </div>
             <div className="rounded-2xl border border-ink-200 bg-white p-5">
-              <h3 className="mb-3 text-xs font-semibold tracking-wide text-teal-600 uppercase">Team</h3>
-              <div className="space-y-2">
-                {project.teamStudentIds.map((sid) => {
-                  const s = getStudent(sid)
-                  return (
-                    <div key={sid} className="flex items-center gap-2.5">
-                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-ink-950 text-xs font-bold text-teal-300">{s?.initials}</span>
-                      <div>
-                        <p className="text-sm font-medium text-ink-800">{s?.name}{sid === student.id ? " (You)" : ""}</p>
-                      </div>
-                    </div>
-                  )
-                })}
+              <h3 className="mb-3 text-xs font-semibold tracking-wide text-teal-600 uppercase">Working Solo</h3>
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-ink-950 text-xs font-bold text-teal-300">{student.initials}</span>
+                <div>
+                  <p className="text-sm font-medium text-ink-800">{student.name} (You)</p>
+                  <p className="text-xs text-ink-400">{student.field}</p>
+                </div>
               </div>
+              <p className="mt-3 text-xs text-ink-400">Every WSL project is worked individually — your submission is entirely your own.</p>
             </div>
           </div>
         </div>
       )}
 
-      {tab === "Evidence & AI Analysis" && (
+      {tab === "Evidence & AI Rating" && (
         <div className="grid gap-6 lg:grid-cols-2">
           <div>
             <div className="rounded-2xl border border-ink-200 bg-white p-5">
@@ -204,44 +196,36 @@ export default function ProjectWorkspace() {
             </div>
 
             <div className="mt-4 space-y-2">
-              {allProjectEvidence.map((e) => {
-                const contributor = getStudent(e.contributorId)
-                return (
-                  <div key={e.id} className="rounded-xl border border-ink-200 bg-white p-4">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <span className="rounded-md bg-ink-50 px-2 py-0.5 text-[11px] font-semibold text-ink-600">{e.type}</span>
-                        <p className="mt-1.5 text-sm font-medium text-ink-900">{e.title}</p>
-                        <p className="text-xs text-ink-500">{e.description}</p>
-                        <p className="mt-1 text-xs text-teal-600">{e.link}</p>
-                      </div>
-                    </div>
-                    <p className="mt-2 text-[11px] text-ink-400">
-                      Submitted by {contributor?.name}{e.contributorId === student.id ? " (you)" : ""} · {formatRelative(e.submittedAt)}
-                    </p>
-                  </div>
-                )
-              })}
+              {myEvidence.map((e) => (
+                <div key={e.id} className="rounded-xl border border-ink-200 bg-white p-4">
+                  <span className="rounded-md bg-ink-50 px-2 py-0.5 text-[11px] font-semibold text-ink-600">{e.type}</span>
+                  <p className="mt-1.5 text-sm font-medium text-ink-900">{e.title}</p>
+                  <p className="text-xs text-ink-500">{e.description}</p>
+                  <p className="mt-1 text-xs text-teal-600">{e.link}</p>
+                  <p className="mt-2 text-[11px] text-ink-400">Submitted {formatRelative(e.submittedAt)}</p>
+                </div>
+              ))}
             </div>
           </div>
 
           <div>
             <div className="rounded-2xl border border-ink-200 bg-ink-950 p-5">
-              <h3 className="font-semibold text-white">AI Evidence Analysis</h3>
+              <h3 className="font-semibold text-white">WSL AI Rating</h3>
               <p className="mt-1 text-xs text-ink-300">
-                Simulated demo AI — analyzes your submitted evidence and identifies evidence-backed skill signals. It does not certify proficiency.
+                Simulated demo AI — rates each required skill based on your submitted evidence. It's automatic and informational
+                only: it never blocks or gates your submission.
               </p>
               {myEvidence.length === 0 ? (
-                <p className="mt-4 text-sm text-ink-400">Submit evidence first, then run analysis.</p>
+                <p className="mt-4 text-sm text-ink-400">Submit evidence first, then request a rating.</p>
               ) : mySignals.length > 0 ? (
-                <p className="mt-4 text-sm text-teal-300">Analysis complete — see results below, or in the Skills tab.</p>
+                <p className="mt-4 text-sm text-teal-300">Rating complete — see the results below.</p>
               ) : (
                 <button
                   onClick={handleAnalyze}
                   disabled={analyzing}
                   className="mt-4 w-full rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-ink-950 hover:bg-teal-400 disabled:opacity-60"
                 >
-                  {analyzing ? "Analyzing evidence…" : "Analyze Evidence with AI"}
+                  {analyzing ? "Rating your evidence…" : "Rate My Evidence with AI"}
                 </button>
               )}
             </div>
@@ -250,19 +234,18 @@ export default function ProjectWorkspace() {
               <div className="mt-4 space-y-3">
                 {mySignals.map((s) => (
                   <div key={s.id} className="rounded-xl border border-ink-200 bg-white p-4">
-                    <div className="mb-1 flex items-center justify-between">
-                      <span className="text-sm font-semibold text-ink-900">{s.skill}</span>
-                      <LevelBadge level={s.level} />
-                    </div>
-                    <ConfidenceMeter value={s.confidence} />
-                    <div className="mt-2 flex items-center justify-between text-xs">
-                      <StatusBadge status={s.status} />
-                    </div>
+                    <span className="text-sm font-semibold text-ink-900">{s.skill}</span>
+                    <div className="mt-2"><ConfidenceMeter value={s.aiRating} label="AI rating" /></div>
+                    {s.companyRating !== undefined ? (
+                      <div className="mt-2"><ConfidenceMeter value={s.companyRating} label="Company rating" /></div>
+                    ) : (
+                      <p className="mt-2 text-xs text-ink-400">Company rating not given yet.</p>
+                    )}
                   </div>
                 ))}
                 <p className="text-xs text-ink-400">
-                  Evidence confidence indicates how strongly the submitted work supports the skill signal. It does not represent proficiency.
-                  A human mentor still verifies each signal before it joins your profile.
+                  This AI rating is yours to see right away — it doesn't gate anything. Your university separately reviews your
+                  full submission before sharing it with the company, who may add their own rating afterward.
                 </p>
               </div>
             )}
@@ -270,72 +253,10 @@ export default function ProjectWorkspace() {
         </div>
       )}
 
-      {tab === "Team" && (
-        <div>
-          <h3 className="mb-3 font-semibold text-ink-900">Individual Contribution</h3>
-          <p className="mb-4 text-sm text-ink-500">Every team member's evidence and skills are tracked individually — not shared as one identical record.</p>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {project.teamStudentIds.map((sid) => {
-              const s = getStudent(sid)
-              const contribSkills = project.individualContributions[sid] ?? []
-              const evCount = contributorEvidence(evidence, project.id, sid).length
-              return (
-                <div key={sid} className="rounded-2xl border border-ink-200 bg-white p-5">
-                  <div className="flex items-center gap-2.5">
-                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-ink-950 text-xs font-bold text-teal-300">{s?.initials}</span>
-                    <div>
-                      <p className="text-sm font-semibold text-ink-900">{s?.name}{sid === student.id ? " (You)" : ""}</p>
-                      <p className="text-xs text-ink-400">{s?.field}</p>
-                    </div>
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    {contribSkills.length === 0 ? (
-                      <span className="text-xs text-ink-400">No contribution recorded yet.</span>
-                    ) : (
-                      contribSkills.map((sk) => <SkillChip key={sk} skill={sk} size="sm" />)
-                    )}
-                  </div>
-                  <p className="mt-3 text-xs text-ink-400">{evCount} evidence item{evCount === 1 ? "" : "s"} submitted</p>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
-      {tab === "Skills" && (
-        <div>
-          {mySignals.length === 0 ? (
-            <EmptyState title="No skill signals yet" description="Submit evidence and run AI analysis to generate skill signals for this project." />
-          ) : (
-            <div className="space-y-3">
-              {mySignals.map((s) => (
-                <div key={s.id} className="rounded-2xl border border-ink-200 bg-white p-5">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-ink-900">{s.skill}</span>
-                      <LevelBadge level={s.level} />
-                    </div>
-                    <StatusBadge status={s.status} />
-                  </div>
-                  <div className="mt-3 max-w-sm"><ConfidenceMeter value={s.confidence} /></div>
-                  {s.status === "Verified" && (
-                    <p className="mt-3 text-xs text-verified-600">
-                      ✓ Verified by {s.verifiedBy} on {formatDate(s.verifiedAt)}
-                    </p>
-                  )}
-                  {s.reviewerNotes && <p className="mt-2 text-xs text-ink-500">“{s.reviewerNotes}”</p>}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
       {tab === "Feedback" && (
         <div className="space-y-3">
           {project.feedback.length === 0 ? (
-            <EmptyState title="No feedback yet" description="Mentor feedback will appear here once your evidence has been reviewed." />
+            <EmptyState title="No feedback yet" description="Feedback from your university or the company will appear here." />
           ) : (
             project.feedback.map((f, i) => (
               <div key={i} className="rounded-2xl border border-ink-200 bg-white p-5">

@@ -6,63 +6,49 @@ import type { ChallengeStatus } from "../../types"
 
 const STATUS_PIPELINE: ChallengeStatus[] = [
   "Draft",
-  "Submitted",
-  "Under WSL Review",
-  "Approved",
   "Sent to University",
-  "University Accepted",
-  "Open to Students",
+  "University Assigned",
   "In Progress",
-  "Completed",
-  "Evidence Under Review",
-  "Verified",
+  "Submissions Under Review",
+  "Confirmed to Company",
+  "Company Reviewed",
 ]
 
 const STAGES = [
   {
     who: "Company",
-    title: "Submits a safe, structured challenge",
+    title: "Submits a safe challenge",
     body: "A real operational problem, described without exposing confidential data — with a clear visibility level, dataset availability, and sensitivity rating.",
   },
   {
     who: "WSL",
-    title: "Structures and reviews the challenge",
-    body: "WSL converts the business challenge into a safe, structured learning challenge before any student ever sees it.",
+    title: "Screens it automatically",
+    body: "WSL checks the challenge for private or confidential data. It's automatic and invisible — nobody using the site watches this step happen.",
   },
   {
     who: "University",
-    title: "Accepts and maps it to a course",
-    body: "A university reviews the structured challenge and maps it to a real course, program, semester, and student group.",
+    title: "Assigns it to a college",
+    body: "A university assigns the challenge to students of the relevant college — not a specific course, open to anyone in that program.",
   },
   {
     who: "Student",
-    title: "Discovers the challenge and starts a project",
-    body: "Eligible students browse challenges approved by their university and start a project workspace once they commit.",
+    title: "Solves it on their own",
+    body: "Eligible students discover the challenge and start a project. Every project is individual work — never a team submission.",
   },
   {
-    who: "Student",
-    title: "Produces evidence, not just a submission",
-    body: "Reports, repositories, presentations, datasets, and documentation — the artifacts of real work.",
+    who: "WSL",
+    title: "Rates the submission automatically",
+    body: "The moment evidence is submitted, WSL rates each required skill as a percentage. It's informational only and never blocks anything — it shows up on the student's dashboard right away.",
   },
   {
-    who: "AI",
-    title: "Analyzes evidence for skill signals",
-    body: "The AI identifies which skills the submitted evidence supports, and how strongly — it does not certify anyone.",
-  },
-  {
-    who: "University Mentor",
-    title: "Reviews and verifies",
-    body: "A human reviewer checks the AI's findings against the evidence and verifies, requests more evidence, or rejects.",
-  },
-  {
-    who: "Student",
-    title: "Living skill record updates",
-    body: "Verified skills join the student's profile — a growing record of demonstrated, not claimed, capability.",
+    who: "University",
+    title: "Reviews and confirms",
+    body: "A university reviewer looks at the submission to gauge the student's level, then confirms it to the company.",
   },
   {
     who: "Company",
-    title: "Discovers talent through evidence",
-    body: "Companies search verified skills and open the underlying evidence — the exact work behind the claim.",
+    title: "Reviews and rates it too",
+    body: "The company opens the confirmed submission and gives its own rating, the same way WSL did.",
   },
 ]
 
@@ -71,7 +57,7 @@ export default function HowItWorks() {
     <div className="mx-auto max-w-5xl px-4 py-14 sm:px-6">
       <PageHeader
         eyebrow="How It Works"
-        title="One loop, nine steps, three roles"
+        title="One loop, seven steps, three roles"
         subtitle="Every step below is a real, clickable part of the WSL demo — switch personas to walk the whole loop yourself."
       />
 

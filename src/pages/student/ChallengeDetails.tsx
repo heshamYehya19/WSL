@@ -24,7 +24,7 @@ export default function ChallengeDetails() {
   const [starting, setStarting] = useState(false)
 
   const challenge = challenges.find((c) => c.id === id)
-  const existingProject = student ? projects.find((p) => p.challengeId === id && p.teamStudentIds.includes(student.id)) : undefined
+  const existingProject = student ? projects.find((p) => p.challengeId === id && p.studentId === student.id) : undefined
 
   useEffect(() => {
     if (starting && existingProject) {
@@ -95,7 +95,7 @@ export default function ChallengeDetails() {
           <Section title="Confidentiality">
             <p className="text-sm text-ink-700">
               Data sensitivity: <strong>{challenge.dataSensitivity}</strong>. Visibility: <strong>{challenge.visibility}</strong>.
-              {" "}This challenge was structured and reviewed by WSL before being made available to students.
+              {" "}WSL automatically screened this challenge for private or confidential data before it reached your university.
             </p>
           </Section>
           <Section title="Learning Outcomes">
@@ -116,15 +116,15 @@ export default function ChallengeDetails() {
               <div className="flex justify-between"><dt className="text-ink-400">Difficulty</dt><dd className="font-medium text-ink-800">{challenge.difficulty}</dd></div>
               <div className="flex justify-between"><dt className="text-ink-400">Deadline</dt><dd className="font-medium text-ink-800">{formatDate(challenge.deadline)}</dd></div>
               <div className="flex justify-between"><dt className="text-ink-400">Time left</dt><dd className="font-medium text-ink-800">{Math.max(daysUntil(challenge.deadline), 0)} days</dd></div>
-              <div className="flex justify-between"><dt className="text-ink-400">Teams</dt><dd className="font-medium text-ink-800">{challenge.numTeams}</dd></div>
-              {challenge.courseMapping && (
-                <div className="flex justify-between"><dt className="text-ink-400">Course</dt><dd className="text-right font-medium text-ink-800">{challenge.courseMapping.course}</dd></div>
+              {challenge.assignedProgram && (
+                <div className="flex justify-between"><dt className="text-ink-400">Assigned to</dt><dd className="text-right font-medium text-ink-800">{challenge.assignedProgram}</dd></div>
               )}
             </dl>
+            <p className="mt-3 text-xs text-ink-400">You'll work this challenge on your own — not as a team.</p>
             <button
               onClick={handleStart}
               disabled={!student}
-              className="mt-5 w-full rounded-xl bg-ink-950 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-teal-600 disabled:opacity-50"
+              className="mt-3 w-full rounded-xl bg-ink-950 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-teal-600 disabled:opacity-50"
             >
               {existingProject ? "Go to Project" : "Start Project"}
             </button>

@@ -26,7 +26,7 @@ export default function ForCompanies() {
             See what candidates actually built.
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-ink-500">
-            Submit a real problem, not confidential data. WSL structures it into a safe learning challenge before any student sees it.
+            Submit a real problem, not confidential data. WSL automatically screens it before any student sees it.
           </p>
         </div>
       </section>
@@ -34,7 +34,7 @@ export default function ForCompanies() {
       <section className="mx-auto max-w-5xl px-4 py-14 sm:px-6">
         <Reveal className="rounded-2xl border border-teal-500/30 bg-teal-50 px-6 py-5 text-center">
           <p className="font-semibold text-ink-900">
-            “WSL converts business challenges into safe, structured learning challenges before students access them.”
+            “WSL automatically checks every challenge for private data before students ever see it — nobody watches that happen.”
           </p>
         </Reveal>
 
@@ -58,16 +58,16 @@ export default function ForCompanies() {
 
         <div className="mt-10 grid gap-6 sm:grid-cols-2">
           <Reveal className="rounded-2xl border border-ink-200 bg-white p-5 transition-all duration-300 hover:-translate-y-1 hover:border-teal-300 hover:shadow-lg hover:shadow-ink-950/5">
-            <h3 className="font-semibold text-ink-900">Matched to a real course, not a queue</h3>
+            <h3 className="font-semibold text-ink-900">Matched to a program, not a queue</h3>
             <p className="mt-1.5 text-sm leading-relaxed text-ink-500">
-              Accepted challenges are mapped to an actual university course and student team — not left
-              waiting in a generic backlog.
+              Accepted challenges are assigned to an entire college or program — not left waiting in a
+              generic backlog for one student to pick up.
             </p>
           </Reveal>
           <Reveal delay={100} className="rounded-2xl border border-ink-200 bg-white p-5 transition-all duration-300 hover:-translate-y-1 hover:border-teal-300 hover:shadow-lg hover:shadow-ink-950/5">
             <h3 className="font-semibold text-ink-900">Evidence, not an opaque score</h3>
             <p className="mt-1.5 text-sm leading-relaxed text-ink-500">
-              Talent Discovery never ranks candidates with a mystery score. You see verified skills and the exact evidence behind them.
+              Talent Discovery never ranks candidates with a mystery score. You see WSL's automatic rating, the exact evidence behind it, and can add your own rating too.
             </p>
           </Reveal>
         </div>

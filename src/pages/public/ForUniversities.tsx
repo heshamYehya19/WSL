@@ -4,20 +4,20 @@ import { Reveal } from "../../components/ui/Reveal"
 
 const POINTS = [
   {
-    title: "Real challenges, mapped to real courses",
-    body: "Accept structured, pre-screened company challenges and map each one to a course, program, semester, and student group.",
+    title: "Real challenges, assigned college-wide",
+    body: "Accept pre-screened company challenges and assign each one to a whole college or program — not locked to a single course.",
   },
   {
-    title: "Verification stays with faculty",
-    body: "AI surfaces evidence-backed skill signals — your mentors decide what gets verified. WSL never certifies a student on its own.",
+    title: "You decide what reaches the company",
+    body: "WSL rates each submission automatically and informationally — your reviewers decide what actually gets confirmed onward.",
   },
   {
     title: "Full visibility into student work",
-    body: "Monitor active projects, review submitted evidence, and track learning outcomes across every participating course.",
+    body: "Monitor every individual submission, see WSL's automatic ratings, and gauge your students' level before confirming their work.",
   },
   {
     title: "WSL doesn't replace you",
-    body: "It connects real-world problems to the learning and verification your institution already provides.",
+    body: "It connects real-world problems to the assignment and review process your institution already provides.",
   },
 ]
 
@@ -28,10 +28,10 @@ export default function ForUniversities() {
         <div className="mx-auto max-w-4xl px-4 text-center sm:px-6">
           <div className="text-xs font-semibold tracking-wide text-teal-600 uppercase">For Universities</div>
           <h1 className="mt-2 text-3xl font-bold tracking-tight text-ink-950 sm:text-4xl">
-            Real industry problems, mapped into your curriculum.
+            Real industry problems, assigned to your programs.
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-ink-500">
-            WSL routes safe, structured industry problems into your existing courses — and keeps verification exactly where it belongs.
+            WSL routes safe, automatically-screened industry problems to your students, college-wide — and keeps the final review exactly where it belongs.
           </p>
         </div>
       </section>
@@ -56,7 +56,7 @@ export default function ForUniversities() {
             <StatTile label="Active Challenges" value="12" />
             <StatTile label="Student Projects" value="84" />
             <StatTile label="Evidence Items" value="236" />
-            <StatTile label="Skills Verified" value="417" />
+            <StatTile label="Skills Rated" value="417" />
           </div>
           <p className="mt-2 text-xs text-ink-400">Demo values shown for illustration.</p>
         </Reveal>

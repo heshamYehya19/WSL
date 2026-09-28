@@ -108,7 +108,7 @@ export function HeroNetwork() {
           <div className="rounded-lg bg-white/5 p-2">
             <div className="text-[10px] font-medium text-teal-200">AI Talent Matcher</div>
             <div className="mt-1 text-[9px] leading-tight text-ink-400">
-              Matches candidates by verified skill evidence.
+              Matches candidates by rated skill evidence.
             </div>
           </div>
         </AudienceCard>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 
-export function ConfidenceMeter({ value, label = "Evidence confidence" }: { value: number; label?: string }) {
+export function ConfidenceMeter({ value, label = "Rating" }: { value: number; label?: string }) {
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {

@@ -8,7 +8,7 @@ import { EmptyState } from "../../components/ui/EmptyState"
 import { getOrg } from "../../lib/selectors"
 import { daysUntil } from "../../lib/format"
 
-const OPEN_STATUSES = ["Open to Students", "In Progress", "Evidence Under Review", "Completed", "Verified"]
+const OPEN_STATUSES = ["University Assigned", "In Progress", "Submissions Under Review", "Confirmed to Company", "Company Reviewed"]
 
 export default function ChallengeDiscovery() {
   const { student } = useDemoUser()
@@ -32,8 +32,8 @@ export default function ChallengeDiscovery() {
     <div>
       <PageHeader
         eyebrow="Challenge Discovery"
-        title="Challenges approved by your university"
-        subtitle="Every challenge below has already been structured by WSL and accepted by a university — safe to explore."
+        title="Challenges assigned by your university"
+        subtitle="Every challenge below has already passed WSL's automatic screening and been assigned by a university — work them on your own."
       />
 
       <div className="mb-6 flex flex-wrap gap-3">
@@ -83,7 +83,7 @@ export default function ChallengeDiscovery() {
                 <p className="mt-3 line-clamp-2 text-xs text-ink-500">{c.learningOutcomes[0]}</p>
                 <div className="mt-4 flex items-center justify-between border-t border-ink-100 pt-3 text-xs text-ink-400">
                   <span>{c.difficulty}</span>
-                  <span>{c.numTeams} team{c.numTeams > 1 ? "s" : ""}</span>
+                  <span>{c.assignedProgram ?? "Any program"}</span>
                   <span>{dLeft > 0 ? `${dLeft}d left` : "Closed"}</span>
                 </div>
                 <div className="mt-2">

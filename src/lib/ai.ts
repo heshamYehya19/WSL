@@ -1,11 +1,10 @@
-import type { Evidence, EvidenceType, SkillLevel } from "../types"
+import type { Evidence, EvidenceType } from "../types"
 
-// Demo-only simulated AI evidence analysis. In a production WSL, this step would
-// run a real model over submitted artifacts. Here we deterministically derive a
-// plausible result from the challenge's required skills and the evidence actually
-// submitted, so the analysis always feels grounded in what was uploaded.
-
-const LEVEL_CYCLE: SkillLevel[] = ["Advanced", "Intermediate", "Advanced", "Foundational"]
+// Demo-only simulated AI review. In a production WSL this would run a real model
+// over submitted artifacts; here we deterministically derive a plausible rating
+// from the skills a challenge asks for and the evidence actually submitted, so
+// results always feel grounded in what was uploaded. This review is automatic
+// and informational only — it never blocks or gates anything in the workflow.
 
 const EVIDENCE_WEIGHT: Record<EvidenceType, number> = {
   "GitHub Repository": 6,
@@ -27,19 +26,17 @@ function hashString(input: string): number {
   return h
 }
 
-export interface SimulatedSignal {
+export interface SimulatedRating {
   skill: string
-  level: SkillLevel
-  confidence: number
+  rating: number
   evidenceIds: string[]
 }
 
 /**
- * Simulates AI evidence analysis for a set of required skills, given the
- * evidence actually submitted for a project. Confidence scales with how much
- * (and what kind of) evidence was submitted — never with an assumed skill level.
+ * Simulates an automatic AI review: rates each required skill 0-100 based on how
+ * much (and what kind of) evidence was submitted for it.
  */
-export function simulateEvidenceAnalysis(requiredSkills: string[], submittedEvidence: Evidence[]): SimulatedSignal[] {
+export function simulateAIReview(requiredSkills: string[], submittedEvidence: Evidence[]): SimulatedRating[] {
   if (submittedEvidence.length === 0) return []
 
   const baseWeight = submittedEvidence.reduce((sum, e) => sum + (EVIDENCE_WEIGHT[e.type] ?? 3), 0)
@@ -47,20 +44,18 @@ export function simulateEvidenceAnalysis(requiredSkills: string[], submittedEvid
 
   return requiredSkills.map((skill, idx) => {
     const seed = hashString(skill + submittedEvidence.length)
-    const level = LEVEL_CYCLE[seed % LEVEL_CYCLE.length]
-    const spread = seed % 5
-    const confidence = Math.max(72, Math.min(96, 74 + baseWeight * 1.5 - idx * 2 + spread))
+    const spread = seed % 9
+    const rating = Math.max(60, Math.min(97, 66 + baseWeight * 1.5 - idx * 2 + spread))
     return {
       skill,
-      level,
-      confidence: Math.round(confidence),
+      rating: Math.round(rating),
       evidenceIds,
     }
   })
 }
 
-export function confidenceDescription(confidence: number): string {
-  if (confidence >= 90) return "Strongly supported by submitted evidence"
-  if (confidence >= 80) return "Well supported by submitted evidence"
-  return "Partially supported — additional evidence would strengthen this signal"
+export function ratingDescription(rating: number): string {
+  if (rating >= 85) return "Strongly supported by the submitted evidence"
+  if (rating >= 70) return "Well supported by the submitted evidence"
+  return "Partially supported — the submission covers this skill only lightly"
 }

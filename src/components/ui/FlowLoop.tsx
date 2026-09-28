@@ -1,12 +1,12 @@
 const STEPS = [
-  { label: "Real Problem", detail: "A company submits a real operational challenge" },
-  { label: "Learn", detail: "University connects it to a real course" },
-  { label: "Build", detail: "Students work the problem as a team" },
-  { label: "Evidence", detail: "Work produces reports, code, and artifacts" },
-  { label: "AI Signal", detail: "AI identifies evidence-backed skill signals" },
-  { label: "Verify", detail: "A human mentor reviews and verifies" },
-  { label: "Prove", detail: "Skill joins the student's living record" },
-  { label: "Opportunity", detail: "Companies discover verified capability" },
+  { label: "Submit", detail: "A company submits a real operational challenge" },
+  { label: "Screen", detail: "WSL automatically checks for private data — no one watches this happen" },
+  { label: "Assign", detail: "The university assigns it to students of the relevant college" },
+  { label: "Solve", detail: "A student works the challenge on their own" },
+  { label: "AI Rating", detail: "WSL rates the submission automatically — informational, never blocking" },
+  { label: "Review", detail: "The university reviews the work and confirms it to the company" },
+  { label: "Company Rating", detail: "The company reviews the confirmed submission and rates it too" },
+  { label: "Opportunity", detail: "Rated work becomes discoverable for real opportunities" },
 ]
 
 export function FlowLoop({ compact = false }: { compact?: boolean }) {

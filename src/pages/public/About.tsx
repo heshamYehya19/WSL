@@ -12,13 +12,13 @@ const NOT_LIST = [
 
 const PRINCIPLES = [
   "Real-world problems become learning opportunities.",
-  "Students produce actual evidence of capability.",
-  "AI analyzes evidence rather than blindly assigning skill scores.",
-  "Human reviewers verify skill signals.",
-  "Skill level and evidence confidence are separate.",
-  "Team members receive individual contribution attribution.",
+  "Students produce actual evidence of capability, working individually.",
+  "WSL screens every challenge automatically for private data — nobody watches it happen.",
+  "AI rates evidence automatically and informationally — it never blocks or gates anything.",
+  "A university reviews each submission before it reaches the company.",
+  "The company rates the confirmed submission independently, the same way WSL did.",
   "Companies do not need to expose confidential information.",
-  "Universities remain central to learning and verification.",
+  "Universities remain central to assigning work and reviewing it.",
   "WSL does not replace universities.",
   "WSL does not replace hiring platforms.",
   "WSL connects education and employment through evidence.",
@@ -35,10 +35,10 @@ export default function About() {
 
       <div className="prose-ink space-y-5 text-ink-700">
         <p className="leading-relaxed">
-          WSL connects real-world problems to university learning projects, turns student work into
-          evidence, has AI identify skill signals in that evidence, and has human reviewers verify those
-          signals before they join a student's living skill record — discoverable by companies looking
-          for demonstrated capability.
+          WSL connects real-world problems to university-assigned projects, turns individual student work
+          into evidence, has WSL's AI rate that evidence automatically the moment it's submitted, and has
+          the university confirm each submission before the company reviews and rates it too — building a
+          living, evidence-backed skill record.
         </p>
       </div>
 
