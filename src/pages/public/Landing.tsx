@@ -3,6 +3,8 @@ import { FlowLoop } from "../../components/ui/FlowLoop"
 import { SkillChip } from "../../components/ui/SkillChip"
 import { ConfidenceMeter } from "../../components/ui/ConfidenceMeter"
 import { StatusBadge } from "../../components/ui/StatusBadge"
+import { HeroNetwork } from "../../components/ui/HeroNetwork"
+import { Reveal } from "../../components/ui/Reveal"
 
 export default function Landing() {
   return (
@@ -11,58 +13,94 @@ export default function Landing() {
       <section className="relative overflow-hidden border-b border-ink-100 bg-ink-950">
         <div className="bg-grid pointer-events-none absolute inset-0 opacity-60" />
         <div className="pointer-events-none absolute -top-40 right-0 h-96 w-96 rounded-full bg-teal-500/10 blur-3xl" />
-        <div className="relative mx-auto max-w-7xl px-4 py-20 sm:px-6 sm:py-28">
-          <div className="mx-auto max-w-3xl text-center">
-            <div className="mx-auto mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-medium text-teal-300">
-              Jordan 2076 Hackathon · Amman — Innovation in Education &amp; Learning Systems
+        <div className="relative mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20">
+          <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-8">
+            <div className="text-center lg:text-left">
+              <div className="mx-auto mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-medium text-teal-300 lg:mx-0">
+                Jordan 2076 Hackathon · Amman — Innovation in Education &amp; Learning Systems
+              </div>
+              <div className="mb-4 flex items-center justify-center gap-3 lg:justify-start">
+                <span className="text-3xl font-extrabold tracking-tight text-white">WSL</span>
+                <span className="font-arabic text-3xl font-bold text-teal-300">وصل</span>
+              </div>
+              <h1 className="text-4xl font-bold tracking-tight text-white sm:text-5xl">
+                Your Degree Says You Know.
+                <br />
+                Your Work Should Prove It.
+              </h1>
+              <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-ink-300 lg:mx-0">
+                WSL connects universities, students, and organizations through real-world projects and
+                evidence-backed skills.
+              </p>
+              <div className="mt-9 flex flex-wrap items-center justify-center gap-3 lg:justify-start">
+                <Link
+                  to="/login"
+                  className="rounded-full bg-teal-500 px-6 py-3 text-sm font-semibold text-ink-950 transition-all duration-200 hover:-translate-y-0.5 hover:bg-teal-400 hover:shadow-lg hover:shadow-teal-500/25 active:translate-y-0"
+                >
+                  Explore WSL
+                </Link>
+                <Link
+                  to="/how-it-works"
+                  className="rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:border-teal-300 hover:text-teal-300 active:translate-y-0"
+                >
+                  See How It Works
+                </Link>
+              </div>
+              <div className="mt-4 flex justify-center lg:justify-start">
+                <Link
+                  to="/login"
+                  className="inline-flex items-center gap-2 rounded-full border border-dashed border-teal-400/40 px-5 py-2.5 text-sm font-semibold text-teal-300 transition-all duration-200 hover:-translate-y-0.5 hover:border-teal-300 hover:text-teal-200 active:translate-y-0"
+                >
+                  Try Our Skill Matcher
+                  <span className="rounded-full bg-teal-500/15 px-2 py-0.5 text-[10px] font-bold tracking-wide text-teal-300 uppercase">
+                    Beta
+                  </span>
+                </Link>
+              </div>
             </div>
-            <div className="mb-4 flex items-center justify-center gap-3">
-              <span className="text-3xl font-extrabold tracking-tight text-white">WSL</span>
-              <span className="font-arabic text-3xl font-bold text-teal-300">وصل</span>
-            </div>
-            <h1 className="text-4xl font-bold tracking-tight text-white sm:text-5xl">
-              Your Degree Says You Know.
-              <br />
-              Your Work Should Prove It.
-            </h1>
-            <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-ink-300">
-              WSL connects universities, students, and organizations through real-world projects and
-              evidence-backed skills.
-            </p>
-            <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
-              <Link
-                to="/login"
-                className="rounded-full bg-teal-500 px-6 py-3 text-sm font-semibold text-ink-950 transition-colors hover:bg-teal-400"
-              >
-                Explore WSL
-              </Link>
-              <Link
-                to="/how-it-works"
-                className="rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-white transition-colors hover:border-teal-300 hover:text-teal-300"
-              >
-                See How It Works
-              </Link>
-            </div>
+            <HeroNetwork />
           </div>
+
+          <Link
+            to="/login"
+            className="group relative mt-14 flex flex-col items-center justify-between gap-2 rounded-2xl border border-white/10 bg-white/5 px-5 py-4 text-center transition-all duration-200 hover:-translate-y-0.5 hover:border-teal-400/30 sm:flex-row sm:text-left"
+          >
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-teal-500/15 text-teal-300">
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 19V9M10 19V5M16 19v-7M22 19v-3" />
+                </svg>
+              </span>
+              <div>
+                <div className="text-sm font-semibold text-white">Global Skill Dashboard</div>
+                <div className="text-xs text-ink-400">A live snapshot of verified skills across the network</div>
+              </div>
+            </div>
+            <span className="text-sm font-semibold text-teal-300 transition-colors group-hover:text-teal-200">
+              Preview →
+            </span>
+          </Link>
         </div>
       </section>
 
       {/* CORE FLOW */}
       <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6">
-        <div className="mb-8 text-center">
+        <Reveal className="mb-8 text-center">
           <div className="text-xs font-semibold tracking-wide text-teal-600 uppercase">The WSL Loop</div>
           <h2 className="mt-2 text-2xl font-bold text-ink-950 sm:text-3xl">From Learning → Doing → Proving</h2>
           <p className="mx-auto mt-2 max-w-2xl text-ink-500">
             Real problem → learning project → student work → evidence → verified skills → opportunities.
           </p>
-        </div>
-        <FlowLoop />
+        </Reveal>
+        <Reveal delay={100}>
+          <FlowLoop />
+        </Reveal>
       </section>
 
       {/* THREE AUDIENCES */}
       <section className="border-y border-ink-100 bg-white py-16">
         <div className="mx-auto grid max-w-7xl gap-6 px-4 sm:px-6 lg:grid-cols-3">
-          <div className="rounded-2xl border border-ink-200 p-6">
+          <Reveal delay={0} className="rounded-2xl border border-ink-200 p-6 transition-all duration-300 hover:-translate-y-1 hover:border-teal-300 hover:shadow-lg hover:shadow-ink-950/5">
             <div className="mb-3 text-xs font-semibold tracking-wide text-teal-600 uppercase">For Students</div>
             <h3 className="text-lg font-bold text-ink-950">Turn your work into evidence of what you can do.</h3>
             <p className="mt-2 text-sm leading-relaxed text-ink-500">
@@ -71,8 +109,8 @@ export default function Landing() {
             <Link to="/for-students" className="mt-4 inline-block text-sm font-semibold text-teal-600 hover:underline">
               Learn more →
             </Link>
-          </div>
-          <div className="rounded-2xl border border-ink-200 p-6">
+          </Reveal>
+          <Reveal delay={100} className="rounded-2xl border border-ink-200 p-6 transition-all duration-300 hover:-translate-y-1 hover:border-teal-300 hover:shadow-lg hover:shadow-ink-950/5">
             <div className="mb-3 text-xs font-semibold tracking-wide text-teal-600 uppercase">For Universities</div>
             <h3 className="text-lg font-bold text-ink-950">Connect learning with authentic real-world challenges.</h3>
             <p className="mt-2 text-sm leading-relaxed text-ink-500">
@@ -81,8 +119,8 @@ export default function Landing() {
             <Link to="/for-universities" className="mt-4 inline-block text-sm font-semibold text-teal-600 hover:underline">
               Learn more →
             </Link>
-          </div>
-          <div className="rounded-2xl border border-ink-200 p-6">
+          </Reveal>
+          <Reveal delay={200} className="rounded-2xl border border-ink-200 p-6 transition-all duration-300 hover:-translate-y-1 hover:border-teal-300 hover:shadow-lg hover:shadow-ink-950/5">
             <div className="mb-3 text-xs font-semibold tracking-wide text-teal-600 uppercase">For Companies</div>
             <h3 className="text-lg font-bold text-ink-950">Discover talent through demonstrated capability.</h3>
             <p className="mt-2 text-sm leading-relaxed text-ink-500">
@@ -91,14 +129,14 @@ export default function Landing() {
             <Link to="/for-companies" className="mt-4 inline-block text-sm font-semibold text-teal-600 hover:underline">
               Learn more →
             </Link>
-          </div>
+          </Reveal>
         </div>
       </section>
 
       {/* GAP EXPLAINER */}
       <section className="mx-auto max-w-7xl px-4 py-20 sm:px-6">
         <div className="grid items-center gap-12 lg:grid-cols-2">
-          <div>
+          <Reveal>
             <div className="text-xs font-semibold tracking-wide text-teal-600 uppercase">The missing layer</div>
             <h2 className="mt-2 text-3xl font-bold tracking-tight text-ink-950">
               Learning produces grades.
@@ -106,21 +144,17 @@ export default function Landing() {
               Employment requires evidence.
             </h2>
             <p className="mt-4 leading-relaxed text-ink-600">
-              Universities show what a student was taught. Students then present CVs and claimed skills.
-              Employers need proof someone can actually perform real work — and today, nothing connects
-              the two reliably.
-            </p>
-            <p className="mt-4 leading-relaxed text-ink-600">
-              WSL creates the missing evidence layer: real problems become learning projects, learning
-              projects produce evidence, and evidence becomes verified, living proof of capability.
+              Nothing today reliably connects what a university teaches to what an employer can verify.
+              WSL closes that gap: real problems become learning projects, projects produce evidence, and
+              evidence becomes verified, living proof of capability.
             </p>
             <div className="mt-6 rounded-xl border border-teal-500/30 bg-teal-50 px-5 py-4">
               <p className="font-semibold text-ink-900">
                 “The project isn't the product. The evidence infrastructure is.”
               </p>
             </div>
-          </div>
-          <div className="rounded-2xl border border-ink-200 bg-white p-5 shadow-sm">
+          </Reveal>
+          <Reveal delay={150} className="rounded-2xl border border-ink-200 bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
             <div className="mb-3 flex items-center justify-between">
               <span className="text-sm font-semibold text-ink-800">Cafeteria Demand Prediction</span>
               <StatusBadge status="Evidence Under Review" />
@@ -152,13 +186,13 @@ export default function Landing() {
             <p className="mt-4 text-xs text-ink-400">
               Evidence confidence reflects how strongly submitted work supports a skill signal — not proficiency.
             </p>
-          </div>
+          </Reveal>
         </div>
       </section>
 
       {/* SKILLS PREVIEW / EMPLOYER TRUST */}
       <section className="border-t border-ink-100 bg-ink-950 py-20">
-        <div className="mx-auto max-w-5xl px-4 text-center sm:px-6">
+        <Reveal className="mx-auto max-w-5xl px-4 text-center sm:px-6">
           <h2 className="text-2xl font-bold text-white sm:text-3xl">Don't just tell employers what you know.</h2>
           <h2 className="text-2xl font-bold text-teal-300 sm:text-3xl">Show them what you've done.</h2>
           <div className="mx-auto mt-8 flex max-w-xl flex-wrap justify-center gap-2">
@@ -169,14 +203,20 @@ export default function Landing() {
             <SkillChip skill="Problem Solving" level="Demonstrated" verified />
           </div>
           <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
-            <Link to="/login" className="rounded-full bg-teal-500 px-6 py-3 text-sm font-semibold text-ink-950 hover:bg-teal-400">
+            <Link
+              to="/login"
+              className="rounded-full bg-teal-500 px-6 py-3 text-sm font-semibold text-ink-950 transition-all duration-200 hover:-translate-y-0.5 hover:bg-teal-400 hover:shadow-lg hover:shadow-teal-500/25 active:translate-y-0"
+            >
               Explore the Demo
             </Link>
-            <Link to="/about" className="rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-white hover:border-teal-300">
+            <Link
+              to="/about"
+              className="rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:border-teal-300 active:translate-y-0"
+            >
               About WSL
             </Link>
           </div>
-        </div>
+        </Reveal>
       </section>
     </div>
   )

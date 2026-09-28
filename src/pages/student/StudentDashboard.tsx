@@ -6,9 +6,20 @@ import { StatTile } from "../../components/ui/Card"
 import { StatusBadge } from "../../components/ui/StatusBadge"
 import { SkillChip } from "../../components/ui/SkillChip"
 import { EmptyState } from "../../components/ui/EmptyState"
+import { BarList } from "../../components/ui/BarList"
+import { SegmentedBar } from "../../components/ui/SegmentedBar"
 import { formatRelative } from "../../lib/format"
 import { challengeFor, contributorEvidence, getOrg, pendingSignals, studentProjects, studentSignals, verifiedSignals } from "../../lib/selectors"
 import { opportunities } from "../../data/seed"
+import type { SkillLevel } from "../../types"
+
+const LEVEL_ORDER: SkillLevel[] = ["Foundational", "Intermediate", "Advanced", "Demonstrated"]
+const LEVEL_COLOR: Record<SkillLevel, string> = {
+  Foundational: "bg-teal-100",
+  Intermediate: "bg-teal-300",
+  Advanced: "bg-teal-500",
+  Demonstrated: "bg-teal-700",
+}
 
 export default function StudentDashboard() {
   const { student } = useDemoUser()
@@ -21,6 +32,30 @@ export default function StudentDashboard() {
   const myEvidence = evidence.filter((e) => e.contributorId === student.id)
   const verifiedSkillNames = new Set(myVerified.map((s) => s.skill))
   const matchedOpportunities = opportunities.filter((o) => o.requiredSkills.some((s) => verifiedSkillNames.has(s)))
+  const mySignals = studentSignals(skillSignals, student.id)
+
+  const topSkillsBySkill = new Map<string, (typeof mySignals)[number]>()
+  for (const s of mySignals) {
+    const existing = topSkillsBySkill.get(s.skill)
+    if (!existing || s.confidence > existing.confidence) topSkillsBySkill.set(s.skill, s)
+  }
+  const skillConfidenceItems = Array.from(topSkillsBySkill.values())
+    .sort((a, b) => b.confidence - a.confidence)
+    .slice(0, 7)
+    .map((s) => ({
+      key: s.id,
+      label: s.skill,
+      value: s.confidence,
+      displayValue: `${s.confidence}%`,
+      meta: s.status === "Verified" ? <StatusBadge status="Verified" className="px-1.5 py-0 text-[10px]" /> : undefined,
+    }))
+
+  const levelSegments = LEVEL_ORDER.map((level) => ({
+    key: level,
+    label: level,
+    value: mySignals.filter((s) => s.level === level).length,
+    colorClassName: LEVEL_COLOR[level],
+  }))
 
   const activity = [
     ...myProjects.map((p) => ({ at: p.startedAt, text: `Started project "${p.title}"` })),
@@ -50,6 +85,17 @@ export default function StudentDashboard() {
         <StatTile label="Skill Signals Found" value={studentSignals(skillSignals, student.id).length} />
       </div>
 
+      <div className="mt-8 grid gap-6 lg:grid-cols-2">
+        <div className="rounded-2xl border border-ink-200 bg-white p-5">
+          <h2 className="mb-4 font-semibold text-ink-900">Skill Confidence</h2>
+          <BarList items={skillConfidenceItems} max={100} emptyMessage="No skill signals yet — submit evidence to start building your profile." />
+        </div>
+        <div className="rounded-2xl border border-ink-200 bg-white p-5">
+          <h2 className="mb-4 font-semibold text-ink-900">Skill Level Breakdown</h2>
+          <SegmentedBar segments={levelSegments} emptyMessage="No skill signals yet." />
+        </div>
+      </div>
+
       <div className="mt-8 grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <div className="mb-3 flex items-center justify-between">
@@ -64,7 +110,7 @@ export default function StudentDashboard() {
             />
           ) : (
             <div className="space-y-3">
-              {myProjects.map((p) => {
+              {myProjects.map((p, i) => {
                 const org = getOrg(p.organizationId)
                 const challenge = challengeFor(challenges, p)
                 const contribSkills = p.individualContributions[student.id] ?? []
@@ -73,7 +119,8 @@ export default function StudentDashboard() {
                   <Link
                     key={p.id}
                     to={`/student/projects/${p.id}`}
-                    className="block rounded-2xl border border-ink-200 bg-white p-5 transition-colors hover:border-teal-400"
+                    style={{ animationDelay: `${i * 60}ms` }}
+                    className="animate-fade-in-up block rounded-2xl border border-ink-200 bg-white p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-teal-400 hover:shadow-md"
                   >
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div>
@@ -103,7 +150,7 @@ export default function StudentDashboard() {
             ) : (
               <ul className="space-y-4">
                 {activity.map((a, i) => (
-                  <li key={i} className="relative pl-4 text-sm">
+                  <li key={i} style={{ animationDelay: `${i * 60}ms` }} className="animate-fade-in-up relative pl-4 text-sm">
                     <span className="absolute top-1.5 left-0 h-1.5 w-1.5 rounded-full bg-teal-500" />
                     <p className="text-ink-700">{a.text}</p>
                     <p className="text-xs text-ink-400">{formatRelative(a.at)}</p>

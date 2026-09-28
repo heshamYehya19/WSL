@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom"
 import { StatTile } from "../../components/ui/Card"
+import { Reveal } from "../../components/ui/Reveal"
 
 const POINTS = [
   {
@@ -27,7 +28,7 @@ export default function ForUniversities() {
         <div className="mx-auto max-w-4xl px-4 text-center sm:px-6">
           <div className="text-xs font-semibold tracking-wide text-teal-600 uppercase">For Universities</div>
           <h1 className="mt-2 text-3xl font-bold tracking-tight text-ink-950 sm:text-4xl">
-            Connect learning with authentic real-world challenges.
+            Real industry problems, mapped into your curriculum.
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-ink-500">
             WSL routes safe, structured industry problems into your existing courses — and keeps verification exactly where it belongs.
@@ -37,15 +38,19 @@ export default function ForUniversities() {
 
       <section className="mx-auto max-w-5xl px-4 py-14 sm:px-6">
         <div className="grid gap-6 sm:grid-cols-2">
-          {POINTS.map((p) => (
-            <div key={p.title} className="rounded-2xl border border-ink-200 bg-white p-5">
+          {POINTS.map((p, i) => (
+            <Reveal
+              key={p.title}
+              delay={i * 80}
+              className="rounded-2xl border border-ink-200 bg-white p-5 transition-all duration-300 hover:-translate-y-1 hover:border-teal-300 hover:shadow-lg hover:shadow-ink-950/5"
+            >
               <h3 className="font-semibold text-ink-900">{p.title}</h3>
               <p className="mt-1.5 text-sm leading-relaxed text-ink-500">{p.body}</p>
-            </div>
+            </Reveal>
           ))}
         </div>
 
-        <div className="mt-10">
+        <Reveal className="mt-10">
           <p className="mb-3 text-sm font-semibold text-ink-500 uppercase tracking-wide">A snapshot from Amman National University</p>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
             <StatTile label="Active Challenges" value="12" />
@@ -54,12 +59,12 @@ export default function ForUniversities() {
             <StatTile label="Skills Verified" value="417" />
           </div>
           <p className="mt-2 text-xs text-ink-400">Demo values shown for illustration.</p>
-        </div>
+        </Reveal>
 
         <div className="mt-10 text-center">
           <Link
             to="/login"
-            className="inline-block rounded-full bg-ink-950 px-6 py-3 text-sm font-semibold text-white hover:bg-teal-600"
+            className="inline-block rounded-full bg-ink-950 px-6 py-3 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-teal-600 hover:shadow-lg hover:shadow-teal-600/20 active:translate-y-0"
           >
             Continue as a University
           </Link>

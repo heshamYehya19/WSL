@@ -75,3 +75,78 @@ body {
   stroke-dasharray: 4 6;
   animation: dash-flow 1.4s linear infinite;
 }
+
+/* Wordmark hover: the connector traces itself in, nodes light up, and the
+   Arabic mark sharpens from a faint "draft" into solid "ink" — a small nod to
+   what وصل (connection) actually means. */
+.wordmark-connector {
+  stroke-dasharray: 19;
+  stroke-dashoffset: 19;
+  transition: stroke-dashoffset 0.5s cubic-bezier(0.65, 0, 0.35, 1);
+}
+.group:hover .wordmark-connector {
+  stroke-dashoffset: 0;
+}
+
+.wordmark-node {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.35s ease-out;
+  transition-delay: 0.15s;
+}
+.wordmark-node-delay {
+  transition-delay: 0.22s;
+}
+.group:hover .wordmark-node {
+  transform: scale(1.2);
+  filter: drop-shadow(0 0 3px rgba(45, 212, 191, 0.85));
+}
+
+.wordmark-spark {
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 0.55;
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s, opacity 0.3s ease-out 0.3s;
+}
+.group:hover .wordmark-spark {
+  transform: scale(1.35);
+  opacity: 1;
+}
+
+.wordmark-ink {
+  opacity: 0.7;
+  transition: opacity 0.4s ease-out, letter-spacing 0.4s ease-out;
+}
+.group:hover .wordmark-ink {
+  opacity: 1;
+  letter-spacing: 0.015em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wordmark-connector,
+  .wordmark-node,
+  .wordmark-spark,
+  .wordmark-ink {
+    transition: none;
+  }
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-in-up {
+  animation: fade-in-up 0.45s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in-up {
+    animation: none;
+  }
+}

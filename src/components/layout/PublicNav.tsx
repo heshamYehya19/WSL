@@ -26,7 +26,11 @@ export function PublicNav() {
               key={l.to}
               to={l.to}
               className={({ isActive }) =>
-                `text-sm font-medium transition-colors ${isActive ? "text-teal-600" : "text-ink-600 hover:text-ink-950"}`
+                `relative pb-0.5 text-sm font-medium transition-colors after:absolute after:-bottom-0.5 after:left-0 after:h-px after:w-full after:origin-left after:bg-teal-500 after:transition-transform after:duration-300 after:ease-out after:content-[''] ${
+                  isActive
+                    ? "text-teal-600 after:scale-x-100"
+                    : "text-ink-600 after:scale-x-0 hover:text-ink-950 hover:after:scale-x-100"
+                }`
               }
             >
               {l.label}
@@ -39,7 +43,7 @@ export function PublicNav() {
           ) : (
             <NavLink
               to="/login"
-              className="rounded-full bg-ink-950 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-teal-600"
+              className="rounded-full bg-ink-950 px-4 py-2 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-teal-600 hover:shadow-lg hover:shadow-teal-600/20 active:translate-y-0"
             >
               Demo Access
             </NavLink>
