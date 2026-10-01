@@ -23,5 +23,6 @@ dist-ssr
 *.sln
 *.sw?
 
-# Local SQLite database (created and seeded on first run)
-data
+# SQLite temporary files (the database itself, data/wsl.db, is committed)
+*.db-wal
+*.db-shm
