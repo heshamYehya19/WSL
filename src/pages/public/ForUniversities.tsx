@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom"
 import { StatTile } from "../../components/ui/Card"
 import { Reveal } from "../../components/ui/Reveal"
+import { usePlatformTotals } from "../../lib/showcase"
 
 const POINTS = [
   {
@@ -22,6 +23,8 @@ const POINTS = [
 ]
 
 export default function ForUniversities() {
+  const totals = usePlatformTotals()
+
   return (
     <div>
       <section className="border-b border-ink-100 bg-white py-16">
@@ -51,14 +54,16 @@ export default function ForUniversities() {
         </div>
 
         <Reveal className="mt-10">
-          <p className="mb-3 text-sm font-semibold text-ink-500 uppercase tracking-wide">A snapshot from Amman National University</p>
+          <p className="mb-3 text-sm font-semibold text-ink-500 uppercase tracking-wide">
+            Live across {totals.universities} partner universities
+          </p>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <StatTile label="Active Challenges" value="12" />
-            <StatTile label="Student Projects" value="84" />
-            <StatTile label="Evidence Items" value="236" />
-            <StatTile label="Skills Rated" value="417" />
+            <StatTile label="Active Challenges" value={totals.activeChallenges} />
+            <StatTile label="Student Projects" value={totals.projects} />
+            <StatTile label="Evidence Items" value={totals.evidence} />
+            <StatTile label="Skills Rated" value={totals.skillsRated} />
           </div>
-          <p className="mt-2 text-xs text-ink-400">Demo values shown for illustration.</p>
+          <p className="mt-2 text-xs text-ink-400">Counted live from the WSL platform.</p>
         </Reveal>
 
         <div className="mt-10 text-center">

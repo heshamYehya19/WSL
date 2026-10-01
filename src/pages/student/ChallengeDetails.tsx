@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import { useDemoUser } from "../../state/demoUser"
 import { useStore } from "../../state/store"
 import { PageHeader } from "../../components/ui/PageHeader"
 import { StatusBadge } from "../../components/ui/StatusBadge"
 import { formatDate, daysUntil } from "../../lib/format"
-import { getOrg } from "../../lib/selectors"
+import { assignmentFor, canStudentSee, statusAtUniversity } from "../../lib/selectors"
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -20,31 +20,29 @@ export default function ChallengeDetails() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { student } = useDemoUser()
-  const { challenges, projects, startProject } = useStore()
+  const { challenges, projects, students, startProject, getOrg } = useStore()
   const [starting, setStarting] = useState(false)
 
-  const challenge = challenges.find((c) => c.id === id)
+  const found = challenges.find((c) => c.id === id)
+  const challenge = found && student && canStudentSee(found, student) ? found : undefined
   const existingProject = student ? projects.find((p) => p.challengeId === id && p.studentId === student.id) : undefined
-
-  useEffect(() => {
-    if (starting && existingProject) {
-      navigate(`/student/projects/${existingProject.id}`)
-    }
-  }, [starting, existingProject, navigate])
 
   if (!challenge) {
     return <EmptyChallenge />
   }
   const org = getOrg(challenge.organizationId)
+  const closed = daysUntil(challenge.deadline) <= 0
 
-  const handleStart = () => {
+  const handleStart = async () => {
     if (!student) return
     if (existingProject) {
       navigate(`/student/projects/${existingProject.id}`)
       return
     }
     setStarting(true)
-    startProject(challenge.id, student.id)
+    const projectId = await startProject(challenge.id)
+    setStarting(false)
+    if (projectId) navigate(`/student/projects/${projectId}`)
   }
 
   return (
@@ -54,7 +52,7 @@ export default function ChallengeDetails() {
         eyebrow={`${org?.name} · ${challenge.industry}`}
         title={challenge.title}
         subtitle={undefined}
-        action={<StatusBadge status={challenge.status} />}
+        action={<StatusBadge status={statusAtUniversity(challenge, student!.universityId, projects, students)} />}
       />
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -116,17 +114,17 @@ export default function ChallengeDetails() {
               <div className="flex justify-between"><dt className="text-ink-400">Difficulty</dt><dd className="font-medium text-ink-800">{challenge.difficulty}</dd></div>
               <div className="flex justify-between"><dt className="text-ink-400">Deadline</dt><dd className="font-medium text-ink-800">{formatDate(challenge.deadline)}</dd></div>
               <div className="flex justify-between"><dt className="text-ink-400">Time left</dt><dd className="font-medium text-ink-800">{Math.max(daysUntil(challenge.deadline), 0)} days</dd></div>
-              {challenge.assignedProgram && (
-                <div className="flex justify-between"><dt className="text-ink-400">Assigned to</dt><dd className="text-right font-medium text-ink-800">{challenge.assignedProgram}</dd></div>
+              {assignmentFor(challenge, student?.universityId) && (
+                <div className="flex justify-between"><dt className="text-ink-400">Assigned to</dt><dd className="text-right font-medium text-ink-800">{assignmentFor(challenge, student?.universityId)?.program}</dd></div>
               )}
             </dl>
             <p className="mt-3 text-xs text-ink-400">You'll work this challenge on your own — not as a team.</p>
             <button
               onClick={handleStart}
-              disabled={!student}
+              disabled={!student || starting || (closed && !existingProject)}
               className="mt-3 w-full rounded-xl bg-ink-950 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-teal-600 disabled:opacity-50"
             >
-              {existingProject ? "Go to Project" : "Start Project"}
+              {existingProject ? "Go to Project" : closed ? "Deadline Passed" : starting ? "Starting…" : "Start Project"}
             </button>
           </div>
         </div>

@@ -1,21 +1,24 @@
 import { useState } from "react"
 import { Link, useParams } from "react-router-dom"
 import { useStore } from "../../state/store"
+import { useDemoUser } from "../../state/demoUser"
 import { StatusBadge } from "../../components/ui/StatusBadge"
 import { ConfidenceMeter } from "../../components/ui/ConfidenceMeter"
-import { challengeFor, getOrg, getStudent, skillsForProject } from "../../lib/selectors"
-import { companyContacts } from "../../data/seed"
+import { challengeFor, skillsForProject } from "../../lib/selectors"
 import { formatDate } from "../../lib/format"
 
 export default function CompanySubmission() {
   const { projectId } = useParams()
-  const { projects, challenges, evidence, skillSignals, submitCompanyFeedback, addFeedback } = useStore()
-  const project = projects.find((p) => p.id === projectId)
+  const { company } = useDemoUser()
+  const { projects, challenges, evidence, skillSignals, submitCompanyReview, getStudent, getUniversity } = useStore()
+  // Companies only see submissions to their own challenges.
+  const project = projects.find((p) => p.id === projectId && p.organizationId === company?.id)
   const signals = project ? skillsForProject(skillSignals, project.id) : []
   const [ratings, setRatings] = useState<Record<string, number>>(() =>
     Object.fromEntries(signals.map((s) => [s.id, s.companyRating ?? s.aiRating])),
   )
   const [note, setNote] = useState("")
+  const [saving, setSaving] = useState(false)
 
   if (!project) {
     return (
@@ -27,19 +30,16 @@ export default function CompanySubmission() {
   }
 
   const student = getStudent(project.studentId)
-  const org = getOrg(project.organizationId)
+  const uni = student ? getUniversity(student.universityId) : undefined
   const challenge = challengeFor(challenges, project)
   const projectEvidence = evidence.filter((e) => e.projectId === project.id)
   const canReview = project.status === "Confirmed to Company"
   const alreadyReviewed = project.status === "Company Reviewed"
-  const contact = companyContacts[project.organizationId] ?? { name: "Company Reviewer", role: "Representative" }
 
-  const submit = () => {
-    submitCompanyFeedback(project.id, ratings)
-    if (note.trim()) {
-      addFeedback(project.id, contact.name, contact.role, note.trim())
-    }
-    setNote("")
+  const submit = async () => {
+    setSaving(true)
+    if (await submitCompanyReview(project.id, ratings, note.trim())) setNote("")
+    setSaving(false)
   }
 
   return (
@@ -48,19 +48,18 @@ export default function CompanySubmission() {
 
       <div className="mt-3 mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-xs text-ink-400">{student?.name} · {org?.name}</p>
+          <p className="text-xs text-ink-400">{student?.name} · {uni?.name}</p>
           <h1 className="text-2xl font-bold tracking-tight text-ink-950">{project.title}</h1>
           <p className="mt-1 text-sm text-ink-500">{challenge?.industry}</p>
         </div>
         <StatusBadge status={project.status} />
       </div>
 
-      {!canReview && !alreadyReviewed && (
+      {!canReview && !alreadyReviewed ? (
         <div className="mb-6 rounded-xl border border-amber-400/40 bg-amber-100 px-4 py-3 text-sm text-ink-700">
-          This submission hasn't been confirmed by the university yet — check back once it has.
+          This submission hasn't been confirmed by the university yet — its evidence opens here once it has.
         </div>
-      )}
-
+      ) : (
       <div className="rounded-2xl border border-ink-200 bg-white p-6">
         <h3 className="mb-3 text-xs font-semibold tracking-wide text-teal-600 uppercase">Evidence</h3>
         <div className="space-y-2">
@@ -120,8 +119,11 @@ export default function CompanySubmission() {
               placeholder="What stood out? What would you want to see more of?"
               className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-teal-400"
             />
-            <button onClick={submit} className="mt-3 w-full rounded-lg bg-ink-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-600">
-              Submit Feedback
+            {challenge && (
+              <p className="mt-1 text-xs text-ink-400">Sent as {challenge.contactPerson}, {challenge.contactRole} — the contact on this challenge.</p>
+            )}
+            <button onClick={submit} disabled={saving} className="mt-3 w-full rounded-lg bg-ink-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-600 disabled:opacity-50">
+              {saving ? "Saving…" : "Submit Feedback"}
             </button>
           </div>
         )}
@@ -133,13 +135,14 @@ export default function CompanySubmission() {
           </p>
         )}
       </div>
+      )}
 
-      {project.feedback.length > 0 && (
+      {(canReview || alreadyReviewed) && project.feedback.length > 0 && (
         <div className="mt-6 rounded-2xl border border-ink-200 bg-white p-6">
           <h3 className="mb-3 text-xs font-semibold tracking-wide text-teal-600 uppercase">Feedback Thread</h3>
           <div className="space-y-2">
-            {project.feedback.map((f, i) => (
-              <div key={i} className="rounded-xl border border-ink-200 p-4">
+            {project.feedback.map((f) => (
+              <div key={f.id} className="rounded-xl border border-ink-200 p-4">
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-semibold text-ink-900">{f.author} <span className="font-normal text-ink-400">· {f.role}</span></p>
                   <p className="text-xs text-ink-400">{formatDate(f.at)}</p>

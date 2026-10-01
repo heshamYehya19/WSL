@@ -5,8 +5,11 @@ import { ConfidenceMeter } from "../../components/ui/ConfidenceMeter"
 import { StatusBadge } from "../../components/ui/StatusBadge"
 import { HeroNetwork } from "../../components/ui/HeroNetwork"
 import { Reveal } from "../../components/ui/Reveal"
+import { useShowcase } from "../../lib/showcase"
 
 export default function Landing() {
+  const showcase = useShowcase()
+
   return (
     <div>
       {/* HERO */}
@@ -155,30 +158,28 @@ export default function Landing() {
               </p>
             </div>
           </Reveal>
+          {showcase && (
           <Reveal delay={150} className="rounded-2xl border border-ink-200 bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
-            <div className="mb-3 flex items-center justify-between">
-              <span className="text-sm font-semibold text-ink-800">Cafeteria Demand Prediction</span>
-              <StatusBadge status="Submissions Under Review" />
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <span className="text-sm font-semibold text-ink-800">{showcase.project.title}</span>
+              <StatusBadge status={showcase.project.status} />
             </div>
-            <p className="mb-4 text-xs text-ink-400">Jordan Tech Solutions · Data Science / Machine Learning</p>
+            <p className="mb-4 text-xs text-ink-400">
+              {showcase.org?.name} · {showcase.student?.name}, {showcase.university?.shortName} {showcase.student?.field}
+            </p>
             <div className="space-y-3">
-              <div>
-                <div className="mb-1 text-sm font-medium text-ink-800">Python</div>
-                <ConfidenceMeter value={94} label="AI rating" />
-              </div>
-              <div>
-                <div className="mb-1 text-sm font-medium text-ink-800">Data Analysis</div>
-                <ConfidenceMeter value={91} label="AI rating" />
-              </div>
-              <div>
-                <div className="mb-1 text-sm font-medium text-ink-800">Machine Learning</div>
-                <ConfidenceMeter value={88} label="AI rating" />
-              </div>
+              {showcase.signals.slice(0, 3).map((s) => (
+                <div key={s.id}>
+                  <div className="mb-1 text-sm font-medium text-ink-800">{s.skill}</div>
+                  <ConfidenceMeter value={s.aiRating} label="AI rating" />
+                </div>
+              ))}
             </div>
             <p className="mt-4 text-xs text-ink-400">
               WSL rates each skill automatically the moment evidence is submitted — informational only, it never blocks anything.
             </p>
           </Reveal>
+          )}
         </div>
       </section>
 
@@ -188,17 +189,14 @@ export default function Landing() {
           <h2 className="text-2xl font-bold text-white sm:text-3xl">Don't just tell employers what you know.</h2>
           <h2 className="text-2xl font-bold text-teal-300 sm:text-3xl">Show them what you've done.</h2>
           <div className="mx-auto mt-8 flex max-w-xl flex-wrap justify-center gap-2">
-            <SkillChip skill="Python" rating={94} />
-            <SkillChip skill="Data Analysis" rating={91} />
-            <SkillChip skill="Machine Learning" rating={88} />
-            <SkillChip skill="Data Visualization" rating={85} />
+            {showcase?.signals.map((s) => <SkillChip key={s.id} skill={s.skill} rating={s.companyRating ?? s.aiRating} />)}
           </div>
           <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
             <Link
               to="/login"
               className="rounded-full bg-teal-500 px-6 py-3 text-sm font-semibold text-ink-950 transition-all duration-200 hover:-translate-y-0.5 hover:bg-teal-400 hover:shadow-lg hover:shadow-teal-500/25 active:translate-y-0"
             >
-              Explore the Demo
+              Explore WSL
             </Link>
             <Link
               to="/about"

@@ -1,4 +1,4 @@
-import type { Evidence, EvidenceType } from "../types"
+import type { Evidence, EvidenceType } from "../src/types.ts"
 
 // Demo-only simulated AI review. In a production WSL this would run a real model
 // over submitted artifacts; here we deterministically derive a plausible rating
@@ -14,8 +14,8 @@ const EVIDENCE_WEIGHT: Record<EvidenceType, number> = {
   "Analysis": 4,
   "Dataset / Model": 4,
   "Presentation": 2,
-  "Prototype / Demo": 5,
-  "Video / Demo Link": 2,
+  "Prototype": 5,
+  "Video Walkthrough": 2,
 }
 
 function hashString(input: string): number {
@@ -52,10 +52,4 @@ export function simulateAIReview(requiredSkills: string[], submittedEvidence: Ev
       evidenceIds,
     }
   })
-}
-
-export function ratingDescription(rating: number): string {
-  if (rating >= 85) return "Strongly supported by the submitted evidence"
-  if (rating >= 70) return "Well supported by the submitted evidence"
-  return "Partially supported — the submission covers this skill only lightly"
 }

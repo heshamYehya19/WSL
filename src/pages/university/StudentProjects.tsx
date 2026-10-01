@@ -4,12 +4,12 @@ import { useStore } from "../../state/store"
 import { PageHeader } from "../../components/ui/PageHeader"
 import { StatusBadge } from "../../components/ui/StatusBadge"
 import { EmptyState } from "../../components/ui/EmptyState"
-import { challengeFor, getOrg, getStudent, isUniversityStudent, skillsForProject } from "../../lib/selectors"
+import { challengeFor, skillsForProject } from "../../lib/selectors"
 import { formatDate } from "../../lib/format"
 
 export default function StudentProjects() {
   const { university } = useDemoUser()
-  const { projects, challenges, evidence, skillSignals } = useStore()
+  const { projects, challenges, evidence, skillSignals, getOrg, getStudent, isUniversityStudent } = useStore()
   if (!university) return null
 
   const uniProjects = projects.filter((p) => isUniversityStudent(p.studentId, university.id))

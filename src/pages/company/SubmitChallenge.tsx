@@ -3,8 +3,7 @@ import { useNavigate } from "react-router-dom"
 import { useDemoUser } from "../../state/demoUser"
 import { useStore } from "../../state/store"
 import { PageHeader } from "../../components/ui/PageHeader"
-import { universities } from "../../data/seed"
-import type { Challenge, ChallengeVisibility, DataSensitivity, Difficulty } from "../../types"
+import type { ChallengeVisibility, DataSensitivity, Difficulty } from "../../types"
 
 const DIFFICULTIES: Difficulty[] = ["Foundational", "Intermediate", "Advanced"]
 const SENSITIVITIES: DataSensitivity[] = ["None (Public Dataset)", "Low", "Moderate", "High (NDA Required)"]
@@ -28,7 +27,8 @@ const inputClass = "w-full rounded-lg border border-ink-200 px-3 py-2 text-sm ou
 
 export default function SubmitChallenge() {
   const { company } = useDemoUser()
-  const { createChallenge } = useStore()
+  const { createChallenge, universities, contacts } = useStore()
+  const myContacts = contacts.filter((c) => c.organizationId === company?.id)
   const navigate = useNavigate()
 
   const [title, setTitle] = useState("")
@@ -43,60 +43,34 @@ export default function SubmitChallenge() {
   const [dataSensitivity, setDataSensitivity] = useState<DataSensitivity>("Low")
   const [deadline, setDeadline] = useState("")
   const [preferredUniversityId, setPreferredUniversityId] = useState<string>("")
-  const [contactPerson, setContactPerson] = useState("")
-  const [contactRole, setContactRole] = useState("")
+  const [contactId, setContactId] = useState(myContacts.find((c) => c.isPrimary)?.id ?? myContacts[0]?.id ?? "")
+  const [saving, setSaving] = useState(false)
+  const [minDeadline] = useState(() => new Date(Date.now() + 86_400_000).toISOString().slice(0, 10))
 
   if (!company) return null
 
-  const buildChallenge = (asDraft: boolean): Challenge => {
-    const skills = requiredSkills.split(",").map((s) => s.trim()).filter(Boolean)
-    const outcomes = learningOutcomes.split("\n").map((s) => s.trim()).filter(Boolean)
-    const now = new Date().toISOString()
-
-    const history: Challenge["history"] = asDraft
-      ? [{ status: "Draft", at: now }]
-      : [
-          { status: "Draft", at: now },
-          {
-            status: "Sent to University",
-            at: now,
-            note: "WSL automatically screened this challenge for private or confidential data — none found.",
-          },
-        ]
-
-    return {
-      id: `chal-${Date.now()}`,
-      title: title || "Untitled Challenge",
-      organizationId: company.id,
+  const submit = async (asDraft: boolean) => {
+    setSaving(true)
+    const id = await createChallenge({
+      title,
       problemDescription,
-      objectives: outcomes.length ? outcomes : ["Explore the problem", "Prototype a solution", "Present findings"],
-      expectedOutput: "A working prototype or analysis plus a short report, as detailed in submission requirements.",
-      industry: industry || company.industry,
-      difficulty,
-      requiredSkills: skills.length ? skills : ["Problem Solving"],
-      learningOutcomes: outcomes.length ? outcomes : ["Apply classroom concepts to a real operational problem"],
-      datasetAvailability: datasetAvailability || "To be confirmed during WSL's automatic screening.",
-      dataSensitivity,
-      deadline: deadline ? new Date(deadline).toISOString() : new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString(),
-      preferredUniversityId: preferredUniversityId || null,
-      contactPerson: contactPerson || "Company Contact",
-      contactRole: contactRole || "Representative",
+      requiredSkills: requiredSkills.split(",").map((s) => s.trim()).filter(Boolean),
       visibility,
-      submissionRequirements: ["Project report", "GitHub repository", "Presentation"],
-      status: asDraft ? "Draft" : "Sent to University",
-      assignedProgram: null,
-      submittedAt: asDraft ? null : now,
-      history,
-    }
+      industry,
+      difficulty,
+      learningOutcomes: learningOutcomes.split("\n").map((s) => s.trim()).filter(Boolean),
+      datasetAvailability,
+      dataSensitivity,
+      deadline,
+      preferredUniversityId: preferredUniversityId || null,
+      contactId,
+      asDraft,
+    })
+    setSaving(false)
+    if (id) navigate(`/company/challenges/${id}`)
   }
 
-  const submit = (asDraft: boolean) => {
-    const challenge = buildChallenge(asDraft)
-    createChallenge(challenge)
-    navigate(`/company/challenges/${challenge.id}`)
-  }
-
-  const canSubmit = title.trim().length > 0 && problemDescription.trim().length > 0
+  const canSubmit = !saving && title.trim().length > 0 && problemDescription.trim().length > 0
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -116,7 +90,7 @@ export default function SubmitChallenge() {
             className={inputClass}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="e.g. Predict Cafeteria Demand"
+            placeholder="e.g. Forecast Weekly Support Ticket Volume"
             autoFocus
           />
         </Field>
@@ -180,8 +154,8 @@ export default function SubmitChallenge() {
               </Field>
             </div>
 
-            <Field label="Deadline">
-              <input type="date" className={inputClass} value={deadline} onChange={(e) => setDeadline(e.target.value)} />
+            <Field label="Deadline" hint="Defaults to 30 days from today.">
+              <input type="date" min={minDeadline} className={inputClass} value={deadline} onChange={(e) => setDeadline(e.target.value)} />
             </Field>
 
             <Field label="Preferred university" hint="Leave unset to let WSL route it.">
@@ -191,14 +165,11 @@ export default function SubmitChallenge() {
               </select>
             </Field>
 
-            <div className="grid grid-cols-2 gap-4">
-              <Field label="Contact person">
-                <input className={inputClass} value={contactPerson} onChange={(e) => setContactPerson(e.target.value)} />
-              </Field>
-              <Field label="Contact role">
-                <input className={inputClass} value={contactRole} onChange={(e) => setContactRole(e.target.value)} />
-              </Field>
-            </div>
+            <Field label="Contact person" hint="Reviews submissions and signs your company's feedback.">
+              <select className={inputClass} value={contactId} onChange={(e) => setContactId(e.target.value)}>
+                {myContacts.map((c) => <option key={c.id} value={c.id}>{c.name} — {c.role}</option>)}
+              </select>
+            </Field>
           </div>
         </details>
 
@@ -208,7 +179,7 @@ export default function SubmitChallenge() {
             disabled={!canSubmit}
             className="rounded-lg bg-ink-950 px-6 py-2.5 text-sm font-semibold text-white hover:bg-teal-600 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Submit Challenge
+            {saving ? "Submitting…" : "Submit Challenge"}
           </button>
           <button onClick={() => submit(true)} disabled={!canSubmit} className="text-sm font-medium text-ink-400 hover:text-ink-700 disabled:opacity-40">
             Save as draft instead

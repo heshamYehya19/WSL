@@ -4,16 +4,20 @@ import { useDemoUser } from "../../state/demoUser"
 import { useStore } from "../../state/store"
 import { PageHeader } from "../../components/ui/PageHeader"
 import { StatusBadge } from "../../components/ui/StatusBadge"
-import { getOrg } from "../../lib/selectors"
-import { formatRelative } from "../../lib/format"
+import { assignmentFor, statusAtUniversity } from "../../lib/selectors"
+import { daysUntil, formatDate, formatRelative } from "../../lib/format"
 
 export default function ChallengeReview() {
   const { id } = useParams()
   const { university } = useDemoUser()
-  const { challenges, assignChallenge } = useStore()
-  const challenge = challenges.find((c) => c.id === id)
+  const { challenges, projects, students, assignChallenge, getOrg, getStaff } = useStore()
+  // Visible when it was sent to this university, or to any university (no preference).
+  const challenge = challenges.find(
+    (c) => c.id === id && c.status !== "Draft" && (c.preferredUniversityId === null || c.preferredUniversityId === university?.id),
+  )
 
-  const [program, setProgram] = useState(university?.programs[0] ?? "")
+  const [programId, setProgramId] = useState(university?.programs[0]?.id ?? "")
+  const [saving, setSaving] = useState(false)
 
   if (!challenge || !university) {
     return (
@@ -25,12 +29,33 @@ export default function ChallengeReview() {
   }
 
   const org = getOrg(challenge.organizationId)
-  const canAssign = challenge.status === "Sent to University"
+  const mine = assignmentFor(challenge, university.id)
+  const status = statusAtUniversity(challenge, university.id, projects, students)
+  const deadlinePassed = daysUntil(challenge.deadline) <= 0
+  const canAssign = !mine && !deadlinePassed
+  const otherAssignments = challenge.assignments.filter((a) => a.universityId !== university.id).length
+  // An open challenge's history also records other universities' activity, which isn't
+  // this university's business — show only the company's steps plus this university's own.
+  const history =
+    challenge.preferredUniversityId === null
+      ? [
+          ...challenge.history.filter((h) => h.status === "Draft" || h.status === "Sent to University"),
+          ...(mine ? [{ status: "University Assigned" as const, at: mine.assignedAt, note: `Assigned to ${mine.program} students at ${university.name}.` }] : []),
+        ]
+      : challenge.history
+  const selectedProgram = university.programs.find((p) => p.id === programId)
+  const coordinator = selectedProgram ? getStaff(selectedProgram.coordinatorId) : undefined
+
+  const assign = async () => {
+    setSaving(true)
+    await assignChallenge(challenge.id, programId)
+    setSaving(false)
+  }
 
   return (
     <div className="mx-auto max-w-4xl">
       <Link to="/university/challenges" className="text-sm text-ink-400 hover:text-teal-600">← Back to Challenges</Link>
-      <PageHeader eyebrow={`${org?.name} · ${challenge.industry}`} title={challenge.title} action={<StatusBadge status={challenge.status} />} />
+      <PageHeader eyebrow={`${org?.name} · ${challenge.industry}`} title={challenge.title} action={<StatusBadge status={status} />} />
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-5 lg:col-span-2">
@@ -64,7 +89,7 @@ export default function ChallengeReview() {
           <div className="rounded-2xl border border-ink-200 bg-white p-5">
             <h3 className="mb-3 text-xs font-semibold tracking-wide text-teal-600 uppercase">Timeline</h3>
             <ul className="space-y-2">
-              {challenge.history.map((h, i) => (
+              {history.map((h, i) => (
                 <li key={i} className="flex items-start gap-3 text-sm">
                   <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-teal-500" />
                   <span>
@@ -86,28 +111,37 @@ export default function ChallengeReview() {
                 <div>
                   <label className="mb-1 block text-xs font-medium text-ink-500">College / program</label>
                   <select
-                    value={program}
-                    onChange={(e) => setProgram(e.target.value)}
+                    value={programId}
+                    onChange={(e) => setProgramId(e.target.value)}
                     className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-teal-400"
                   >
-                    {university.programs.map((p) => <option key={p} value={p}>{p}</option>)}
+                    {university.programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
                   <p className="mt-1 text-xs text-ink-400">Opens this challenge to every student in that program — not tied to a specific course.</p>
+                  {coordinator && <p className="mt-1 text-xs text-ink-400">Mentor: {coordinator.name}</p>}
                 </div>
                 <button
-                  onClick={() => assignChallenge(challenge.id, program)}
-                  className="w-full rounded-lg bg-ink-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-600"
+                  onClick={assign}
+                  disabled={saving || !programId}
+                  className="w-full rounded-lg bg-ink-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-600 disabled:opacity-50"
                 >
-                  Assign to Students
+                  {saving ? "Assigning…" : "Assign to Students"}
                 </button>
               </div>
-            ) : challenge.assignedProgram ? (
+            ) : mine ? (
               <div>
-                <p className="text-xs text-ink-400">Assigned to</p>
-                <p className="font-medium text-ink-800">{challenge.assignedProgram}</p>
+                <p className="text-xs text-ink-400">Assigned to your students</p>
+                <p className="font-medium text-ink-800">{mine.program}</p>
+                <p className="mt-1 text-xs text-ink-400">on {formatDate(mine.assignedAt)}</p>
               </div>
             ) : (
-              <p className="text-sm text-ink-400">This challenge hasn't reached your university yet.</p>
+              <p className="text-sm text-ink-400">This challenge's deadline has passed, so it can no longer be assigned.</p>
+            )}
+            {challenge.preferredUniversityId === null && (
+              <p className="mt-4 border-t border-ink-100 pt-3 text-xs text-ink-400">
+                Open challenge — every university assigns it independently.
+                {otherAssignments > 0 && ` ${otherAssignments} other universit${otherAssignments === 1 ? "y has" : "ies have"} assigned it to their own students.`}
+              </p>
             )}
           </div>
         </div>

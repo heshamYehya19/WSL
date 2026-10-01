@@ -5,7 +5,7 @@ import { useStore } from "../../state/store"
 import { PageHeader } from "../../components/ui/PageHeader"
 import { StatusBadge } from "../../components/ui/StatusBadge"
 import { EmptyState } from "../../components/ui/EmptyState"
-import { challengeFor, getOrg, getStudent, isUniversityStudent, skillsForProject } from "../../lib/selectors"
+import { challengeFor, skillsForProject } from "../../lib/selectors"
 import type { ChallengeStatus } from "../../types"
 
 const TABS: { label: string; statuses: ChallengeStatus[] }[] = [
@@ -15,7 +15,7 @@ const TABS: { label: string; statuses: ChallengeStatus[] }[] = [
 
 export default function SubmissionsQueue() {
   const { university } = useDemoUser()
-  const { projects, challenges, skillSignals } = useStore()
+  const { projects, challenges, skillSignals, getOrg, getStudent, isUniversityStudent } = useStore()
   const [tab, setTab] = useState(0)
   if (!university) return null
 

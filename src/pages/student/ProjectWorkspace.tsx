@@ -5,7 +5,7 @@ import { useStore } from "../../state/store"
 import { StatusBadge } from "../../components/ui/StatusBadge"
 import { ConfidenceMeter } from "../../components/ui/ConfidenceMeter"
 import { EmptyState } from "../../components/ui/EmptyState"
-import { challengeFor, getOrg, projectEvidence, skillsForProject } from "../../lib/selectors"
+import { challengeFor, projectEvidence, skillsForProject } from "../../lib/selectors"
 import { formatDate, formatRelative } from "../../lib/format"
 import type { EvidenceType } from "../../types"
 
@@ -14,11 +14,11 @@ const EVIDENCE_TYPES: EvidenceType[] = [
   "GitHub Repository",
   "Code",
   "Presentation",
-  "Prototype / Demo",
+  "Prototype",
   "Documentation",
   "Analysis",
   "Dataset / Model",
-  "Video / Demo Link",
+  "Video Walkthrough",
 ]
 
 const TABS = ["Overview", "Evidence & AI Rating", "Feedback"] as const
@@ -26,12 +26,14 @@ const TABS = ["Overview", "Evidence & AI Rating", "Feedback"] as const
 export default function ProjectWorkspace() {
   const { id } = useParams()
   const { student } = useDemoUser()
-  const { projects, challenges, evidence, skillSignals, addEvidence, runAIReview } = useStore()
+  const { projects, challenges, evidence, skillSignals, addEvidence, runAIReview, toggleTask, getOrg } = useStore()
   const [tab, setTab] = useState<(typeof TABS)[number]>("Overview")
   const [analyzing, setAnalyzing] = useState(false)
   const [form, setForm] = useState({ type: "Project Report" as EvidenceType, title: "", description: "", link: "" })
+  const [submitting, setSubmitting] = useState(false)
 
-  const project = projects.find((p) => p.id === id)
+  // Students only ever open their own project workspaces.
+  const project = projects.find((p) => p.id === id && p.studentId === student?.id)
   if (!project || !student) {
     return (
       <div className="py-20 text-center">
@@ -48,17 +50,23 @@ export default function ProjectWorkspace() {
   const doneTasks = project.tasks.filter((t) => t.done).length
   const progressPct = project.tasks.length ? Math.round((doneTasks / project.tasks.length) * 100) : 0
 
-  const submitEvidence = (e: React.FormEvent) => {
+  // Once the university confirms the submission it is locked — evidence and tasks become read-only.
+  const locked = project.status === "Confirmed to Company" || project.status === "Company Reviewed"
+
+  const submitEvidence = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.title.trim()) return
-    addEvidence(project.id, student.id, form.type, form.title.trim(), form.description.trim(), form.link.trim() || "link.demo/evidence")
-    setForm({ type: "Project Report", title: "", description: "", link: "" })
+    if (!form.title.trim() || !form.link.trim()) return
+    setSubmitting(true)
+    const ok = await addEvidence(project.id, { type: form.type, title: form.title.trim(), description: form.description.trim(), link: form.link.trim() })
+    setSubmitting(false)
+    if (ok) setForm({ type: "Project Report", title: "", description: "", link: "" })
   }
 
   const handleAnalyze = () => {
     setAnalyzing(true)
-    setTimeout(() => {
-      runAIReview(project.id, student.id)
+    // A short pause so the simulated review reads as work being done.
+    setTimeout(async () => {
+      await runAIReview(project.id)
       setAnalyzing(false)
     }, 1400)
   }
@@ -109,9 +117,17 @@ export default function ProjectWorkspace() {
               <ul className="space-y-2">
                 {project.tasks.length === 0 && <p className="text-sm text-ink-400">No tasks recorded for this project.</p>}
                 {project.tasks.map((t) => (
-                  <li key={t.id} className="flex items-center gap-2.5 text-sm">
-                    <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[11px] ${t.done ? "border-teal-500 bg-teal-500 text-white" : "border-ink-300 text-transparent"}`}>✓</span>
-                    <span className={t.done ? "text-ink-700 line-through decoration-ink-300" : "text-ink-700"}>{t.title}</span>
+                  <li key={t.id}>
+                    <button
+                      type="button"
+                      disabled={locked}
+                      onClick={() => toggleTask(project.id, t.id, !t.done)}
+                      className="flex w-full items-center gap-2.5 rounded-lg py-0.5 text-left text-sm enabled:hover:bg-ink-50 disabled:cursor-default"
+                      aria-pressed={t.done}
+                    >
+                      <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[11px] ${t.done ? "border-teal-500 bg-teal-500 text-white" : "border-ink-300 text-transparent"}`}>✓</span>
+                      <span className={t.done ? "text-ink-700 line-through decoration-ink-300" : "text-ink-700"}>{t.title}</span>
+                    </button>
                   </li>
                 ))}
               </ul>
@@ -150,6 +166,9 @@ export default function ProjectWorkspace() {
           <div>
             <div className="rounded-2xl border border-ink-200 bg-white p-5">
               <h3 className="mb-3 font-semibold text-ink-900">Submit Evidence</h3>
+              {locked ? (
+                <p className="text-sm text-ink-400">Your university confirmed this submission to the company, so its evidence is now locked.</p>
+              ) : (
               <form onSubmit={submitEvidence} className="space-y-3">
                 <div>
                   <label className="mb-1 block text-xs font-medium text-ink-500">Evidence type</label>
@@ -181,7 +200,7 @@ export default function ProjectWorkspace() {
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-ink-500">Link (repo, doc, deck...)</label>
+                  <label className="mb-1 block text-xs font-medium text-ink-500">Link (repo, doc, deck...) — required</label>
                   <input
                     value={form.link}
                     onChange={(e) => setForm((f) => ({ ...f, link: e.target.value }))}
@@ -189,10 +208,11 @@ export default function ProjectWorkspace() {
                     className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-teal-400"
                   />
                 </div>
-                <button type="submit" className="w-full rounded-lg bg-ink-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-600">
-                  Add Evidence
+                <button type="submit" disabled={submitting || !form.title.trim() || !form.link.trim()} className="w-full rounded-lg bg-ink-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-600 disabled:opacity-40">
+                  {submitting ? "Saving…" : "Add Evidence"}
                 </button>
               </form>
+              )}
             </div>
 
             <div className="mt-4 space-y-2">
@@ -212,8 +232,8 @@ export default function ProjectWorkspace() {
             <div className="rounded-2xl border border-ink-200 bg-ink-950 p-5">
               <h3 className="font-semibold text-white">WSL AI Rating</h3>
               <p className="mt-1 text-xs text-ink-300">
-                Simulated demo AI — rates each required skill based on your submitted evidence. It's automatic and informational
-                only: it never blocks or gates your submission.
+                Rates each required skill based on your submitted evidence. It's automatic and informational only: it never
+                blocks or gates your submission.
               </p>
               {myEvidence.length === 0 ? (
                 <p className="mt-4 text-sm text-ink-400">Submit evidence first, then request a rating.</p>
@@ -258,8 +278,8 @@ export default function ProjectWorkspace() {
           {project.feedback.length === 0 ? (
             <EmptyState title="No feedback yet" description="Feedback from your university or the company will appear here." />
           ) : (
-            project.feedback.map((f, i) => (
-              <div key={i} className="rounded-2xl border border-ink-200 bg-white p-5">
+            project.feedback.map((f) => (
+              <div key={f.id} className="rounded-2xl border border-ink-200 bg-white p-5">
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-semibold text-ink-900">{f.author} <span className="font-normal text-ink-400">· {f.role}</span></p>
                   <p className="text-xs text-ink-400">{formatDate(f.at)}</p>

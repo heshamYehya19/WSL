@@ -5,11 +5,11 @@ export type EvidenceType =
   | "GitHub Repository"
   | "Code"
   | "Presentation"
-  | "Prototype / Demo"
+  | "Prototype"
   | "Documentation"
   | "Analysis"
   | "Dataset / Model"
-  | "Video / Demo Link"
+  | "Video Walkthrough"
 
 // A lean, linear pipeline: company submits -> WSL's private-data screen (automatic,
 // invisible) -> university assigns it college-wide -> a student works it solo ->
@@ -30,12 +30,50 @@ export type DataSensitivity = "None (Public Dataset)" | "Low" | "Moderate" | "Hi
 
 export type Difficulty = "Foundational" | "Intermediate" | "Advanced"
 
+export type StudentMajor =
+  | "Artificial Intelligence"
+  | "Software Engineering"
+  | "Cyber Security"
+  | "Computer Science"
+  | "Business Information Technology"
+
+export interface Program {
+  id: string
+  universityId: string
+  name: string
+  major: StudentMajor
+  /** The faculty member who mentors students in this program and confirms their work. */
+  coordinatorId: string
+}
+
+/** A university faculty member — the human reviewer behind feedback and confirmations. */
+export interface Staff {
+  id: string
+  universityId: string
+  name: string
+  title: string
+}
+
 export interface University {
   id: string
   name: string
   shortName: string
   city: string
-  programs: string[]
+  type: "Public" | "Private"
+  established: number
+  website: string
+  faculty: string
+  about: string
+  programs: Program[]
+}
+
+/** A named person at a company who submits challenges and reviews student work. */
+export interface CompanyContact {
+  id: string
+  organizationId: string
+  name: string
+  role: string
+  isPrimary: boolean
 }
 
 export interface Organization {
@@ -45,6 +83,14 @@ export interface Organization {
   city: string
   logoInitials: string
   about: string
+}
+
+export interface ChallengeAssignment {
+  universityId: string
+  programId: string
+  /** The college/program the university assigned this to — not a specific course. */
+  program: string
+  assignedAt: string
 }
 
 export interface Challenge {
@@ -62,13 +108,19 @@ export interface Challenge {
   dataSensitivity: DataSensitivity
   deadline: string
   preferredUniversityId: string | null
+  contactId: string
+  /** Resolved from the contact record — never stored on the challenge itself. */
   contactPerson: string
   contactRole: string
   visibility: ChallengeVisibility
   submissionRequirements: string[]
   status: ChallengeStatus
-  /** The college/program the university assigned this to — not a specific course. */
-  assignedProgram: string | null
+  /**
+   * One entry per university that assigned this challenge to its students. A challenge sent
+   * to a specific university has at most one; an open challenge can have one per university.
+   */
+  assignments: ChallengeAssignment[]
+  createdAt: string
   submittedAt: string | null
   history: { status: ChallengeStatus; at: string; note?: string }[]
 }
@@ -104,6 +156,16 @@ export interface ProjectTask {
   done: boolean
 }
 
+export interface FeedbackEntry {
+  id: string
+  /** Resolved from the staff/contact record that wrote it. */
+  author: string
+  role: string
+  authorKind: "staff" | "contact"
+  note: string
+  at: string
+}
+
 export interface Project {
   id: string
   challengeId: string
@@ -114,17 +176,24 @@ export interface Project {
   status: ChallengeStatus
   startedAt: string
   tasks: ProjectTask[]
-  feedback: { author: string; role: string; note: string; at: string }[]
+  feedback: FeedbackEntry[]
 }
+
+export type Availability = "Open to Opportunities" | "Not Available" | "Open to Internships"
 
 export interface Student {
   id: string
   name: string
-  field: string
+  /** The student's major — always one of the IT fields WSL supports. */
+  field: StudentMajor
   universityId: string
+  programId: string
+  studentNumber: string
   year: string
+  gpa: number
+  city: string
   bio: string
-  availability: "Open to Opportunities" | "Not Available" | "Open to Internships"
+  availability: Availability
   initials: string
 }
 
@@ -136,6 +205,32 @@ export interface Opportunity {
   location: string
   requiredSkills: string[]
   description: string
+  postedAt: string
+}
+
+export interface AppNotification {
+  id: string
+  title: string
+  body: string
+  link: string | null
+  read: boolean
+  createdAt: string
+}
+
+/** Everything the app renders, read fresh from the database. */
+export interface Snapshot {
+  universities: University[]
+  staff: Staff[]
+  organizations: Organization[]
+  contacts: CompanyContact[]
+  students: Student[]
+  challenges: Challenge[]
+  projects: Project[]
+  evidence: Evidence[]
+  skillSignals: SkillSignal[]
+  opportunities: Opportunity[]
+  /** Only the signed-in account's own notifications. */
+  notifications: AppNotification[]
 }
 
 export interface DemoUserState {

@@ -19,7 +19,7 @@ export function Footer() {
               <ul className="space-y-1.5 text-sm text-ink-600">
                 <li><Link to="/how-it-works" className="hover:text-teal-600">How It Works</Link></li>
                 <li><Link to="/about" className="hover:text-teal-600">About WSL</Link></li>
-                <li><Link to="/login" className="hover:text-teal-600">Demo Access</Link></li>
+                <li><Link to="/login" className="hover:text-teal-600">Sign In</Link></li>
               </ul>
             </div>
             <div>
@@ -34,7 +34,7 @@ export function Footer() {
         </div>
         <div className="mt-8 flex flex-col gap-2 border-t border-ink-100 pt-6 text-xs text-ink-400 sm:flex-row sm:items-center sm:justify-between">
           <span>Jordan 2076 Hackathon — Amman track: Innovation in Education &amp; Learning Systems.</span>
-          <span>All names, organizations, and data on this site are illustrative demo content.</span>
+          <span>Universities and companies are real Jordanian institutions; student profiles, challenges, and ratings shown are illustrative.</span>
         </div>
       </div>
     </footer>

@@ -6,23 +6,28 @@ import { StatTile } from "../../components/ui/Card"
 import { StatusBadge } from "../../components/ui/StatusBadge"
 import { BarList } from "../../components/ui/BarList"
 import { SegmentedBar } from "../../components/ui/SegmentedBar"
-import { getOrg, getStudent, isUniversityStudent, studentsOfUniversity } from "../../lib/selectors"
-import { formatRelative } from "../../lib/format"
+import { daysUntil, formatRelative } from "../../lib/format"
+import { assignmentFor, isRoutedTo, statusAtUniversity } from "../../lib/selectors"
 
 export default function UniversityDashboard() {
   const { university } = useDemoUser()
-  const { challenges, projects, evidence, skillSignals } = useStore()
+  const { challenges, projects, students, evidence, skillSignals, getOrg, getStudent, isUniversityStudent, studentsOfUniversity } = useStore()
   if (!university) return null
 
   const roster = studentsOfUniversity(university.id)
-  const uniChallenges = challenges.filter((c) => c.preferredUniversityId === university.id && c.status !== "Draft")
-  const activeChallenges = uniChallenges.filter((c) => ["University Assigned", "In Progress", "Submissions Under Review"].includes(c.status))
+  const uniChallenges = challenges.filter((c) => assignmentFor(c, university.id))
+  const activeChallenges = uniChallenges.filter((c) =>
+    ["University Assigned", "In Progress", "Submissions Under Review"].includes(statusAtUniversity(c, university.id, projects, students)),
+  )
   const uniProjects = projects.filter((p) => isUniversityStudent(p.studentId, university.id))
   const uniEvidence = evidence.filter((e) => isUniversityStudent(e.studentId, university.id))
   const uniSignals = skillSignals.filter((s) => isUniversityStudent(s.studentId, university.id))
   const companyRatedCount = uniSignals.filter((s) => s.companyRating !== undefined).length
 
-  const needsReview = challenges.filter((c) => c.status === "Sent to University" && (c.preferredUniversityId === university.id || c.preferredUniversityId === null))
+  // Waiting on this university: routed to it, not yet assigned by it, and still open.
+  const needsReview = challenges.filter(
+    (c) => isRoutedTo(c, university.id) && !assignmentFor(c, university.id) && daysUntil(c.deadline) > 0,
+  )
   const projectsAwaitingConfirmation = uniProjects.filter((p) => p.status === "Submissions Under Review")
 
   const confirmationSegments = [
@@ -42,7 +47,7 @@ export default function UniversityDashboard() {
       <PageHeader
         eyebrow="University Dashboard"
         title={university.name}
-        subtitle={`${university.city} · ${university.programs.join(", ")}`}
+        subtitle={`${university.faculty} · ${university.city} · ${university.programs.map((p) => p.name.replace("B.Sc. ", "")).join(", ")}`}
       />
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
@@ -50,7 +55,7 @@ export default function UniversityDashboard() {
         <StatTile label="Student Projects" value={uniProjects.length} />
         <StatTile label="Evidence Submitted" value={uniEvidence.length} />
         <StatTile label="Skills Rated" value={uniSignals.length} hint={`${companyRatedCount} company-rated`} />
-        <StatTile label="Students Participating" value={roster.length} />
+        <StatTile label="Students Participating" value={new Set(uniProjects.map((p) => p.studentId)).size} hint={`of ${roster.length} enrolled`} />
       </div>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
@@ -88,7 +93,7 @@ export default function UniversityDashboard() {
                       <p className="font-semibold text-ink-900">{c.title}</p>
                       <p className="text-xs text-ink-400">{org?.name} · {c.industry}</p>
                     </div>
-                    <StatusBadge status={c.status} />
+                    <StatusBadge status="Sent to University" />
                   </div>
                 </Link>
               )

@@ -9,8 +9,7 @@ import { EmptyState } from "../../components/ui/EmptyState"
 import { BarList } from "../../components/ui/BarList"
 import { SegmentedBar } from "../../components/ui/SegmentedBar"
 import { formatRelative } from "../../lib/format"
-import { bestRating, challengeFor, getOrg, skillsForProject, studentProjects, studentSignals } from "../../lib/selectors"
-import { opportunities } from "../../data/seed"
+import { bestRating, challengeFor, skillsForProject, studentProjects, studentSignals } from "../../lib/selectors"
 
 const RATING_BANDS = [
   { key: "developing", label: "Developing (0-59)", min: 0, max: 59, colorClassName: "bg-teal-100" },
@@ -22,7 +21,7 @@ const MATCH_THRESHOLD = 75
 
 export default function StudentDashboard() {
   const { student } = useDemoUser()
-  const { projects, challenges, evidence, skillSignals } = useStore()
+  const { projects, challenges, evidence, skillSignals, opportunities, getOrg, getProgram } = useStore()
   if (!student) return null
 
   const myProjects = studentProjects(projects, student.id)
@@ -74,7 +73,7 @@ export default function StudentDashboard() {
       <PageHeader
         eyebrow="Student Dashboard"
         title={`Welcome back, ${student.name.split(" ")[0]}`}
-        subtitle={`${student.field} · ${student.year} — this is your living record of demonstrated capability.`}
+        subtitle={`${getProgram(student.programId)?.name ?? student.field} · ${student.year} — this is your living record of demonstrated capability.`}
       />
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">

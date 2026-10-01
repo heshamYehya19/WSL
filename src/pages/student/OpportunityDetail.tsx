@@ -3,15 +3,14 @@ import { useDemoUser } from "../../state/demoUser"
 import { useStore } from "../../state/store"
 import { PageHeader } from "../../components/ui/PageHeader"
 import { SkillChip } from "../../components/ui/SkillChip"
-import { bestRating, getOrg, studentSignals } from "../../lib/selectors"
-import { opportunities } from "../../data/seed"
+import { bestRating, studentSignals } from "../../lib/selectors"
 
 const MATCH_THRESHOLD = 75
 
 export default function OpportunityDetail() {
   const { id } = useParams()
   const { student } = useDemoUser()
-  const { skillSignals } = useStore()
+  const { skillSignals, opportunities, getOrg } = useStore()
   const opportunity = opportunities.find((o) => o.id === id)
 
   if (!opportunity || !student) {
@@ -32,6 +31,7 @@ export default function OpportunityDetail() {
     <div className="mx-auto max-w-3xl">
       <Link to="/student/opportunities" className="text-sm text-ink-400 hover:text-teal-600">← Back to Opportunities</Link>
       <PageHeader eyebrow={`${org?.name} · ${opportunity.type}`} title={opportunity.title} subtitle={opportunity.location} />
+      {org && <p className="-mt-4 mb-6 max-w-2xl text-sm text-ink-500">{org.about}</p>}
 
       <div className="rounded-2xl border border-ink-200 bg-white p-6">
         <p className="text-sm leading-relaxed text-ink-700">{opportunity.description}</p>

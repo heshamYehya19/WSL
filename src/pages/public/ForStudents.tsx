@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom"
 import { SkillChip } from "../../components/ui/SkillChip"
 import { Reveal } from "../../components/ui/Reveal"
+import { useShowcase } from "../../lib/showcase"
 
 const POINTS = [
   {
@@ -26,6 +27,8 @@ const POINTS = [
 ]
 
 export default function ForStudents() {
+  const showcase = useShowcase()
+
   return (
     <div>
       <section className="border-b border-ink-100 bg-white py-16">
@@ -54,18 +57,20 @@ export default function ForStudents() {
           ))}
         </div>
 
+        {showcase && (
         <Reveal className="mt-10 rounded-2xl border border-ink-200 bg-ink-950 p-8">
           <p className="text-xs font-semibold tracking-wide text-teal-300 uppercase">Example: living skill record</p>
-          <h3 className="mt-1 text-lg font-bold text-white">Lina Qasem — Human-Computer Interaction, Jordan Institute of Technology</h3>
+          <h3 className="mt-1 text-lg font-bold text-white">
+            {showcase.student?.name} — {showcase.program?.name ?? showcase.student?.field}, {showcase.university?.name}
+          </h3>
           <div className="mt-4 flex flex-wrap gap-2">
-            <SkillChip skill="UI/UX Design" rating={95} />
-            <SkillChip skill="Frontend Development" rating={92} />
-            <SkillChip skill="Research" rating={85} />
+            {showcase.signals.map((s) => <SkillChip key={s.id} skill={s.skill} rating={s.companyRating ?? s.aiRating} />)}
           </div>
           <p className="mt-4 text-sm text-ink-300">
             This is not what a student claims they know. This is what their work has demonstrated.
           </p>
         </Reveal>
+        )}
 
         <div className="mt-10 text-center">
           <Link

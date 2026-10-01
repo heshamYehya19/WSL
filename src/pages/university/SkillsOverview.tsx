@@ -3,11 +3,11 @@ import { useDemoUser } from "../../state/demoUser"
 import { useStore } from "../../state/store"
 import { PageHeader } from "../../components/ui/PageHeader"
 import { SkillChip } from "../../components/ui/SkillChip"
-import { bestRating, studentSignals, studentsOfUniversity } from "../../lib/selectors"
+import { bestRating, studentSignals } from "../../lib/selectors"
 
 export default function SkillsOverview() {
   const { university } = useDemoUser()
-  const { skillSignals, projects } = useStore()
+  const { skillSignals, projects, studentsOfUniversity } = useStore()
   if (!university) return null
 
   const roster = studentsOfUniversity(university.id)
