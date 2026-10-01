@@ -81,6 +81,8 @@ export interface Evidence {
   title: string
   description: string
   link: string
+  /** Optional pasted content (code, write-up, etc.) — what WSL's AI model actually analyzes. */
+  content?: string
   submittedAt: string
 }
 
@@ -91,6 +93,8 @@ export interface SkillSignal {
   skill: string
   /** WSL's automatic rating (0-100). Generated the moment evidence is submitted — informational only, never blocks anything. */
   aiRating: number
+  /** A short, concrete statistic behind the rating, e.g. "Detected Python code (92% confidence)...". */
+  aiNote: string
   /** The company's own rating (0-100), given after the university confirms the submission. */
   companyRating?: number
   companyRatedAt?: string

@@ -457,6 +457,23 @@ export const evidence: Evidence[] = [
     title: "cafeteria-demand-forecasting",
     description: "Full data pipeline, feature engineering, and model training code (Python, pandas, scikit-learn).",
     link: "github.com/demo-wsl/cafeteria-demand-forecasting",
+    content: `import pandas as pd
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import train_test_split
+
+def build_features(df):
+    df["day_of_week"] = df["date"].dt.dayofweek
+    df["is_holiday"] = df["date"].isin(holiday_dates)
+    return df
+
+df = pd.read_csv("cafeteria_orders.csv", parse_dates=["date"])
+df = build_features(df)
+X_train, X_test, y_train, y_test = train_test_split(
+    df.drop(columns=["demand"]), df["demand"], test_size=0.2
+)
+model = RandomForestRegressor(n_estimators=200, max_depth=8)
+model.fit(X_train, y_train)
+print("R2:", model.score(X_test, y_test))`,
     submittedAt: iso(-6),
   },
   {
@@ -531,14 +548,19 @@ export const evidence: Evidence[] = [
   },
 ]
 
+// aiRating/aiNote below are real output from WSL's trained ML model (src/lib/ml),
+// run against this file's actual evidence text/content — see
+// scripts/ml/regenerate_seed_ratings.mjs, which recomputes these whenever the
+// model or the evidence above changes. Not hand-picked numbers.
 export const skillSignals: SkillSignal[] = [
   {
     id: "sig-1",
     projectId: "proj-cafeteria",
     studentId: "stu-ahmed",
     skill: "Python",
-    aiRating: 94,
-    evidenceIds: ["ev-1", "ev-3"],
+    aiRating: 79,
+    aiNote: "Detected Python code (40% confidence) across 727 characters analyzed.",
+    evidenceIds: ["ev-1"],
     analyzedAt: iso(-3),
   },
   {
@@ -546,8 +568,9 @@ export const skillSignals: SkillSignal[] = [
     projectId: "proj-cafeteria",
     studentId: "stu-ahmed",
     skill: "Data Analysis",
-    aiRating: 91,
-    evidenceIds: ["ev-1", "ev-2"],
+    aiRating: 52,
+    aiNote: "17% topical match to Data Analysis reference material, based on the submitted content's wording.",
+    evidenceIds: ["ev-2"],
     analyzedAt: iso(-3),
   },
   {
@@ -555,8 +578,9 @@ export const skillSignals: SkillSignal[] = [
     projectId: "proj-cafeteria",
     studentId: "stu-ahmed",
     skill: "Machine Learning",
-    aiRating: 88,
-    evidenceIds: ["ev-1", "ev-3"],
+    aiRating: 58,
+    aiNote: "19% topical match to Machine Learning reference material, based on the submitted content's wording.",
+    evidenceIds: ["ev-3"],
     analyzedAt: iso(-3),
   },
   {
@@ -564,8 +588,9 @@ export const skillSignals: SkillSignal[] = [
     projectId: "proj-cafeteria",
     studentId: "stu-ahmed",
     skill: "Data Visualization",
-    aiRating: 85,
-    evidenceIds: ["ev-2", "ev-4"],
+    aiRating: 39,
+    aiNote: "12% topical match to Data Visualization reference material, based on the submitted content's wording.",
+    evidenceIds: ["ev-2"],
     analyzedAt: iso(-3),
   },
   {
@@ -573,7 +598,8 @@ export const skillSignals: SkillSignal[] = [
     projectId: "proj-churn-sara",
     studentId: "stu-sara",
     skill: "Python",
-    aiRating: 82,
+    aiRating: 35,
+    aiNote: "No Python code detected in the submitted content — closest match was Prose (35% confidence).",
     evidenceIds: ["ev-5"],
     analyzedAt: iso(-4),
   },
@@ -582,8 +608,19 @@ export const skillSignals: SkillSignal[] = [
     projectId: "proj-churn-sara",
     studentId: "stu-sara",
     skill: "Data Analysis",
-    aiRating: 87,
-    evidenceIds: ["ev-5", "ev-6"],
+    aiRating: 97,
+    aiNote: "47% topical match to Data Analysis reference material, based on the submitted content's wording.",
+    evidenceIds: ["ev-5"],
+    analyzedAt: iso(-4),
+  },
+  {
+    id: "sig-11",
+    projectId: "proj-churn-sara",
+    studentId: "stu-sara",
+    skill: "Machine Learning",
+    aiRating: 16,
+    aiNote: "Submitted content doesn't clearly relate to Machine Learning — only 3% topical match.",
+    evidenceIds: ["ev-5"],
     analyzedAt: iso(-4),
   },
   {
@@ -591,8 +628,9 @@ export const skillSignals: SkillSignal[] = [
     projectId: "proj-churn-sara",
     studentId: "stu-sara",
     skill: "Problem Solving",
-    aiRating: 80,
-    evidenceIds: ["ev-6"],
+    aiRating: 18,
+    aiNote: "Submitted content doesn't clearly relate to Problem Solving — only 4% topical match.",
+    evidenceIds: ["ev-5"],
     analyzedAt: iso(-4),
   },
   {
@@ -600,10 +638,11 @@ export const skillSignals: SkillSignal[] = [
     projectId: "proj-support-portal",
     studentId: "stu-lina",
     skill: "UI/UX Design",
-    aiRating: 93,
+    aiRating: 97,
+    aiNote: "38% topical match to UI/UX Design reference material, based on the submitted content's wording.",
     companyRating: 95,
     companyRatedAt: iso(-80),
-    evidenceIds: ["ev-7"],
+    evidenceIds: ["ev-8"],
     analyzedAt: iso(-95),
   },
   {
@@ -611,7 +650,8 @@ export const skillSignals: SkillSignal[] = [
     projectId: "proj-support-portal",
     studentId: "stu-lina",
     skill: "Frontend Development",
-    aiRating: 90,
+    aiRating: 38,
+    aiNote: "No Frontend Development code detected in the submitted content — closest match was Prose (24% confidence).",
     companyRating: 92,
     companyRatedAt: iso(-80),
     evidenceIds: ["ev-7"],
@@ -622,7 +662,8 @@ export const skillSignals: SkillSignal[] = [
     projectId: "proj-support-portal",
     studentId: "stu-lina",
     skill: "Research",
-    aiRating: 88,
+    aiRating: 82,
+    aiNote: "28% topical match to Research reference material, based on the submitted content's wording.",
     companyRating: 85,
     companyRatedAt: iso(-80),
     evidenceIds: ["ev-8"],

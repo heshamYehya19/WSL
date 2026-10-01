@@ -15,10 +15,10 @@ export function FlowLoop({ compact = false }: { compact?: boolean }) {
       {STEPS.map((step, i) => (
         <div
           key={step.label}
-          className="relative flex flex-col gap-2 rounded-xl border border-ink-200 bg-white px-4 py-3.5 transition-all duration-300 hover:-translate-y-1 hover:border-teal-300 hover:shadow-md hover:shadow-ink-950/5"
+          className="relative flex flex-col gap-2 rounded-xl border border-ink-200 bg-surface px-4 py-3.5 transition-all duration-300 hover:-translate-y-1 hover:border-teal-300 hover:shadow-md hover:shadow-ink-950/5"
         >
           <div className="flex items-center gap-2">
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-ink-950 text-[11px] font-bold text-teal-300">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-night text-[11px] font-bold text-teal-300">
               {i + 1}
             </span>
             <span className="text-sm font-semibold text-ink-900">{step.label}</span>

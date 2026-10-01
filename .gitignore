@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Re-fetchable raw training data cache (scripts/ml/train.py repopulates this
+# from GitHub/Wikipedia on a clean run) — the trained model artifacts that
+# actually ship with the app live in src/lib/ml/*.json, not here.
+scripts/ml/cache/

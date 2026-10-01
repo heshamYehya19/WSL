@@ -19,7 +19,7 @@ function AudienceCard({
   return (
     <div
       className={`w-40 shrink-0 rounded-2xl border p-3 shadow-xl backdrop-blur-sm sm:w-44 ${
-        highlighted ? "z-20 border-teal-400/40 bg-ink-900/95" : "z-10 border-white/10 bg-ink-900/80"
+        highlighted ? "z-20 border-teal-400/40 bg-night/95" : "z-10 border-white/10 bg-night/80"
       } ${className}`}
     >
       <div className="mb-2.5 flex items-center justify-between gap-2">

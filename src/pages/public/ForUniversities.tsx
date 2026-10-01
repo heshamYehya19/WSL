@@ -24,7 +24,7 @@ const POINTS = [
 export default function ForUniversities() {
   return (
     <div>
-      <section className="border-b border-ink-100 bg-white py-16">
+      <section className="border-b border-ink-100 bg-surface py-16">
         <div className="mx-auto max-w-4xl px-4 text-center sm:px-6">
           <div className="text-xs font-semibold tracking-wide text-teal-600 uppercase">For Universities</div>
           <h1 className="mt-2 text-3xl font-bold tracking-tight text-ink-950 sm:text-4xl">
@@ -42,7 +42,7 @@ export default function ForUniversities() {
             <Reveal
               key={p.title}
               delay={i * 80}
-              className="rounded-2xl border border-ink-200 bg-white p-5 transition-all duration-300 hover:-translate-y-1 hover:border-teal-300 hover:shadow-lg hover:shadow-ink-950/5"
+              className="rounded-2xl border border-ink-200 bg-surface p-5 transition-all duration-300 hover:-translate-y-1 hover:border-teal-300 hover:shadow-lg hover:shadow-ink-950/5"
             >
               <h3 className="font-semibold text-ink-900">{p.title}</h3>
               <p className="mt-1.5 text-sm leading-relaxed text-ink-500">{p.body}</p>
@@ -64,7 +64,7 @@ export default function ForUniversities() {
         <div className="mt-10 text-center">
           <Link
             to="/login"
-            className="inline-block rounded-full bg-ink-950 px-6 py-3 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-teal-600 hover:shadow-lg hover:shadow-teal-600/20 active:translate-y-0"
+            className="inline-block rounded-full bg-night px-6 py-3 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-teal-600 hover:shadow-lg hover:shadow-teal-600/20 active:translate-y-0"
           >
             Continue as a University
           </Link>

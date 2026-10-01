@@ -2,6 +2,7 @@ import { useState } from "react"
 import { NavLink } from "react-router-dom"
 import { Wordmark } from "../ui/Wordmark"
 import { DemoSwitcher } from "./DemoSwitcher"
+import { ThemeToggle } from "../ui/ThemeToggle"
 import { useDemoUser } from "../../state/demoUser"
 
 const LINKS = [
@@ -17,7 +18,7 @@ export function PublicNav() {
   const { session } = useDemoUser()
 
   return (
-    <header className="sticky top-0 z-50 border-b border-ink-100 bg-white/90 backdrop-blur">
+    <header className="sticky top-0 z-50 border-b border-ink-100 bg-surface/90 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
         <Wordmark />
         <nav className="hidden items-center gap-6 lg:flex">
@@ -38,12 +39,13 @@ export function PublicNav() {
           ))}
         </nav>
         <div className="flex items-center gap-3">
+          <ThemeToggle />
           {session.role !== "guest" ? (
             <DemoSwitcher />
           ) : (
             <NavLink
               to="/login"
-              className="rounded-full bg-ink-950 px-4 py-2 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-teal-600 hover:shadow-lg hover:shadow-teal-600/20 active:translate-y-0"
+              className="rounded-full bg-night px-4 py-2 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-teal-600 hover:shadow-lg hover:shadow-teal-600/20 active:translate-y-0"
             >
               Demo Access
             </NavLink>

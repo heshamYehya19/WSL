@@ -23,7 +23,7 @@ export default function MyProjects() {
         <EmptyState
           title="No projects yet"
           description="Start a project from Challenge Discovery to begin building your evidence record."
-          action={<Link to="/student/challenges" className="rounded-full bg-ink-950 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-600">Discover Challenges</Link>}
+          action={<Link to="/student/challenges" className="rounded-full bg-night px-4 py-2 text-sm font-semibold text-white hover:bg-teal-600">Discover Challenges</Link>}
         />
       ) : (
         <div className="space-y-4">
@@ -33,7 +33,7 @@ export default function MyProjects() {
             const myEv = evidence.filter((e) => e.projectId === p.id)
             const mySignals = skillsForProject(skillSignals, p.id)
             return (
-              <Link key={p.id} to={`/student/projects/${p.id}`} className="block rounded-2xl border border-ink-200 bg-white p-5 hover:border-teal-400">
+              <Link key={p.id} to={`/student/projects/${p.id}`} className="block rounded-2xl border border-ink-200 bg-surface p-5 hover:border-teal-400">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <h3 className="font-semibold text-ink-900">{p.title}</h3>

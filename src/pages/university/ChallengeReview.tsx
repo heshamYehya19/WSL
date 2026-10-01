@@ -34,11 +34,11 @@ export default function ChallengeReview() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-5 lg:col-span-2">
-          <div className="rounded-2xl border border-ink-200 bg-white p-5">
+          <div className="rounded-2xl border border-ink-200 bg-surface p-5">
             <h3 className="mb-2 text-xs font-semibold tracking-wide text-teal-600 uppercase">Problem</h3>
             <p className="text-sm leading-relaxed text-ink-700">{challenge.problemDescription}</p>
           </div>
-          <div className="rounded-2xl border border-ink-200 bg-white p-5">
+          <div className="rounded-2xl border border-ink-200 bg-surface p-5">
             <h3 className="mb-2 text-xs font-semibold tracking-wide text-teal-600 uppercase">Required Skills</h3>
             <div className="flex flex-wrap gap-1.5">
               {challenge.requiredSkills.map((s) => (
@@ -46,7 +46,7 @@ export default function ChallengeReview() {
               ))}
             </div>
           </div>
-          <div className="rounded-2xl border border-ink-200 bg-white p-5">
+          <div className="rounded-2xl border border-ink-200 bg-surface p-5">
             <h3 className="mb-2 text-xs font-semibold tracking-wide text-teal-600 uppercase">Learning Outcomes</h3>
             <ul className="space-y-1.5">
               {challenge.learningOutcomes.map((o) => (
@@ -54,14 +54,14 @@ export default function ChallengeReview() {
               ))}
             </ul>
           </div>
-          <div className="rounded-2xl border border-ink-200 bg-white p-5">
+          <div className="rounded-2xl border border-ink-200 bg-surface p-5">
             <h3 className="mb-2 text-xs font-semibold tracking-wide text-teal-600 uppercase">Data Sensitivity &amp; Expected Output</h3>
             <p className="text-sm text-ink-700"><strong>{challenge.dataSensitivity}</strong> · {challenge.datasetAvailability}</p>
             <p className="mt-2 text-sm text-ink-700">{challenge.expectedOutput}</p>
             <p className="mt-2 text-xs text-ink-400">WSL already screened this challenge automatically for private or confidential data.</p>
           </div>
 
-          <div className="rounded-2xl border border-ink-200 bg-white p-5">
+          <div className="rounded-2xl border border-ink-200 bg-surface p-5">
             <h3 className="mb-3 text-xs font-semibold tracking-wide text-teal-600 uppercase">Timeline</h3>
             <ul className="space-y-2">
               {challenge.history.map((h, i) => (
@@ -79,7 +79,7 @@ export default function ChallengeReview() {
         </div>
 
         <div>
-          <div className="sticky top-24 rounded-2xl border border-ink-200 bg-white p-5">
+          <div className="sticky top-24 rounded-2xl border border-ink-200 bg-surface p-5">
             <h3 className="mb-3 font-semibold text-ink-900">Assign to Students</h3>
             {canAssign ? (
               <div className="space-y-3">
@@ -96,7 +96,7 @@ export default function ChallengeReview() {
                 </div>
                 <button
                   onClick={() => assignChallenge(challenge.id, program)}
-                  className="w-full rounded-lg bg-ink-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-600"
+                  className="w-full rounded-lg bg-night px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-600"
                 >
                   Assign to Students
                 </button>

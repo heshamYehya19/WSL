@@ -41,12 +41,12 @@ export default function ChallengeDiscovery() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search by title or skill..."
-          className="min-w-56 flex-1 rounded-xl border border-ink-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-teal-400"
+          className="min-w-56 flex-1 rounded-xl border border-ink-200 bg-surface px-4 py-2.5 text-sm outline-none focus:border-teal-400"
         />
         <select
           value={industry}
           onChange={(e) => setIndustry(e.target.value)}
-          className="rounded-xl border border-ink-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-teal-400"
+          className="rounded-xl border border-ink-200 bg-surface px-4 py-2.5 text-sm outline-none focus:border-teal-400"
         >
           {industries.map((i) => (
             <option key={i} value={i}>{i}</option>
@@ -65,10 +65,10 @@ export default function ChallengeDiscovery() {
               <Link
                 key={c.id}
                 to={`/student/challenges/${c.id}`}
-                className="flex flex-col rounded-2xl border border-ink-200 bg-white p-5 transition-colors hover:border-teal-400"
+                className="flex flex-col rounded-2xl border border-ink-200 bg-surface p-5 transition-colors hover:border-teal-400"
               >
                 <div className="mb-2 flex items-start justify-between gap-2">
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-ink-950 text-[11px] font-bold text-teal-300">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-night text-[11px] font-bold text-teal-300">
                     {org?.logoInitials}
                   </span>
                   <span className="rounded-full border border-ink-200 px-2 py-0.5 text-[11px] font-medium text-ink-500">{c.visibility}</span>

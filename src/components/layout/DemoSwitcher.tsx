@@ -29,7 +29,7 @@ export function DemoSwitcher() {
     <div className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-2 rounded-full border border-ink-200 bg-white px-3 py-1.5 text-sm font-medium text-ink-700 hover:border-teal-400"
+        className="flex items-center gap-2 rounded-full border border-ink-200 bg-surface px-3 py-1.5 text-sm font-medium text-ink-700 hover:border-teal-400"
       >
         <span className="flex h-2 w-2 rounded-full bg-teal-400" />
         Demo: {currentLabel}
@@ -38,7 +38,7 @@ export function DemoSwitcher() {
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 z-50 mt-2 w-80 rounded-xl border border-ink-200 bg-white p-3 shadow-xl">
+          <div className="absolute right-0 z-50 mt-2 w-80 rounded-xl border border-ink-200 bg-surface p-3 shadow-xl">
             <p className="px-1 pb-2 text-xs text-ink-400">
               No real login required — switch personas to explore the full WSL loop.
             </p>

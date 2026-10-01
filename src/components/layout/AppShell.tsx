@@ -3,6 +3,7 @@ import { NavLink, Navigate, Outlet } from "react-router-dom"
 import type { ReactNode } from "react"
 import { Wordmark } from "../ui/Wordmark"
 import { DemoSwitcher } from "./DemoSwitcher"
+import { ThemeToggle } from "../ui/ThemeToggle"
 import { useDemoUser } from "../../state/demoUser"
 import { AmbientConstellation } from "../ui/AmbientConstellation"
 import type { Role } from "../../types"
@@ -66,7 +67,7 @@ export function AppShell({ role }: { role: Exclude<Role, "guest"> }) {
   return (
     <div className="relative isolate flex min-h-screen bg-ink-50">
       <AmbientConstellation />
-      <aside className="relative z-10 hidden w-64 shrink-0 flex-col border-r border-ink-100 bg-white px-4 py-5 md:flex">
+      <aside className="relative z-10 hidden w-64 shrink-0 flex-col border-r border-ink-100 bg-surface px-4 py-5 md:flex">
         <Wordmark />
         <div className="mt-6 rounded-xl bg-ink-50 px-3 py-2.5">
           <div className="text-[11px] font-semibold tracking-wide text-teal-600 uppercase">{ROLE_LABEL[role]} view</div>
@@ -81,7 +82,7 @@ export function AppShell({ role }: { role: Exclude<Role, "guest"> }) {
               end={item.to === `/${role}`}
               className={({ isActive }) =>
                 `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-                  isActive ? "bg-ink-950 text-white" : "text-ink-600 hover:bg-ink-50"
+                  isActive ? "bg-night text-white" : "text-ink-600 hover:bg-ink-50"
                 }`
               }
             >
@@ -96,7 +97,7 @@ export function AppShell({ role }: { role: Exclude<Role, "guest"> }) {
       </aside>
 
       <div className="relative z-10 flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-ink-100 bg-white/90 px-4 backdrop-blur sm:px-6">
+        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-ink-100 bg-surface/90 px-4 backdrop-blur sm:px-6">
           <div className="flex items-center gap-2 md:hidden">
             <Wordmark />
           </div>
@@ -116,7 +117,7 @@ export function AppShell({ role }: { role: Exclude<Role, "guest"> }) {
               {notifOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setNotifOpen(false)} />
-                  <div className="absolute right-0 z-50 mt-2 w-72 rounded-xl border border-ink-200 bg-white p-2 shadow-xl">
+                  <div className="absolute right-0 z-50 mt-2 w-72 rounded-xl border border-ink-200 bg-surface p-2 shadow-xl">
                     <div className="rounded-lg px-3 py-2 text-sm hover:bg-ink-50">
                       <div className="font-medium text-ink-800">WSL rated a new submission</div>
                       <div className="text-xs text-ink-500">A student's evidence was rated automatically and is ready for your review.</div>
@@ -129,6 +130,7 @@ export function AppShell({ role }: { role: Exclude<Role, "guest"> }) {
                 </>
               )}
             </div>
+            <ThemeToggle />
             <DemoSwitcher />
           </div>
         </header>

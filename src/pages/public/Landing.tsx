@@ -10,7 +10,7 @@ export default function Landing() {
   return (
     <div>
       {/* HERO */}
-      <section className="relative overflow-hidden border-b border-ink-100 bg-ink-950">
+      <section className="relative overflow-hidden border-b border-ink-100 bg-night">
         <div className="bg-grid pointer-events-none absolute inset-0 opacity-60" />
         <div className="pointer-events-none absolute -top-40 right-0 h-96 w-96 rounded-full bg-teal-500/10 blur-3xl" />
         <div className="relative mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20">
@@ -99,7 +99,7 @@ export default function Landing() {
       </section>
 
       {/* THREE AUDIENCES */}
-      <section className="border-y border-ink-100 bg-white py-16">
+      <section className="border-y border-ink-100 bg-surface py-16">
         <div className="mx-auto grid max-w-7xl gap-6 px-4 sm:px-6 lg:grid-cols-3">
           <Reveal delay={0} className="rounded-2xl border border-ink-200 p-6 transition-all duration-300 hover:-translate-y-1 hover:border-teal-300 hover:shadow-lg hover:shadow-ink-950/5">
             <div className="mb-3 text-xs font-semibold tracking-wide text-teal-600 uppercase">For Students</div>
@@ -155,7 +155,7 @@ export default function Landing() {
               </p>
             </div>
           </Reveal>
-          <Reveal delay={150} className="rounded-2xl border border-ink-200 bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
+          <Reveal delay={150} className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
             <div className="mb-3 flex items-center justify-between">
               <span className="text-sm font-semibold text-ink-800">Cafeteria Demand Prediction</span>
               <StatusBadge status="Submissions Under Review" />
@@ -183,7 +183,7 @@ export default function Landing() {
       </section>
 
       {/* SKILLS PREVIEW / EMPLOYER TRUST */}
-      <section className="border-t border-ink-100 bg-ink-950 py-20">
+      <section className="border-t border-ink-100 bg-night py-20">
         <Reveal className="mx-auto max-w-5xl px-4 text-center sm:px-6">
           <h2 className="text-2xl font-bold text-white sm:text-3xl">Don't just tell employers what you know.</h2>
           <h2 className="text-2xl font-bold text-teal-300 sm:text-3xl">Show them what you've done.</h2>

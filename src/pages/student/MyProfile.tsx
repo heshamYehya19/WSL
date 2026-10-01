@@ -12,7 +12,7 @@ export default function MyProfile() {
     <div className="mx-auto max-w-4xl">
       <PageHeader eyebrow="My Profile" title="Living Skill Record" subtitle={undefined} />
 
-      <div className="rounded-2xl border border-ink-200 bg-ink-950 p-6">
+      <div className="rounded-2xl border border-ink-200 bg-night p-6">
         <div className="flex flex-wrap items-center gap-4">
           <span className="flex h-14 w-14 items-center justify-center rounded-full bg-teal-500 text-lg font-bold text-ink-950">
             {student.initials}

@@ -1,10 +1,14 @@
 @import "tailwindcss";
 
+/* Dark mode is opt-in via a `.dark` class on <html> (toggled by ThemeProvider),
+   not just the OS media query — this lets the sun/moon control actually work. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
   --font-arabic: "Noto Kufi Arabic", "Segoe UI", sans-serif;
 
-  /* Ink / neutral scale */
+  /* Ink / neutral scale — redefined under .dark below */
   --color-ink-950: #0a1620;
   --color-ink-900: #0e1f2b;
   --color-ink-800: #142c3b;
@@ -17,7 +21,16 @@
   --color-ink-100: #e6eef1;
   --color-ink-50: #f4f8f9;
 
-  /* Brand teal (وصل / connection) */
+  /* Card / header surfaces — redefined under .dark. Deliberately NOT "white",
+     so brand-dark panels (below) can keep using real white text on top of them
+     without that getting swept up in the surface inversion. */
+  --color-surface: #ffffff;
+
+  /* Fixed-dark brand surface (primary buttons, hero, sidebar active state) —
+     intentionally the SAME in both themes, never inverted. */
+  --color-night: #0a1620;
+
+  /* Brand teal (وصل / connection) — redefined under .dark below */
   --color-teal-700: #0f766e;
   --color-teal-600: #0d9488;
   --color-teal-500: #14b8a6;
@@ -25,18 +38,59 @@
   --color-teal-300: #5eead4;
   --color-teal-100: #ccfbf1;
 
-  /* Amber accent (pending / human review) */
+  /* Amber accent (pending / human review) — redefined under .dark below */
   --color-amber-600: #b45309;
   --color-amber-500: #d97706;
   --color-amber-400: #f2c879;
   --color-amber-100: #fef3d9;
 
-  /* Status */
+  /* Status — redefined under .dark below */
   --color-verified-600: #15803d;
   --color-verified-500: #16a34a;
   --color-verified-100: #dcfce7;
   --color-danger-600: #b91c1c;
   --color-danger-100: #fee2e2;
+}
+
+/* Dark theme: redeclares the same CSS variables with inverted lightness, so
+   every utility class built on them (bg-ink-50, text-ink-900, bg-teal-100...)
+   adapts automatically with no per-component dark: classes needed. Brand-dark
+   surfaces (--color-night) and literal white-on-dark accents are deliberately
+   left out — they're already dark/light by design in both themes. */
+:root.dark {
+  /* Deliberately darker than --color-night so night-colored buttons/badges
+     (fixed-dark brand surfaces) still stand out against the page background
+     instead of disappearing into it. */
+  --color-ink-50: #050a11;
+  --color-ink-100: #141f2c;
+  --color-ink-200: #22303f;
+  --color-ink-300: #56708a;
+  --color-ink-400: #8099aa;
+  --color-ink-500: #9cb1be;
+  --color-ink-600: #b9cad3;
+  --color-ink-700: #d3dee3;
+  --color-ink-800: #e6edf0;
+  --color-ink-900: #f3f6f7;
+  --color-ink-950: #ffffff;
+
+  --color-surface: #101c29;
+
+  --color-teal-50: #0c2b28;
+  --color-teal-100: #103b35;
+  --color-teal-700: #5eead4;
+  --color-teal-600: #2dd4bf;
+
+  --color-amber-100: #3a2a10;
+  --color-amber-600: #f2c879;
+
+  --color-verified-100: #0f2e1c;
+  --color-verified-600: #4ade80;
+
+  --color-danger-100: #3a1414;
+  --color-danger-600: #f87171;
+
+  --color-sky-100: #0c2436;
+  --color-sky-700: #7dd3fc;
 }
 
 html {
@@ -48,11 +102,17 @@ body {
   color: var(--color-ink-900);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 ::selection {
   background: var(--color-teal-300);
   color: var(--color-ink-950);
+}
+
+:root.dark ::selection {
+  background: var(--color-teal-400);
+  color: var(--color-night);
 }
 
 .font-arabic {

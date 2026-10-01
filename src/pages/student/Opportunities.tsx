@@ -27,7 +27,7 @@ export default function Opportunities() {
           const org = getOrg(o.organizationId)
           const matched = o.requiredSkills.filter((s) => ratedNames.has(s))
           return (
-            <Link key={o.id} to={`/student/opportunities/${o.id}`} className="rounded-2xl border border-ink-200 bg-white p-5 hover:border-teal-400">
+            <Link key={o.id} to={`/student/opportunities/${o.id}`} className="rounded-2xl border border-ink-200 bg-surface p-5 hover:border-teal-400">
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <h3 className="font-semibold text-ink-900">{o.title}</h3>

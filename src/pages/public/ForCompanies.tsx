@@ -19,7 +19,7 @@ const VISIBILITY = [
 export default function ForCompanies() {
   return (
     <div>
-      <section className="border-b border-ink-100 bg-white py-16">
+      <section className="border-b border-ink-100 bg-surface py-16">
         <div className="mx-auto max-w-4xl px-4 text-center sm:px-6">
           <div className="text-xs font-semibold tracking-wide text-teal-600 uppercase">For Companies</div>
           <h1 className="mt-2 text-3xl font-bold tracking-tight text-ink-950 sm:text-4xl">
@@ -45,9 +45,9 @@ export default function ForCompanies() {
               <Reveal
                 key={v.label}
                 delay={i * 80}
-                className="rounded-2xl border border-ink-200 bg-white p-5 transition-all duration-300 hover:-translate-y-1 hover:border-teal-300 hover:shadow-lg hover:shadow-ink-950/5"
+                className="rounded-2xl border border-ink-200 bg-surface p-5 transition-all duration-300 hover:-translate-y-1 hover:border-teal-300 hover:shadow-lg hover:shadow-ink-950/5"
               >
-                <div className="mb-2 inline-flex rounded-full bg-ink-950 px-3 py-1 text-xs font-semibold text-teal-300">
+                <div className="mb-2 inline-flex rounded-full bg-night px-3 py-1 text-xs font-semibold text-teal-300">
                   {v.label}
                 </div>
                 <p className="text-sm leading-relaxed text-ink-500">{v.body}</p>
@@ -57,14 +57,14 @@ export default function ForCompanies() {
         </div>
 
         <div className="mt-10 grid gap-6 sm:grid-cols-2">
-          <Reveal className="rounded-2xl border border-ink-200 bg-white p-5 transition-all duration-300 hover:-translate-y-1 hover:border-teal-300 hover:shadow-lg hover:shadow-ink-950/5">
+          <Reveal className="rounded-2xl border border-ink-200 bg-surface p-5 transition-all duration-300 hover:-translate-y-1 hover:border-teal-300 hover:shadow-lg hover:shadow-ink-950/5">
             <h3 className="font-semibold text-ink-900">Matched to a program, not a queue</h3>
             <p className="mt-1.5 text-sm leading-relaxed text-ink-500">
               Accepted challenges are assigned to an entire college or program — not left waiting in a
               generic backlog for one student to pick up.
             </p>
           </Reveal>
-          <Reveal delay={100} className="rounded-2xl border border-ink-200 bg-white p-5 transition-all duration-300 hover:-translate-y-1 hover:border-teal-300 hover:shadow-lg hover:shadow-ink-950/5">
+          <Reveal delay={100} className="rounded-2xl border border-ink-200 bg-surface p-5 transition-all duration-300 hover:-translate-y-1 hover:border-teal-300 hover:shadow-lg hover:shadow-ink-950/5">
             <h3 className="font-semibold text-ink-900">Evidence, not an opaque score</h3>
             <p className="mt-1.5 text-sm leading-relaxed text-ink-500">
               Talent Discovery never ranks candidates with a mystery score. You see WSL's automatic rating, the exact evidence behind it, and can add your own rating too.
@@ -75,7 +75,7 @@ export default function ForCompanies() {
         <div className="mt-10 text-center">
           <Link
             to="/login"
-            className="inline-block rounded-full bg-ink-950 px-6 py-3 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-teal-600 hover:shadow-lg hover:shadow-teal-600/20 active:translate-y-0"
+            className="inline-block rounded-full bg-night px-6 py-3 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-teal-600 hover:shadow-lg hover:shadow-teal-600/20 active:translate-y-0"
           >
             Continue as a Company
           </Link>

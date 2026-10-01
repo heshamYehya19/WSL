@@ -1,7 +1,7 @@
 import type { ReactNode } from "react"
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <div className={`rounded-2xl border border-ink-200 bg-white ${className}`}>{children}</div>
+  return <div className={`rounded-2xl border border-ink-200 bg-surface ${className}`}>{children}</div>
 }
 
 export function CardHeader({ title, subtitle, action }: { title: ReactNode; subtitle?: ReactNode; action?: ReactNode }) {
@@ -18,7 +18,7 @@ export function CardHeader({ title, subtitle, action }: { title: ReactNode; subt
 
 export function StatTile({ label, value, hint }: { label: string; value: ReactNode; hint?: string }) {
   return (
-    <div className="rounded-2xl border border-ink-200 bg-white px-5 py-4">
+    <div className="rounded-2xl border border-ink-200 bg-surface px-5 py-4">
       <div className="text-2xl font-bold tracking-tight text-ink-900">{value}</div>
       <div className="mt-1 text-sm text-ink-500">{label}</div>
       {hint && <div className="mt-1 text-xs text-teal-600">{hint}</div>}

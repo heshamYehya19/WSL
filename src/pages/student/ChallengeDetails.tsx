@@ -58,7 +58,7 @@ export default function ChallengeDetails() {
       />
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="rounded-2xl border border-ink-200 bg-white px-6 lg:col-span-2">
+        <div className="rounded-2xl border border-ink-200 bg-surface px-6 lg:col-span-2">
           <Section title="The Problem">
             <p className="text-sm leading-relaxed text-ink-700">{challenge.problemDescription}</p>
           </Section>
@@ -111,7 +111,7 @@ export default function ChallengeDetails() {
         </div>
 
         <div>
-          <div className="sticky top-24 rounded-2xl border border-ink-200 bg-white p-5">
+          <div className="sticky top-24 rounded-2xl border border-ink-200 bg-surface p-5">
             <dl className="space-y-3 text-sm">
               <div className="flex justify-between"><dt className="text-ink-400">Difficulty</dt><dd className="font-medium text-ink-800">{challenge.difficulty}</dd></div>
               <div className="flex justify-between"><dt className="text-ink-400">Deadline</dt><dd className="font-medium text-ink-800">{formatDate(challenge.deadline)}</dd></div>
@@ -124,7 +124,7 @@ export default function ChallengeDetails() {
             <button
               onClick={handleStart}
               disabled={!student}
-              className="mt-3 w-full rounded-xl bg-ink-950 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-teal-600 disabled:opacity-50"
+              className="mt-3 w-full rounded-xl bg-night px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-teal-600 disabled:opacity-50"
             >
               {existingProject ? "Go to Project" : "Start Project"}
             </button>

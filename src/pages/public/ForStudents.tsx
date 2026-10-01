@@ -28,7 +28,7 @@ const POINTS = [
 export default function ForStudents() {
   return (
     <div>
-      <section className="border-b border-ink-100 bg-white py-16">
+      <section className="border-b border-ink-100 bg-surface py-16">
         <div className="mx-auto max-w-4xl px-4 text-center sm:px-6">
           <div className="text-xs font-semibold tracking-wide text-teal-600 uppercase">For Students</div>
           <h1 className="mt-2 text-3xl font-bold tracking-tight text-ink-950 sm:text-4xl">
@@ -46,7 +46,7 @@ export default function ForStudents() {
             <Reveal
               key={p.title}
               delay={i * 80}
-              className="rounded-2xl border border-ink-200 bg-white p-5 transition-all duration-300 hover:-translate-y-1 hover:border-teal-300 hover:shadow-lg hover:shadow-ink-950/5"
+              className="rounded-2xl border border-ink-200 bg-surface p-5 transition-all duration-300 hover:-translate-y-1 hover:border-teal-300 hover:shadow-lg hover:shadow-ink-950/5"
             >
               <h3 className="font-semibold text-ink-900">{p.title}</h3>
               <p className="mt-1.5 text-sm leading-relaxed text-ink-500">{p.body}</p>
@@ -54,7 +54,7 @@ export default function ForStudents() {
           ))}
         </div>
 
-        <Reveal className="mt-10 rounded-2xl border border-ink-200 bg-ink-950 p-8">
+        <Reveal className="mt-10 rounded-2xl border border-ink-200 bg-night p-8">
           <p className="text-xs font-semibold tracking-wide text-teal-300 uppercase">Example: living skill record</p>
           <h3 className="mt-1 text-lg font-bold text-white">Lina Qasem — Human-Computer Interaction, Jordan Institute of Technology</h3>
           <div className="mt-4 flex flex-wrap gap-2">
@@ -70,7 +70,7 @@ export default function ForStudents() {
         <div className="mt-10 text-center">
           <Link
             to="/login"
-            className="inline-block rounded-full bg-ink-950 px-6 py-3 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-teal-600 hover:shadow-lg hover:shadow-teal-600/20 active:translate-y-0"
+            className="inline-block rounded-full bg-night px-6 py-3 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-teal-600 hover:shadow-lg hover:shadow-teal-600/20 active:translate-y-0"
           >
             Continue as a Student
           </Link>

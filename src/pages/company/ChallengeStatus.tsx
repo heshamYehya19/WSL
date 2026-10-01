@@ -44,7 +44,7 @@ export default function ChallengeStatus() {
         <StatusBadge status={challenge.status} />
       </div>
 
-      <div className="rounded-2xl border border-ink-200 bg-white p-6">
+      <div className="rounded-2xl border border-ink-200 bg-surface p-6">
         <h3 className="mb-4 text-xs font-semibold tracking-wide text-teal-600 uppercase">Pipeline Progress</h3>
         <div className="flex flex-wrap gap-2">
           {PIPELINE.map((s, i) => (
@@ -58,7 +58,7 @@ export default function ChallengeStatus() {
           {challenge.status === "Draft" && (
             <button
               onClick={() => submitDraft(challenge.id)}
-              className="rounded-lg bg-ink-950 px-5 py-2.5 text-sm font-semibold text-white hover:bg-teal-600"
+              className="rounded-lg bg-night px-5 py-2.5 text-sm font-semibold text-white hover:bg-teal-600"
             >
               Submit for Review
             </button>
@@ -96,7 +96,7 @@ export default function ChallengeStatus() {
         </div>
       </div>
 
-      <div className="mt-6 rounded-2xl border border-ink-200 bg-white p-6">
+      <div className="mt-6 rounded-2xl border border-ink-200 bg-surface p-6">
         <h3 className="mb-3 text-xs font-semibold tracking-wide text-teal-600 uppercase">Student Submissions</h3>
         {relatedProjects.length === 0 ? (
           <p className="text-sm text-ink-400">No students have started this challenge yet.</p>
@@ -125,7 +125,7 @@ export default function ChallengeStatus() {
         </p>
       </div>
 
-      <div className="mt-6 rounded-2xl border border-ink-200 bg-white p-6">
+      <div className="mt-6 rounded-2xl border border-ink-200 bg-surface p-6">
         <h3 className="mb-3 text-xs font-semibold tracking-wide text-teal-600 uppercase">History</h3>
         <ul className="space-y-2">
           {challenge.history.map((h, i) => (

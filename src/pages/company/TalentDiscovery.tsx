@@ -54,12 +54,12 @@ export default function TalentDiscovery() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search rated skills, e.g. Python + Machine Learning"
-          className="min-w-64 flex-1 rounded-xl border border-ink-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-teal-400"
+          className="min-w-64 flex-1 rounded-xl border border-ink-200 bg-surface px-4 py-2.5 text-sm outline-none focus:border-teal-400"
         />
-        <select value={field} onChange={(e) => setField(e.target.value)} className="rounded-xl border border-ink-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-teal-400">
+        <select value={field} onChange={(e) => setField(e.target.value)} className="rounded-xl border border-ink-200 bg-surface px-4 py-2.5 text-sm outline-none focus:border-teal-400">
           {fields.map((f) => <option key={f} value={f}>{f}</option>)}
         </select>
-        <select value={uniFilter} onChange={(e) => setUniFilter(e.target.value)} className="rounded-xl border border-ink-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-teal-400">
+        <select value={uniFilter} onChange={(e) => setUniFilter(e.target.value)} className="rounded-xl border border-ink-200 bg-surface px-4 py-2.5 text-sm outline-none focus:border-teal-400">
           {unis.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
         </select>
       </div>
@@ -72,9 +72,9 @@ export default function TalentDiscovery() {
             const uni = getUniversity(student.universityId)
             const project = projects.find((p) => confirmedProjectIds.has(p.id) && p.studentId === student.id)
             return (
-              <Link key={student.id} to={`/company/talent/${student.id}`} className="rounded-2xl border border-ink-200 bg-white p-5 hover:border-teal-400">
+              <Link key={student.id} to={`/company/talent/${student.id}`} className="rounded-2xl border border-ink-200 bg-surface p-5 hover:border-teal-400">
                 <div className="flex items-center gap-2.5">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-ink-950 text-xs font-bold text-teal-300">{student.initials}</span>
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-night text-xs font-bold text-teal-300">{student.initials}</span>
                   <div>
                     <p className="text-sm font-semibold text-ink-900">{student.name}</p>
                     <p className="text-xs text-ink-400">{student.field} · {uni?.shortName}</p>

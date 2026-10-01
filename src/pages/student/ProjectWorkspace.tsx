@@ -29,7 +29,7 @@ export default function ProjectWorkspace() {
   const { projects, challenges, evidence, skillSignals, addEvidence, runAIReview } = useStore()
   const [tab, setTab] = useState<(typeof TABS)[number]>("Overview")
   const [analyzing, setAnalyzing] = useState(false)
-  const [form, setForm] = useState({ type: "Project Report" as EvidenceType, title: "", description: "", link: "" })
+  const [form, setForm] = useState({ type: "Project Report" as EvidenceType, title: "", description: "", link: "", content: "" })
 
   const project = projects.find((p) => p.id === id)
   if (!project || !student) {
@@ -51,16 +51,22 @@ export default function ProjectWorkspace() {
   const submitEvidence = (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.title.trim()) return
-    addEvidence(project.id, student.id, form.type, form.title.trim(), form.description.trim(), form.link.trim() || "link.demo/evidence")
-    setForm({ type: "Project Report", title: "", description: "", link: "" })
+    addEvidence(
+      project.id,
+      student.id,
+      form.type,
+      form.title.trim(),
+      form.description.trim(),
+      form.link.trim() || "link.demo/evidence",
+      form.content.trim(),
+    )
+    setForm({ type: "Project Report", title: "", description: "", link: "", content: "" })
   }
 
   const handleAnalyze = () => {
     setAnalyzing(true)
-    setTimeout(() => {
-      runAIReview(project.id, student.id)
-      setAnalyzing(false)
-    }, 1400)
+    const minDelay = new Promise((resolve) => setTimeout(resolve, 1000))
+    Promise.all([runAIReview(project.id, student.id), minDelay]).finally(() => setAnalyzing(false))
   }
 
   return (
@@ -92,11 +98,11 @@ export default function ProjectWorkspace() {
       {tab === "Overview" && (
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="space-y-6 lg:col-span-2">
-            <div className="rounded-2xl border border-ink-200 bg-white p-5">
+            <div className="rounded-2xl border border-ink-200 bg-surface p-5">
               <h3 className="mb-2 text-xs font-semibold tracking-wide text-teal-600 uppercase">Problem</h3>
               <p className="text-sm leading-relaxed text-ink-700">{challenge?.problemDescription}</p>
             </div>
-            <div className="rounded-2xl border border-ink-200 bg-white p-5">
+            <div className="rounded-2xl border border-ink-200 bg-surface p-5">
               <h3 className="mb-2 text-xs font-semibold tracking-wide text-teal-600 uppercase">Objectives</h3>
               <ul className="space-y-1.5">
                 {challenge?.objectives.map((o) => (
@@ -104,7 +110,7 @@ export default function ProjectWorkspace() {
                 ))}
               </ul>
             </div>
-            <div className="rounded-2xl border border-ink-200 bg-white p-5">
+            <div className="rounded-2xl border border-ink-200 bg-surface p-5">
               <h3 className="mb-3 text-xs font-semibold tracking-wide text-teal-600 uppercase">Tasks</h3>
               <ul className="space-y-2">
                 {project.tasks.length === 0 && <p className="text-sm text-ink-400">No tasks recorded for this project.</p>}
@@ -118,7 +124,7 @@ export default function ProjectWorkspace() {
             </div>
           </div>
           <div className="space-y-6">
-            <div className="rounded-2xl border border-ink-200 bg-white p-5">
+            <div className="rounded-2xl border border-ink-200 bg-surface p-5">
               <h3 className="mb-3 text-xs font-semibold tracking-wide text-teal-600 uppercase">Progress</h3>
               <div className="h-2 w-full overflow-hidden rounded-full bg-ink-100">
                 <div className="h-full rounded-full bg-teal-500" style={{ width: `${progressPct}%` }} />
@@ -130,10 +136,10 @@ export default function ProjectWorkspace() {
                 <div className="flex justify-between"><dt className="text-ink-400">Skills rated</dt><dd className="text-ink-800">{mySignals.length}</dd></div>
               </dl>
             </div>
-            <div className="rounded-2xl border border-ink-200 bg-white p-5">
+            <div className="rounded-2xl border border-ink-200 bg-surface p-5">
               <h3 className="mb-3 text-xs font-semibold tracking-wide text-teal-600 uppercase">Working Solo</h3>
               <div className="flex items-center gap-2.5">
-                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-ink-950 text-xs font-bold text-teal-300">{student.initials}</span>
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-night text-xs font-bold text-teal-300">{student.initials}</span>
                 <div>
                   <p className="text-sm font-medium text-ink-800">{student.name} (You)</p>
                   <p className="text-xs text-ink-400">{student.field}</p>
@@ -148,7 +154,7 @@ export default function ProjectWorkspace() {
       {tab === "Evidence & AI Rating" && (
         <div className="grid gap-6 lg:grid-cols-2">
           <div>
-            <div className="rounded-2xl border border-ink-200 bg-white p-5">
+            <div className="rounded-2xl border border-ink-200 bg-surface p-5">
               <h3 className="mb-3 font-semibold text-ink-900">Submit Evidence</h3>
               <form onSubmit={submitEvidence} className="space-y-3">
                 <div>
@@ -189,7 +195,17 @@ export default function ProjectWorkspace() {
                     className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-teal-400"
                   />
                 </div>
-                <button type="submit" className="w-full rounded-lg bg-ink-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-600">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-ink-500">Code / content snippet (optional)</label>
+                  <textarea
+                    value={form.content}
+                    onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))}
+                    rows={5}
+                    placeholder="Paste real code or a detailed excerpt here — this is what WSL's AI model actually analyzes to verify each required skill."
+                    className="w-full rounded-lg border border-ink-200 px-3 py-2 font-mono text-xs outline-none focus:border-teal-400"
+                  />
+                </div>
+                <button type="submit" className="w-full rounded-lg bg-night px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-600">
                   Add Evidence
                 </button>
               </form>
@@ -197,11 +213,14 @@ export default function ProjectWorkspace() {
 
             <div className="mt-4 space-y-2">
               {myEvidence.map((e) => (
-                <div key={e.id} className="rounded-xl border border-ink-200 bg-white p-4">
+                <div key={e.id} className="rounded-xl border border-ink-200 bg-surface p-4">
                   <span className="rounded-md bg-ink-50 px-2 py-0.5 text-[11px] font-semibold text-ink-600">{e.type}</span>
                   <p className="mt-1.5 text-sm font-medium text-ink-900">{e.title}</p>
                   <p className="text-xs text-ink-500">{e.description}</p>
                   <p className="mt-1 text-xs text-teal-600">{e.link}</p>
+                  {e.content && (
+                    <pre className="mt-2 max-h-24 overflow-hidden rounded-lg bg-ink-50 px-2.5 py-2 font-mono text-[11px] text-ink-600">{e.content}</pre>
+                  )}
                   <p className="mt-2 text-[11px] text-ink-400">Submitted {formatRelative(e.submittedAt)}</p>
                 </div>
               ))}
@@ -209,7 +228,7 @@ export default function ProjectWorkspace() {
           </div>
 
           <div>
-            <div className="rounded-2xl border border-ink-200 bg-ink-950 p-5">
+            <div className="rounded-2xl border border-ink-200 bg-night p-5">
               <h3 className="font-semibold text-white">WSL AI Rating</h3>
               <p className="mt-1 text-xs text-ink-300">
                 Simulated demo AI — rates each required skill based on your submitted evidence. It's automatic and informational
@@ -233,9 +252,10 @@ export default function ProjectWorkspace() {
             {mySignals.length > 0 && (
               <div className="mt-4 space-y-3">
                 {mySignals.map((s) => (
-                  <div key={s.id} className="rounded-xl border border-ink-200 bg-white p-4">
+                  <div key={s.id} className="rounded-xl border border-ink-200 bg-surface p-4">
                     <span className="text-sm font-semibold text-ink-900">{s.skill}</span>
                     <div className="mt-2"><ConfidenceMeter value={s.aiRating} label="AI rating" /></div>
+                    {s.aiNote && <p className="mt-1.5 text-[11px] text-ink-400">{s.aiNote}</p>}
                     {s.companyRating !== undefined ? (
                       <div className="mt-2"><ConfidenceMeter value={s.companyRating} label="Company rating" /></div>
                     ) : (
@@ -259,7 +279,7 @@ export default function ProjectWorkspace() {
             <EmptyState title="No feedback yet" description="Feedback from your university or the company will appear here." />
           ) : (
             project.feedback.map((f, i) => (
-              <div key={i} className="rounded-2xl border border-ink-200 bg-white p-5">
+              <div key={i} className="rounded-2xl border border-ink-200 bg-surface p-5">
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-semibold text-ink-900">{f.author} <span className="font-normal text-ink-400">· {f.role}</span></p>
                   <p className="text-xs text-ink-400">{formatDate(f.at)}</p>

@@ -9,6 +9,7 @@ import {
 } from "../data/seed"
 import type { Challenge, ChallengeStatus, Evidence, EvidenceType, Project, SkillSignal } from "../types"
 import { simulateAIReview } from "../lib/ai"
+import type { SimulatedRating } from "../lib/ai"
 
 interface DataState {
   challenges: Challenge[]
@@ -60,8 +61,8 @@ type Action =
   | { type: "SUBMIT_DRAFT"; id: string }
   | { type: "ASSIGN_CHALLENGE"; id: string; program: string }
   | { type: "START_PROJECT"; challengeId: string; studentId: string }
-  | { type: "ADD_EVIDENCE"; projectId: string; studentId: string; evType: EvidenceType; title: string; description: string; link: string }
-  | { type: "RUN_AI_REVIEW"; projectId: string; studentId: string }
+  | { type: "ADD_EVIDENCE"; projectId: string; studentId: string; evType: EvidenceType; title: string; description: string; link: string; content: string }
+  | { type: "APPLY_AI_REVIEW"; projectId: string; studentId: string; results: SimulatedRating[] }
   | { type: "CONFIRM_TO_COMPANY"; projectId: string }
   | { type: "SUBMIT_COMPANY_FEEDBACK"; projectId: string; ratings: Record<string, number> }
   | { type: "ADD_FEEDBACK"; projectId: string; author: string; role: string; note: string }
@@ -147,23 +148,21 @@ function reducer(state: DataState, action: Action): DataState {
         title: action.title,
         description: action.description,
         link: action.link,
+        content: action.content || undefined,
         submittedAt: new Date().toISOString(),
       }
       return { ...state, evidence: [...state.evidence, newEvidence] }
     }
 
-    case "RUN_AI_REVIEW": {
+    case "APPLY_AI_REVIEW": {
       const project = state.projects.find((p) => p.id === action.projectId)
-      const challenge = project ? state.challenges.find((c) => c.id === project.challengeId) : undefined
-      if (!project || !challenge) return state
-
-      const studentEvidence = state.evidence.filter((e) => e.projectId === action.projectId && e.studentId === action.studentId)
-      if (studentEvidence.length === 0) return state
+      if (!project) return state
 
       const already = new Set(
         state.skillSignals.filter((s) => s.projectId === action.projectId && s.studentId === action.studentId).map((s) => s.skill),
       )
-      const results = simulateAIReview(challenge.requiredSkills, studentEvidence).filter((r) => !already.has(r.skill))
+      const results = action.results.filter((r) => !already.has(r.skill))
+      if (results.length === 0) return state
 
       const newSignals: SkillSignal[] = results.map((r, i) => ({
         id: `sig-${Date.now()}-${i}`,
@@ -171,6 +170,7 @@ function reducer(state: DataState, action: Action): DataState {
         studentId: action.studentId,
         skill: r.skill,
         aiRating: r.rating,
+        aiNote: r.note,
         evidenceIds: r.evidenceIds,
         analyzedAt: new Date().toISOString(),
       }))
@@ -179,7 +179,7 @@ function reducer(state: DataState, action: Action): DataState {
         ...state,
         skillSignals: [...state.skillSignals, ...newSignals],
         projects: state.projects.map((p) => (p.id === action.projectId ? { ...p, status: "Submissions Under Review" } : p)),
-        challenges: advanceIfFurther(state.challenges, challenge.id, "Submissions Under Review", "WSL rated the submitted evidence automatically."),
+        challenges: advanceIfFurther(state.challenges, project.challengeId, "Submissions Under Review", "WSL rated the submitted evidence automatically."),
       }
     }
 
@@ -230,8 +230,8 @@ interface StoreContextValue extends DataState {
   submitDraft: (id: string) => void
   assignChallenge: (id: string, program: string) => void
   startProject: (challengeId: string, studentId: string) => void
-  addEvidence: (projectId: string, studentId: string, evType: EvidenceType, title: string, description: string, link: string) => void
-  runAIReview: (projectId: string, studentId: string) => void
+  addEvidence: (projectId: string, studentId: string, evType: EvidenceType, title: string, description: string, link: string, content: string) => void
+  runAIReview: (projectId: string, studentId: string) => Promise<void>
   confirmToCompany: (projectId: string) => void
   submitCompanyFeedback: (projectId: string, ratings: Record<string, number>) => void
   addFeedback: (projectId: string, author: string, role: string, note: string) => void
@@ -255,9 +255,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       submitDraft: (id) => dispatch({ type: "SUBMIT_DRAFT", id }),
       assignChallenge: (id, program) => dispatch({ type: "ASSIGN_CHALLENGE", id, program }),
       startProject: (challengeId, studentId) => dispatch({ type: "START_PROJECT", challengeId, studentId }),
-      addEvidence: (projectId, studentId, evType, title, description, link) =>
-        dispatch({ type: "ADD_EVIDENCE", projectId, studentId, evType, title, description, link }),
-      runAIReview: (projectId, studentId) => dispatch({ type: "RUN_AI_REVIEW", projectId, studentId }),
+      addEvidence: (projectId, studentId, evType, title, description, link, content) =>
+        dispatch({ type: "ADD_EVIDENCE", projectId, studentId, evType, title, description, link, content }),
+      runAIReview: async (projectId, studentId) => {
+        const project = state.projects.find((p) => p.id === projectId)
+        const challenge = project ? state.challenges.find((c) => c.id === project.challengeId) : undefined
+        if (!project || !challenge) return
+        const studentEvidence = state.evidence.filter((e) => e.projectId === projectId && e.studentId === studentId)
+        if (studentEvidence.length === 0) return
+        const results = await simulateAIReview(challenge.requiredSkills, studentEvidence)
+        dispatch({ type: "APPLY_AI_REVIEW", projectId, studentId, results })
+      },
       confirmToCompany: (projectId) => dispatch({ type: "CONFIRM_TO_COMPANY", projectId }),
       submitCompanyFeedback: (projectId, ratings) => dispatch({ type: "SUBMIT_COMPANY_FEEDBACK", projectId, ratings }),
       addFeedback: (projectId, author, role, note) => dispatch({ type: "ADD_FEEDBACK", projectId, author, role, note }),

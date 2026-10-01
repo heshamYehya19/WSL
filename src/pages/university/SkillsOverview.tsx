@@ -22,9 +22,9 @@ export default function SkillsOverview() {
           const companyRated = signals.filter((sig) => sig.companyRating !== undefined)
           const projectCount = projects.filter((p) => p.studentId === s.id).length
           return (
-            <Link key={s.id} to={`/university/students/${s.id}`} className="rounded-2xl border border-ink-200 bg-white p-5 hover:border-teal-400">
+            <Link key={s.id} to={`/university/students/${s.id}`} className="rounded-2xl border border-ink-200 bg-surface p-5 hover:border-teal-400">
               <div className="flex items-center gap-2.5">
-                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-ink-950 text-xs font-bold text-teal-300">{s.initials}</span>
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-night text-xs font-bold text-teal-300">{s.initials}</span>
                 <div>
                   <p className="text-sm font-semibold text-ink-900">{s.name}</p>
                   <p className="text-xs text-ink-400">{s.field} · {s.year}</p>

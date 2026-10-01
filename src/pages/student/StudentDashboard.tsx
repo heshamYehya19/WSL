@@ -87,11 +87,11 @@ export default function StudentDashboard() {
       </div>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
-        <div className="rounded-2xl border border-ink-200 bg-white p-5">
+        <div className="rounded-2xl border border-ink-200 bg-surface p-5">
           <h2 className="mb-4 font-semibold text-ink-900">Skill Ratings</h2>
           <BarList items={skillRatingItems} max={100} emptyMessage="No skill signals yet — submit evidence to start building your profile." />
         </div>
-        <div className="rounded-2xl border border-ink-200 bg-white p-5">
+        <div className="rounded-2xl border border-ink-200 bg-surface p-5">
           <h2 className="mb-4 font-semibold text-ink-900">Rating Strength</h2>
           <SegmentedBar segments={ratingBandSegments} emptyMessage="No skill signals yet." />
         </div>
@@ -107,7 +107,7 @@ export default function StudentDashboard() {
             <EmptyState
               title="No projects yet"
               description="Browse challenges assigned by your university and start your first project."
-              action={<Link to="/student/challenges" className="rounded-full bg-ink-950 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-600">Discover Challenges</Link>}
+              action={<Link to="/student/challenges" className="rounded-full bg-night px-4 py-2 text-sm font-semibold text-white hover:bg-teal-600">Discover Challenges</Link>}
             />
           ) : (
             <div className="space-y-3">
@@ -121,7 +121,7 @@ export default function StudentDashboard() {
                     key={p.id}
                     to={`/student/projects/${p.id}`}
                     style={{ animationDelay: `${i * 60}ms` }}
-                    className="animate-fade-in-up block rounded-2xl border border-ink-200 bg-white p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-teal-400 hover:shadow-md"
+                    className="animate-fade-in-up block rounded-2xl border border-ink-200 bg-surface p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-teal-400 hover:shadow-md"
                   >
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div>
@@ -150,7 +150,7 @@ export default function StudentDashboard() {
           ) : (
             <div className="grid gap-3 sm:grid-cols-2">
               {latestAiFeedback.map((s) => (
-                <div key={s.id} className="rounded-2xl border border-ink-200 bg-white p-4">
+                <div key={s.id} className="rounded-2xl border border-ink-200 bg-surface p-4">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-semibold text-ink-900">{s.skill}</span>
                     <span className="text-sm font-bold text-teal-600">{s.aiRating}%</span>
@@ -164,7 +164,7 @@ export default function StudentDashboard() {
 
         <div>
           <h2 className="mb-3 font-semibold text-ink-900">Recent Activity</h2>
-          <div className="rounded-2xl border border-ink-200 bg-white p-4">
+          <div className="rounded-2xl border border-ink-200 bg-surface p-4">
             {activity.length === 0 ? (
               <p className="py-4 text-center text-sm text-ink-400">No activity yet.</p>
             ) : (

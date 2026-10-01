@@ -22,7 +22,7 @@ export default function DemoLogin() {
       />
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="rounded-2xl border border-ink-200 bg-white p-5">
+        <div className="rounded-2xl border border-ink-200 bg-surface p-5">
           <div className="mb-1 text-xs font-semibold tracking-wide text-teal-600 uppercase">Student</div>
           <h3 className="mb-3 font-semibold text-ink-900">Browse challenges, submit evidence, build your skill record.</h3>
           <div className="space-y-2">
@@ -42,7 +42,7 @@ export default function DemoLogin() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-ink-200 bg-white p-5">
+        <div className="rounded-2xl border border-ink-200 bg-surface p-5">
           <div className="mb-1 text-xs font-semibold tracking-wide text-teal-600 uppercase">University</div>
           <h3 className="mb-3 font-semibold text-ink-900">Assign challenges, monitor submissions, confirm work to companies.</h3>
           <div className="space-y-2">
@@ -62,7 +62,7 @@ export default function DemoLogin() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-ink-200 bg-white p-5">
+        <div className="rounded-2xl border border-ink-200 bg-surface p-5">
           <div className="mb-1 text-xs font-semibold tracking-wide text-teal-600 uppercase">Company</div>
           <h3 className="mb-3 font-semibold text-ink-900">Submit challenges and discover rated talent.</h3>
           <div className="space-y-2">

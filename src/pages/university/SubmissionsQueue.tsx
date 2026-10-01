@@ -53,7 +53,7 @@ export default function SubmissionsQueue() {
             const signals = skillsForProject(skillSignals, p.id)
             const avgRating = signals.length ? Math.round(signals.reduce((sum, s) => sum + s.aiRating, 0) / signals.length) : null
             return (
-              <Link key={p.id} to={`/university/projects/${p.id}`} className="rounded-2xl border border-ink-200 bg-white p-5 hover:border-teal-400">
+              <Link key={p.id} to={`/university/projects/${p.id}`} className="rounded-2xl border border-ink-200 bg-surface p-5 hover:border-teal-400">
                 <div className="flex items-center justify-between">
                   <span className="font-semibold text-ink-900">{p.title}</span>
                   <StatusBadge status={p.status} />

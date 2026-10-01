@@ -54,11 +54,11 @@ export default function UniversityDashboard() {
       </div>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
-        <div className="rounded-2xl border border-ink-200 bg-white p-5">
+        <div className="rounded-2xl border border-ink-200 bg-surface p-5">
           <h2 className="mb-4 font-semibold text-ink-900">Confirmation Progress</h2>
           <SegmentedBar segments={confirmationSegments} emptyMessage="No skill signals yet." />
         </div>
-        <div className="rounded-2xl border border-ink-200 bg-white p-5">
+        <div className="rounded-2xl border border-ink-200 bg-surface p-5">
           <h2 className="mb-4 font-semibold text-ink-900">Emerging Skills</h2>
           <BarList items={topSkillItems} emptyMessage="No skill signals yet." />
         </div>
@@ -72,7 +72,7 @@ export default function UniversityDashboard() {
           </div>
           <div className="space-y-3">
             {needsReview.length === 0 && (
-              <p className="rounded-2xl border border-dashed border-ink-200 bg-white p-6 text-center text-sm text-ink-400">Nothing waiting on you right now.</p>
+              <p className="rounded-2xl border border-dashed border-ink-200 bg-surface p-6 text-center text-sm text-ink-400">Nothing waiting on you right now.</p>
             )}
             {needsReview.map((c, i) => {
               const org = getOrg(c.organizationId)
@@ -81,7 +81,7 @@ export default function UniversityDashboard() {
                   key={c.id}
                   to={`/university/challenges/${c.id}`}
                   style={{ animationDelay: `${i * 60}ms` }}
-                  className="animate-fade-in-up block rounded-2xl border border-ink-200 bg-white p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-teal-400 hover:shadow-md"
+                  className="animate-fade-in-up block rounded-2xl border border-ink-200 bg-surface p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-teal-400 hover:shadow-md"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div>
@@ -109,7 +109,7 @@ export default function UniversityDashboard() {
                   key={p.id}
                   to={`/university/projects/${p.id}`}
                   style={{ animationDelay: `${i * 60}ms` }}
-                  className="animate-fade-in-up flex items-center justify-between rounded-2xl border border-ink-200 bg-white p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-teal-400 hover:shadow-md"
+                  className="animate-fade-in-up flex items-center justify-between rounded-2xl border border-ink-200 bg-surface p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-teal-400 hover:shadow-md"
                 >
                   <div>
                     <p className="text-sm font-semibold text-ink-900">{p.title}</p>
@@ -120,7 +120,7 @@ export default function UniversityDashboard() {
               )
             })}
             {projectsAwaitingConfirmation.length === 0 && (
-              <p className="rounded-2xl border border-dashed border-ink-200 bg-white p-6 text-center text-sm text-ink-400">No submissions waiting on you right now.</p>
+              <p className="rounded-2xl border border-dashed border-ink-200 bg-surface p-6 text-center text-sm text-ink-400">No submissions waiting on you right now.</p>
             )}
           </div>
         </div>

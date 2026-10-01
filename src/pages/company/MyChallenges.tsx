@@ -19,7 +19,7 @@ export default function MyChallenges() {
       <PageHeader
         eyebrow="My Challenges"
         title="Challenges you've submitted"
-        action={<Link to="/company/submit" className="rounded-full bg-ink-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-600">+ Submit Challenge</Link>}
+        action={<Link to="/company/submit" className="rounded-full bg-night px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-600">+ Submit Challenge</Link>}
       />
 
       {mine.length === 0 ? (
@@ -29,7 +29,7 @@ export default function MyChallenges() {
           {mine.map((c) => {
             const uni = c.preferredUniversityId ? getUniversity(c.preferredUniversityId) : undefined
             return (
-              <Link key={c.id} to={`/company/challenges/${c.id}`} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-ink-200 bg-white p-5 hover:border-teal-400">
+              <Link key={c.id} to={`/company/challenges/${c.id}`} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-ink-200 bg-surface p-5 hover:border-teal-400">
                 <div>
                   <p className="font-semibold text-ink-900">{c.title}</p>
                   <p className="text-xs text-ink-400">

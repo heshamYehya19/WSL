@@ -3,7 +3,7 @@ import { Wordmark } from "../ui/Wordmark"
 
 export function Footer() {
   return (
-    <footer className="border-t border-ink-100 bg-white">
+    <footer className="border-t border-ink-100 bg-surface">
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
         <div className="flex flex-col gap-8 sm:flex-row sm:items-start sm:justify-between">
           <div className="max-w-sm">

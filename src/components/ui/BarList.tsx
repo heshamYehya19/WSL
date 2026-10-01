@@ -25,7 +25,7 @@ export function BarList({
   }, [])
 
   if (items.length === 0) {
-    return <p className="rounded-2xl border border-dashed border-ink-200 bg-white p-6 text-center text-sm text-ink-400">{emptyMessage}</p>
+    return <p className="rounded-2xl border border-dashed border-ink-200 bg-surface p-6 text-center text-sm text-ink-400">{emptyMessage}</p>
   }
 
   const scale = max ?? Math.max(...items.map((i) => i.value), 1)

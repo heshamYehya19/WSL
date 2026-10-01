@@ -49,7 +49,7 @@ export function SkillRecordBody({
               <div key={p.id} className="relative">
                 <span className="absolute top-1.5 -left-[29px] h-3 w-3 rounded-full border-2 border-white bg-teal-500" />
                 <div className="mb-1 text-xs font-semibold text-teal-600">{year}</div>
-                <div className="rounded-2xl border border-ink-200 bg-white p-5">
+                <div className="rounded-2xl border border-ink-200 bg-surface p-5">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div>
                       <Link to={projectHref(p.id)} className="font-semibold text-ink-900 hover:text-teal-600">{p.title}</Link>

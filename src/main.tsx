@@ -5,15 +5,18 @@ import "./index.css"
 import App from "./App.tsx"
 import { StoreProvider } from "./state/store"
 import { DemoUserProvider } from "./state/demoUser"
+import { ThemeProvider } from "./state/theme"
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <BrowserRouter>
-      <DemoUserProvider>
-        <StoreProvider>
-          <App />
-        </StoreProvider>
-      </DemoUserProvider>
+      <ThemeProvider>
+        <DemoUserProvider>
+          <StoreProvider>
+            <App />
+          </StoreProvider>
+        </DemoUserProvider>
+      </ThemeProvider>
     </BrowserRouter>
   </StrictMode>,
 )

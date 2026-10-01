@@ -110,7 +110,7 @@ export default function SubmitChallenge() {
         “WSL automatically checks every challenge for private or confidential data before it reaches a university — nobody watches this happen.”
       </div>
 
-      <form className="space-y-5 rounded-2xl border border-ink-200 bg-white p-6" onSubmit={(e) => e.preventDefault()}>
+      <form className="space-y-5 rounded-2xl border border-ink-200 bg-surface p-6" onSubmit={(e) => e.preventDefault()}>
         <Field label="Challenge title">
           <input
             className={inputClass}
@@ -206,7 +206,7 @@ export default function SubmitChallenge() {
           <button
             onClick={() => submit(false)}
             disabled={!canSubmit}
-            className="rounded-lg bg-ink-950 px-6 py-2.5 text-sm font-semibold text-white hover:bg-teal-600 disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-lg bg-night px-6 py-2.5 text-sm font-semibold text-white hover:bg-teal-600 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Submit Challenge
           </button>

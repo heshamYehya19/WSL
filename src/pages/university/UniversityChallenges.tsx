@@ -47,7 +47,7 @@ export default function UniversityChallenges() {
           {list.map((c) => {
             const org = getOrg(c.organizationId)
             return (
-              <Link key={c.id} to={`/university/challenges/${c.id}`} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-ink-200 bg-white p-5 hover:border-teal-400">
+              <Link key={c.id} to={`/university/challenges/${c.id}`} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-ink-200 bg-surface p-5 hover:border-teal-400">
                 <div>
                   <p className="font-semibold text-ink-900">{c.title}</p>
                   <p className="text-xs text-ink-400">{org?.name} · {c.industry} · Deadline {formatDate(c.deadline)}</p>

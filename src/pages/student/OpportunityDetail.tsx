@@ -33,7 +33,7 @@ export default function OpportunityDetail() {
       <Link to="/student/opportunities" className="text-sm text-ink-400 hover:text-teal-600">← Back to Opportunities</Link>
       <PageHeader eyebrow={`${org?.name} · ${opportunity.type}`} title={opportunity.title} subtitle={opportunity.location} />
 
-      <div className="rounded-2xl border border-ink-200 bg-white p-6">
+      <div className="rounded-2xl border border-ink-200 bg-surface p-6">
         <p className="text-sm leading-relaxed text-ink-700">{opportunity.description}</p>
 
         <h3 className="mt-6 mb-2 text-xs font-semibold tracking-wide text-teal-600 uppercase">Requested Skills</h3>

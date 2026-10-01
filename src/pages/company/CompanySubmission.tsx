@@ -61,7 +61,7 @@ export default function CompanySubmission() {
         </div>
       )}
 
-      <div className="rounded-2xl border border-ink-200 bg-white p-6">
+      <div className="rounded-2xl border border-ink-200 bg-surface p-6">
         <h3 className="mb-3 text-xs font-semibold tracking-wide text-teal-600 uppercase">Evidence</h3>
         <div className="space-y-2">
           {projectEvidence.map((e) => (
@@ -70,6 +70,9 @@ export default function CompanySubmission() {
               <span className="text-sm font-medium text-ink-800">{e.title}</span>
               <p className="mt-1 text-xs text-ink-500">{e.description}</p>
               <p className="mt-1 text-xs text-teal-600">{e.link}</p>
+              {e.content && (
+                <pre className="mt-2 max-h-24 overflow-hidden rounded-lg bg-ink-50 px-2.5 py-2 font-mono text-[11px] text-ink-600">{e.content}</pre>
+              )}
             </div>
           ))}
           {projectEvidence.length === 0 && <p className="text-sm text-ink-400">No evidence submitted.</p>}
@@ -85,6 +88,7 @@ export default function CompanySubmission() {
                 <span className="text-sm font-semibold text-ink-900">{s.skill}</span>
                 <span className="text-xs text-ink-400">WSL AI rating: {s.aiRating}%</span>
               </div>
+              {s.aiNote && <p className="mt-1 text-[11px] text-ink-400">{s.aiNote}</p>}
               {canReview ? (
                 <div className="mt-2">
                   <input
@@ -120,7 +124,7 @@ export default function CompanySubmission() {
               placeholder="What stood out? What would you want to see more of?"
               className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-teal-400"
             />
-            <button onClick={submit} className="mt-3 w-full rounded-lg bg-ink-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-600">
+            <button onClick={submit} className="mt-3 w-full rounded-lg bg-night px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-600">
               Submit Feedback
             </button>
           </div>
@@ -135,7 +139,7 @@ export default function CompanySubmission() {
       </div>
 
       {project.feedback.length > 0 && (
-        <div className="mt-6 rounded-2xl border border-ink-200 bg-white p-6">
+        <div className="mt-6 rounded-2xl border border-ink-200 bg-surface p-6">
           <h3 className="mb-3 text-xs font-semibold tracking-wide text-teal-600 uppercase">Feedback Thread</h3>
           <div className="space-y-2">
             {project.feedback.map((f, i) => (

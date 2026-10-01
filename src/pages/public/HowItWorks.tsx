@@ -66,10 +66,10 @@ export default function HowItWorks() {
           <Reveal
             key={stage.title}
             delay={Math.min(i, 5) * 60}
-            className="flex gap-4 rounded-2xl border border-ink-200 bg-white p-5 transition-all duration-300 hover:-translate-y-0.5 hover:border-teal-300 hover:shadow-md hover:shadow-ink-950/5"
+            className="flex gap-4 rounded-2xl border border-ink-200 bg-surface p-5 transition-all duration-300 hover:-translate-y-0.5 hover:border-teal-300 hover:shadow-md hover:shadow-ink-950/5"
           >
             <div className="flex shrink-0 flex-col items-center">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-ink-950 text-sm font-bold text-teal-300">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-night text-sm font-bold text-teal-300">
                 {i + 1}
               </span>
               {i < STAGES.length - 1 && <span className="mt-1 h-full w-px flex-1 bg-ink-100" />}
@@ -83,7 +83,7 @@ export default function HowItWorks() {
         ))}
       </div>
 
-      <Reveal className="mt-14 rounded-2xl border border-ink-200 bg-white p-6">
+      <Reveal className="mt-14 rounded-2xl border border-ink-200 bg-surface p-6">
         <h2 className="font-semibold text-ink-900">The challenge status pipeline</h2>
         <p className="mt-1 mb-4 text-sm text-ink-500">
           Every company challenge moves through a visible, auditable pipeline — nothing reaches students silently.
@@ -101,7 +101,7 @@ export default function HowItWorks() {
           <p className="mt-1 text-sm text-ink-600">Switch between Student, University, and Company to follow one real project through the whole loop.</p>
           <Link
             to="/login"
-            className="mt-4 inline-block rounded-full bg-ink-950 px-6 py-2.5 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-teal-600 hover:shadow-lg hover:shadow-teal-600/20 active:translate-y-0"
+            className="mt-4 inline-block rounded-full bg-night px-6 py-2.5 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-teal-600 hover:shadow-lg hover:shadow-teal-600/20 active:translate-y-0"
           >
             Start the Demo
           </Link>
