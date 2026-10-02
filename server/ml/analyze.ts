@@ -1,26 +1,33 @@
 // Real content analysis for WSL's "AI rating" — replaces the old hash-based
-// fake in server/ai.ts. Two small models (trained in scripts/ml/train.py from
-// real GitHub source files + Wikipedia articles, see that file for how) run
-// server-side, synchronously, whenever a student requests a rating:
+// fake in server/ai.ts. Three signals run server-side, synchronously, whenever
+// a student requests a rating:
 //
 //   - language model: does the submitted text actually contain code in the
 //     language a skill requires (e.g. "does this contain Python?"), via a
-//     char n-gram TF-IDF + logistic regression classifier.
-//   - topic model: for skills that aren't a programming language (Machine
-//     Learning, Data Analysis, UI/UX Design, ...), how closely does the
-//     submitted text's vocabulary match that topic, via word TF-IDF cosine
-//     similarity against a reference document per skill.
+//     char n-gram TF-IDF + logistic regression classifier (trained in
+//     scripts/ml/train.py from real GitHub source files).
+//   - problem-relevance: does the submission's own wording (identifiers,
+//     comments, prose) actually overlap with what THIS challenge's problem
+//     description/objectives/expected-output specifically asked for — not
+//     a fixed pretrained topic, but a plain word-overlap cosine similarity
+//     computed on the fly against that one challenge's own text. This is
+//     the primary signal: being written in the right language is necessary
+//     but not sufficient — the submission has to address the actual ask.
+//   - topic model (fallback only): for conceptual skills, a cosine match
+//     against a Wikipedia reference doc (server/ml/topic-model.json),
+//     used only when a submission has no detectable overlap with the
+//     challenge's own (sometimes thin) problem text.
 //
 // Each required skill is scored against every individual piece of evidence
 // (not one big pooled blob) and takes the strongest match — otherwise a
 // single real Python file gets diluted into near-nothing once averaged in
 // with three unrelated prose-only reports from the same project.
 //
-// Calibration constants below (LOW_ANCHOR/HIGH_ANCHOR for each model) come
-// from measuring real example text against the trained models — see the
-// calibration run in scripts/ml — not arbitrary guesses, but still rough
-// given the small training corpora available (this is intentionally a
-// "simple" model, not production-grade).
+// Calibration constants below (LOW_ANCHOR/HIGH_ANCHOR, LANG_WEIGHT) come from
+// measuring real example text against these signals — see the calibration
+// methodology in scripts/ml — not arbitrary guesses, but still rough given
+// the small training corpora available (this is intentionally a "simple"
+// model, not production-grade).
 
 import { classify, dot, loadLanguageModel, loadTopicModel, vectorizeChar, vectorizeWord } from "./vectorize.ts"
 
@@ -28,16 +35,31 @@ const LANGUAGE_SKILL_MAP: Record<string, string[]> = {
   "python": ["Python"],
   "java": ["Java"],
   "sql": ["SQL"],
+  "javascript": ["JavaScript"],
+  "typescript": ["TypeScript"],
+  "html": ["HTML"],
   "react": ["JavaScript", "TypeScript", "HTML"],
   "node.js": ["JavaScript", "TypeScript"],
   "frontend development": ["JavaScript", "TypeScript", "HTML"],
   "web development": ["JavaScript", "TypeScript", "HTML"],
+  "c++": ["C++"],
+  "c#": ["C#"],
+  "ruby": ["Ruby"],
+  "swift": ["Swift"],
+  "ios development": ["Swift", "Objective-C"],
+  "shell": ["Shell"],
+  "bash": ["Shell"],
+  "perl": ["Perl"],
+  "php": ["PHP"],
+  "objective-c": ["Objective-C"],
+  "go": ["Go"],
+  "golang": ["Go"],
+  "rust": ["Rust"],
 }
 
-// Skills that are checked BOTH for real code (above) AND for topical vocabulary
-// match (against a Wikipedia reference in topic-model.json) — the stronger of
-// the two signals wins, since e.g. a Figma-only submission can still
-// legitimately demonstrate "Web Development" without a single line of code.
+// Skills that can legitimately be demonstrated without code at all (e.g. a
+// Figma-only submission can still show real "Web Development" work) — for
+// these, missing the language entirely doesn't force the hard cap below.
 const HYBRID_SKILLS = new Set(["frontend development", "web development"])
 
 const MIN_CONTENT_CHARS = 30
@@ -67,12 +89,86 @@ function scaleTopicSim(sim: number): number {
   return clampRating(8 + sim * 260)
 }
 
+// Word-overlap cosine similarity between a submission and THIS challenge's own
+// problem text is naturally sparse for code (identifiers/comments are a small
+// fraction of a source file) and richer for prose (a report can closely echo
+// the challenge's own wording). Measured on real examples: code genuinely
+// solving the stated problem ~0.15-0.5 depending on how descriptive its
+// naming/comments are; code solving a different problem in the same language,
+// or unrelated prose, ~0.00; a report written about the actual problem ~0.3-0.5+.
+function scaleProblemOverlap(sim: number): number {
+  const LOW_ANCHOR = 0.02
+  const HIGH_ANCHOR = 0.4
+  const RATING_LOW = 15
+  const RATING_HIGH = 92
+  const t = (sim - LOW_ANCHOR) / (HIGH_ANCHOR - LOW_ANCHOR)
+  return clampRating(RATING_LOW + t * (RATING_HIGH - RATING_LOW))
+}
+
+// A compact English stopword list (same intent as sklearn's stop_words="english"
+// used in scripts/ml/train.py) so overlap reflects meaningful vocabulary, not
+// grammar words both texts inevitably share.
+const STOPWORDS = new Set(
+  `a about above after again against all am an and any are as at be because been before being below between both
+   but by can cannot could did do does doing don down during each few for from further had has have having he her
+   here hers herself him himself his how i if in into is it its itself just let me more most my myself no nor not
+   now of off on once only or other our ours ourselves out over own same she should so some such than that the
+   their theirs them themselves then there these they this those through to too under until up very was we were
+   what when where which while who whom why will with you your yours yourself yourselves using use used uses via
+   also able new build built using provide provides across`
+    .split(/\s+/)
+    .filter(Boolean),
+)
+
+// Splits snake_case/camelCase identifiers (e.g. "call_transcripts", "intentLabel")
+// into separate words so code identifiers can be matched against the plain
+// English wording of a challenge's problem description.
+function splitIdentifier(token: string): string[] {
+  return token.split(/_+/).flatMap((part) => part.split(/(?<=[a-z0-9])(?=[A-Z])/))
+}
+
+function tokenize(text: string): string[] {
+  const raw = text.match(/[A-Za-z0-9_]{2,}/g) ?? []
+  const words: string[] = []
+  for (const tok of raw) {
+    for (const piece of splitIdentifier(tok)) {
+      const w = piece.toLowerCase()
+      if (w.length >= 2 && !STOPWORDS.has(w) && !/^\d+$/.test(w)) words.push(w)
+    }
+  }
+  return words
+}
+
+function termFreq(tokens: string[]): Map<string, number> {
+  const tf = new Map<string, number>()
+  for (const t of tokens) tf.set(t, (tf.get(t) ?? 0) + 1)
+  return tf
+}
+
+function cosineOverlap(a: Map<string, number>, b: Map<string, number>): number {
+  let dotP = 0
+  let na = 0
+  let nb = 0
+  for (const v of a.values()) na += v * v
+  for (const v of b.values()) nb += v * v
+  for (const [t, v] of a) {
+    const w = b.get(t)
+    if (w) dotP += v * w
+  }
+  if (na === 0 || nb === 0) return 0
+  return dotP / (Math.sqrt(na) * Math.sqrt(nb))
+}
+
 interface Signal {
   rating: number
   note: string
 }
 
-function languageSignal(skill: string, targetClasses: string[], text: string): Signal {
+interface LangResult extends Signal {
+  matched: boolean
+}
+
+function languageSignal(skill: string, targetClasses: string[], text: string): LangResult {
   const model = loadLanguageModel()
   const vec = vectorizeChar(text, model)
   const probs = classify(vec, model)
@@ -89,9 +185,25 @@ function languageSignal(skill: string, targetClasses: string[], text: string): S
     ? `Detected ${topClass} code (${Math.round(topProb * 100)}% confidence) across ${text.trim().length.toLocaleString()} characters analyzed.`
     : `No ${skill} code detected in the submitted content — closest match was ${topClass} (${Math.round(topProb * 100)}% confidence).`
 
+  return { rating, note, matched: isActuallyThatLanguage }
+}
+
+// Does the submission's own wording actually address what THIS challenge
+// asked for in its problem description/objectives/expected output — not
+// just whether it's broadly "about" the skill in the abstract.
+function problemSignal(challengeText: string, text: string): Signal {
+  const sim = cosineOverlap(termFreq(tokenize(challengeText)), termFreq(tokenize(text)))
+  const rating = scaleProblemOverlap(sim)
+  const note =
+    sim > 0.05
+      ? `${Math.round(sim * 100)}% of the submitted content's wording matches what this challenge specifically asked for.`
+      : `Submitted content doesn't substantively address this challenge's stated problem (${Math.round(sim * 100)}% match).`
   return { rating, note }
 }
 
+// Fallback for conceptual skills when a submission has no detectable overlap
+// with the challenge's own (sometimes thin) problem text — falls back to a
+// generic Wikipedia-based reference for the skill rather than reading as zero.
 function topicSignal(skill: string, text: string): Signal {
   const model = loadTopicModel()
   const ref = model.skills[skill]
@@ -113,6 +225,12 @@ export interface SimulatedRating {
   evidenceIds: string[]
 }
 
+export interface ChallengeContext {
+  problemDescription: string
+  objectives: string[]
+  expectedOutput: string
+}
+
 interface EvidenceLike {
   id: string
   type: string
@@ -125,33 +243,52 @@ function evidenceText(e: EvidenceLike): string {
   return [e.title, e.description, e.content].filter(Boolean).join(". ").trim()
 }
 
-function scoreSkillAgainst(skill: string, text: string): Signal {
+// Weight given to raw language-match confidence once a submission is
+// confirmed to actually be in the required language; the rest of the rating
+// is driven by problem-relevance — being in the right language no longer
+// carries a submission to a high rating on its own.
+const LANG_WEIGHT = 0.35
+
+function scoreSkillAgainst(skill: string, text: string, challengeText: string): Signal {
   const key = skill.trim().toLowerCase()
   const targetClasses = LANGUAGE_SKILL_MAP[key]
   const hasTopic = HYBRID_SKILLS.has(key)
+  const problem = problemSignal(challengeText, text)
 
-  if (targetClasses && !hasTopic) return languageSignal(skill, targetClasses, text)
-
-  if (targetClasses && hasTopic) {
-    const lang = languageSignal(skill, targetClasses, text)
+  if (!targetClasses) {
     const topic = topicSignal(skill, text)
-    return lang.rating >= topic.rating ? lang : topic
+    return problem.rating >= topic.rating ? problem : topic
   }
 
-  return topicSignal(skill, text)
+  const lang = languageSignal(skill, targetClasses, text)
+  if (!lang.matched) {
+    // Hybrid skills can still be demonstrated without code at all; everything
+    // else can't claim the skill from wording alone, no matter how closely
+    // the text echoes the problem statement.
+    return hasTopic && problem.rating > lang.rating ? problem : lang
+  }
+
+  // Being in the right language is necessary but not sufficient: the final
+  // rating is dominated by whether this code actually solves what the
+  // challenge specifically asked for, not just its language family.
+  const rating = clampRating(LANG_WEIGHT * lang.rating + (1 - LANG_WEIGHT) * problem.rating)
+  return { rating, note: `${lang.note} ${problem.note}` }
 }
 
 /**
  * Analyzes a student's submitted evidence against each skill a challenge
  * requires, returning a 0-100 rating per skill grounded in the actual
- * submitted text (not just evidence type/count). Each skill is scored
- * against every individual evidence item and takes the strongest match, so
- * one real code sample isn't drowned out by other, unrelated evidence on the
- * same project. Automatic and informational only — never blocks or gates
- * the submission.
+ * submitted text against the challenge's own problem description/objectives/
+ * expected output (not just evidence type/count, and not just "is this the
+ * right language in the abstract"). Each skill is scored against every
+ * individual evidence item and takes the strongest match, so one real code
+ * sample isn't drowned out by other, unrelated evidence on the same project.
+ * Automatic and informational only — never blocks or gates the submission.
  */
-export function simulateAIReview(requiredSkills: string[], submittedEvidence: EvidenceLike[]): SimulatedRating[] {
+export function simulateAIReview(requiredSkills: string[], submittedEvidence: EvidenceLike[], challenge: ChallengeContext): SimulatedRating[] {
   if (submittedEvidence.length === 0) return []
+
+  const challengeText = [challenge.problemDescription, ...challenge.objectives, challenge.expectedOutput].filter(Boolean).join(". ")
 
   return requiredSkills.map((skill) => {
     let best: Signal & { evidenceId: string } = { rating: -1, note: "", evidenceId: submittedEvidence[0].id }
@@ -161,7 +298,7 @@ export function simulateAIReview(requiredSkills: string[], submittedEvidence: Ev
       const candidate =
         text.length < MIN_CONTENT_CHARS
           ? { rating: INSUFFICIENT_RATING, note: `Not enough content in "${item.title}" to verify ${skill} (${text.length} characters).` }
-          : scoreSkillAgainst(skill, text)
+          : scoreSkillAgainst(skill, text, challengeText)
       if (candidate.rating > best.rating) best = { ...candidate, evidenceId: item.id }
     }
 

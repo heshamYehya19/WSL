@@ -681,6 +681,10 @@ export function seedDatabase(db: DatabaseSync): void {
     }
   }
   const objectivesOf = (id: string) => challenges.find((c) => c.id === id)!.objectives
+  const challengeContextOf = (id: string) => {
+    const c = challenges.find((ch) => ch.id === id)!
+    return { problemDescription: c.problem, objectives: c.objectives, expectedOutput: c.expected }
+  }
 
   // ------------------------------------------------------------------- projects
   interface SeedEvidence { id: string; type: string; title: string; description: string; day: number; content?: string }
@@ -1037,6 +1041,7 @@ WHERE s.qty > 0;` },
       const results = simulateAIReview(
         p.signals.map((s) => s.skill),
         p.evidence.map((e) => ({ id: e.id, type: e.type, title: e.title, description: e.description, content: e.content })),
+        challengeContextOf(p.challenge),
       )
       p.signals.forEach((s, i) => {
         const r = results[i]

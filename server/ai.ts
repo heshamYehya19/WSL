@@ -6,4 +6,4 @@
 // gates anything in the workflow. See server/ml/analyze.ts for the analysis
 // itself.
 export { simulateAIReview } from "./ml/analyze.ts"
-export type { SimulatedRating } from "./ml/analyze.ts"
+export type { ChallengeContext, SimulatedRating } from "./ml/analyze.ts"

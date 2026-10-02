@@ -574,9 +574,11 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
       }))
       if (ev.length === 0) throw new ApiError(409, "Submit at least one piece of evidence first.")
 
-      const skills = parseList(one(db, "SELECT required_skills FROM challenges WHERE id = ?", p.challengeId)!.required_skills)
+      const chal = one(db, "SELECT required_skills, problem_description, objectives, expected_output FROM challenges WHERE id = ?", p.challengeId)!
+      const skills = parseList(chal.required_skills)
+      const challenge = { problemDescription: String(chal.problem_description), objectives: parseList(chal.objectives), expectedOutput: String(chal.expected_output) }
       const rated = new Set(all(db, "SELECT skill FROM skill_signals WHERE project_id = ?", id).map((r) => String(r.skill)))
-      const results = simulateAIReview(skills, ev).filter((r) => !rated.has(r.skill))
+      const results = simulateAIReview(skills, ev, challenge).filter((r) => !rated.has(r.skill))
       const now = nowIso()
       for (const r of results) {
         const sigId = newId("sig")

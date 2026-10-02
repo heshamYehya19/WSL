@@ -25,6 +25,7 @@ Requires: numpy, scikit-learn (already installed in this environment).
 """
 
 import json
+import os
 import re
 import time
 import urllib.request
@@ -43,7 +44,10 @@ OUT_DIR = ROOT / "server" / "ml"
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-CODE_LANGUAGES = ["Python", "JavaScript", "TypeScript", "HTML", "SQL", "Java"]
+CODE_LANGUAGES = [
+    "Python", "JavaScript", "TypeScript", "HTML", "SQL", "Java",
+    "C++", "C#", "Ruby", "Swift", "Shell", "Perl", "PHP", "Objective-C", "Go", "Rust",
+]
 MAX_FILE_BYTES = 60_000
 MAX_FILES_PER_LANGUAGE = 60
 
@@ -76,18 +80,22 @@ TOPIC_SKILLS = {
 }
 
 UA = {"User-Agent": "wsl-hackathon-mvp-training-script/1.0"}
+_github_token = os.environ.get("GITHUB_TOKEN")
+API_HEADERS = {**UA, "Authorization": f"Bearer {_github_token}"} if _github_token else UA
 
 
 def http_get_json(url: str) -> dict:
-    req = urllib.request.Request(url, headers=UA)
+    headers = API_HEADERS if url.startswith("https://api.github.com/") else UA
+    req = urllib.request.Request(url, headers=headers)
     for attempt in range(5):
         try:
             with urllib.request.urlopen(req, timeout=20) as resp:
                 return json.loads(resp.read().decode("utf-8"))
         except urllib.error.HTTPError as e:
-            if e.code == 429 and attempt < 4:
+            is_rate_limit = e.code == 429 or (e.code == 403 and "rate limit" in e.read().decode("utf-8", errors="ignore").lower())
+            if is_rate_limit and attempt < 4:
                 wait = 5 * (attempt + 1)
-                print(f"  (429 rate limited, waiting {wait}s)")
+                print(f"  (rate limited, waiting {wait}s)")
                 time.sleep(wait)
                 continue
             raise
@@ -106,20 +114,27 @@ def http_get_text(url: str) -> str:
     return raw.decode("utf-8", errors="ignore")
 
 
-# linguist's samples/ dir only has ~11 real Java files — too few for the
-# classifier to tell Java apart from JavaScript (they share a lot of surface
-# syntax). Supplement with real files from a large, stable, permissively
-# licensed Java project for a less confusable training signal.
+# linguist's samples/ dir only has a handful of real files for some
+# languages — too few for the classifier to reliably tell them apart from
+# look-alikes (Java vs JavaScript, in particular). Supplement thin languages
+# with real files from large, stable, permissively licensed projects.
 SUPPLEMENTARY_SOURCES = {
-    "Java": [("apache/commons-lang", "src/main/java/org/apache/commons/lang3")],
+    "Java": [("apache/commons-lang", "src/main/java/org/apache/commons/lang3", ".java")],
+    "Go": [("gin-gonic/gin", "", ".go")],
+    "Rust": [("sharkdp/bat", "src", ".rs")],
+    "TypeScript": [
+        ("colinhacks/zod", "packages/zod/src/v4/core", ".ts"),
+        ("nestjs/nest", "packages/common/decorators/core", ".ts"),
+    ],
+    "Objective-C": [("AFNetworking/AFNetworking", "AFNetworking", ".m")],
 }
 
 
-def fetch_github_dir_files(repo: str, path: str, limit: int) -> list[str]:
+def fetch_github_dir_files(repo: str, path: str, ext: str, limit: int) -> list[str]:
     print(f"[fetch] listing {repo}/{path} ...")
     encoded_path = urllib.parse.quote(path)
     listing = http_get_json(f"https://api.github.com/repos/{repo}/contents/{encoded_path}")
-    files = [f for f in listing if f.get("type") == "file" and f.get("download_url")]
+    files = [f for f in listing if f.get("type") == "file" and f.get("download_url") and f["name"].endswith(ext) and "test" not in f["name"].lower()]
     texts = []
     for f in files[:limit]:
         if f.get("size", 0) > MAX_FILE_BYTES or f.get("size", 0) < 20:
@@ -164,8 +179,8 @@ def fetch_code_samples() -> dict:
                 texts.append(text)
             time.sleep(0.03)
         print(f"  -> {len(texts)} usable files")
-        for repo, path in SUPPLEMENTARY_SOURCES.get(lang, []):
-            texts.extend(fetch_github_dir_files(repo, path, MAX_FILES_PER_LANGUAGE))
+        for repo, path, ext in SUPPLEMENTARY_SOURCES.get(lang, []):
+            texts.extend(fetch_github_dir_files(repo, path, ext, MAX_FILES_PER_LANGUAGE))
         samples[lang] = texts
 
     cache_file.write_text(json.dumps(samples), encoding="utf-8")
@@ -229,13 +244,13 @@ def train_language_model(code_samples: dict, prose_examples: list[str]):
     )
 
     vectorizer = TfidfVectorizer(
-        analyzer="char", ngram_range=(2, 4), max_features=3000, lowercase=True,
+        analyzer="char", ngram_range=(2, 4), max_features=6000, lowercase=True,
         sublinear_tf=False,
     )
     xt_train = vectorizer.fit_transform(x_train)
     xt_test = vectorizer.transform(x_test)
 
-    clf = LogisticRegression(max_iter=2000, C=4.0)
+    clf = LogisticRegression(max_iter=3000, C=4.0)
     clf.fit(xt_train, y_train)
 
     pred = clf.predict(xt_test)
