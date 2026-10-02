@@ -155,7 +155,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     <StoreContext.Provider value={value}>
       {children}
       {toast && (
-        <div role="alert" className="fixed right-4 bottom-4 left-4 z-[100] mx-auto max-w-md rounded-xl border border-danger-100 bg-surface px-4 py-3 text-sm text-ink-800 shadow-xl sm:left-auto">
+        <div role="alert" className="animate-toast-in fixed right-4 bottom-4 left-4 z-[100] mx-auto max-w-md rounded-xl border border-danger-100 bg-surface px-4 py-3 text-sm text-ink-800 shadow-xl sm:left-auto">
           <div className="flex items-start gap-3">
             <span className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-danger-600" />
             <p className="flex-1">{toast}</p>

@@ -1,7 +1,57 @@
+import type { ReactNode } from "react"
 import { useNavigate } from "react-router-dom"
 import { PageHeader } from "../../components/ui/PageHeader"
 import { useDemoUser } from "../../state/demoUser"
 import { useStore } from "../../state/store"
+
+function RoleIcon({ d }: { d: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d={d} />
+    </svg>
+  )
+}
+
+function RoleCard({ label, title, icon, delay, children }: { label: string; title: string; icon: ReactNode; delay: number; children: ReactNode }) {
+  return (
+    <div
+      style={{ animationDelay: `${delay}ms` }}
+      className="animate-fade-in-up group/card relative overflow-hidden rounded-3xl border border-ink-200 bg-surface p-5 transition-all duration-300 hover:border-teal-400/60 hover:shadow-xl hover:shadow-teal-500/5"
+    >
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-1 origin-left scale-x-0 bg-gradient-to-r from-teal-500 to-teal-300 transition-transform duration-500 group-hover/card:scale-x-100" />
+      <div className="mb-4 flex items-center gap-3">
+        <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-night text-teal-300 transition-transform duration-300 group-hover/card:-rotate-6 group-hover/card:scale-110">
+          {icon}
+        </span>
+        <div className="text-xs font-semibold tracking-wide text-teal-600 uppercase">{label}</div>
+      </div>
+      <h3 className="mb-4 font-semibold text-ink-900">{title}</h3>
+      {children}
+    </div>
+  )
+}
+
+function AccountRow({ initials, round, title, sub, onClick }: { initials: string; round?: boolean; title: string; sub: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="group flex w-full items-center gap-3 rounded-2xl border border-ink-100 px-3 py-2.5 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-teal-400 hover:bg-teal-100/40 hover:shadow-md"
+    >
+      <span
+        className={`flex h-9 w-9 shrink-0 items-center justify-center bg-ink-100 text-[11px] font-bold text-ink-600 transition-all duration-200 group-hover:bg-gradient-to-br group-hover:from-teal-400 group-hover:to-teal-600 group-hover:text-ink-950 ${
+          round ? "rounded-full" : "rounded-xl"
+        }`}
+      >
+        {initials}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-semibold text-ink-900">{title}</span>
+        <span className="block truncate text-xs text-ink-400">{sub}</span>
+      </span>
+      <span className="text-teal-600 opacity-40 transition-all duration-200 group-hover:translate-x-1 group-hover:opacity-100">→</span>
+    </button>
+  )
+}
 
 export default function DemoLogin() {
   const { signInAs } = useDemoUser()
@@ -13,9 +63,6 @@ export default function DemoLogin() {
     navigate(path)
   }
 
-  const rowClass =
-    "flex w-full items-center justify-between gap-3 rounded-xl border border-ink-100 px-3 py-2.5 text-left hover:border-teal-400 hover:bg-teal-50"
-
   return (
     <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6">
       <PageHeader
@@ -25,9 +72,12 @@ export default function DemoLogin() {
       />
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="rounded-2xl border border-ink-200 bg-surface p-5">
-          <div className="mb-1 text-xs font-semibold tracking-wide text-teal-600 uppercase">Student</div>
-          <h3 className="mb-3 font-semibold text-ink-900">Browse challenges, submit evidence, build your skill record.</h3>
+        <RoleCard
+          delay={0}
+          label="Student"
+          title="Browse challenges, submit evidence, build your skill record."
+          icon={<RoleIcon d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM4 21c1.5-4 5-6 8-6s6.5 2 8 6" />}
+        >
           <div className="space-y-4">
             {universities.map((u) => (
               <div key={u.id}>
@@ -36,51 +86,45 @@ export default function DemoLogin() {
                   {students
                     .filter((s) => s.universityId === u.id)
                     .map((s) => (
-                      <button key={s.id} onClick={() => go("student", s.id, "/student")} className={rowClass}>
-                        <span className="min-w-0">
-                          <span className="block truncate text-sm font-semibold text-ink-900">{s.name}</span>
-                          <span className="block truncate text-xs text-ink-400">{s.field} · {s.year}</span>
-                        </span>
-                        <span className="text-teal-600">→</span>
-                      </button>
+                      <AccountRow key={s.id} round initials={s.initials} title={s.name} sub={`${s.field} · ${s.year}`} onClick={() => go("student", s.id, "/student")} />
                     ))}
                 </div>
               </div>
             ))}
           </div>
-        </div>
+        </RoleCard>
 
-        <div className="rounded-2xl border border-ink-200 bg-surface p-5">
-          <div className="mb-1 text-xs font-semibold tracking-wide text-teal-600 uppercase">University</div>
-          <h3 className="mb-3 font-semibold text-ink-900">Assign challenges, monitor submissions, confirm work to companies.</h3>
+        <RoleCard
+          delay={80}
+          label="University"
+          title="Assign challenges, monitor submissions, confirm work to companies."
+          icon={<RoleIcon d="M2 9.5 12 5l10 4.5-10 4.5-10-4.5ZM6 11.6v4.2c0 1.6 2.7 2.9 6 2.9s6-1.3 6-2.9v-4.2" />}
+        >
           <div className="space-y-2">
             {universities.map((u) => (
-              <button key={u.id} onClick={() => go("university", u.id, "/university")} className={rowClass}>
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold text-ink-900">{u.name}</span>
-                  <span className="block truncate text-xs text-ink-400">{u.city} · {u.type} · Est. {u.established}</span>
-                </span>
-                <span className="text-teal-600">→</span>
-              </button>
+              <AccountRow
+                key={u.id}
+                initials={u.shortName.slice(0, 3)}
+                title={u.name}
+                sub={`${u.city} · ${u.type} · Est. ${u.established}`}
+                onClick={() => go("university", u.id, "/university")}
+              />
             ))}
           </div>
-        </div>
+        </RoleCard>
 
-        <div className="rounded-2xl border border-ink-200 bg-surface p-5">
-          <div className="mb-1 text-xs font-semibold tracking-wide text-teal-600 uppercase">Company</div>
-          <h3 className="mb-3 font-semibold text-ink-900">Submit challenges and discover rated talent.</h3>
+        <RoleCard
+          delay={160}
+          label="Company"
+          title="Submit challenges and discover rated talent."
+          icon={<RoleIcon d="M4 20.5V4.5a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v16M14 9.5h5a1 1 0 0 1 1 1v10M7.5 7.5h1M11 7.5h1M7.5 11h1M11 11h1M7.5 14.5h1M11 14.5h1" />}
+        >
           <div className="space-y-2">
             {organizations.map((o) => (
-              <button key={o.id} onClick={() => go("company", o.id, "/company")} className={rowClass}>
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold text-ink-900">{o.name}</span>
-                  <span className="block truncate text-xs text-ink-400">{o.industry}</span>
-                </span>
-                <span className="text-teal-600">→</span>
-              </button>
+              <AccountRow key={o.id} initials={o.logoInitials} title={o.name} sub={o.industry} onClick={() => go("company", o.id, "/company")} />
             ))}
           </div>
-        </div>
+        </RoleCard>
       </div>
     </div>
   )

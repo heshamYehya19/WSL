@@ -1,23 +1,21 @@
 import { Link } from "react-router-dom"
 import { useDemoUser } from "../../state/demoUser"
 import { useStore } from "../../state/store"
-import { PageHeader } from "../../components/ui/PageHeader"
 import { StatTile } from "../../components/ui/Card"
 import { StatusBadge } from "../../components/ui/StatusBadge"
 import { SkillChip } from "../../components/ui/SkillChip"
 import { EmptyState } from "../../components/ui/EmptyState"
 import { BarList } from "../../components/ui/BarList"
-import { SegmentedBar } from "../../components/ui/SegmentedBar"
+import { SkillLevels } from "../../components/ui/SkillLevels"
 import { formatRelative } from "../../lib/format"
 import { bestRating, challengeFor, skillsForProject, studentProjects, studentSignals } from "../../lib/selectors"
 
-const RATING_BANDS = [
-  { key: "developing", label: "Developing (0-59)", min: 0, max: 59, colorClassName: "bg-teal-100" },
-  { key: "solid", label: "Solid (60-79)", min: 60, max: 79, colorClassName: "bg-teal-400" },
-  { key: "strong", label: "Strong (80-100)", min: 80, max: 100, colorClassName: "bg-teal-700" },
-]
-
 const MATCH_THRESHOLD = 75
+
+function greeting() {
+  const h = new Date().getHours()
+  return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening"
+}
 
 export default function StudentDashboard() {
   const { student } = useDemoUser()
@@ -53,12 +51,9 @@ export default function StudentDashboard() {
         ) : undefined,
     }))
 
-  const ratingBandSegments = RATING_BANDS.map((band) => ({
-    key: band.key,
-    label: band.label,
-    value: mySignals.filter((s) => bestRating(s) >= band.min && bestRating(s) <= band.max).length,
-    colorClassName: band.colorClassName,
-  }))
+  const skillLevelItems = Array.from(topSkillsBySkill.values()).map((s) => ({ key: s.id, skill: s.skill, rating: bestRating(s) }))
+
+  const currentProject = myProjects.find((p) => p.status === "In Progress")
 
   const activity = [
     ...myProjects.map((p) => ({ at: p.startedAt, text: `Started project "${p.title}"` })),
@@ -70,11 +65,50 @@ export default function StudentDashboard() {
 
   return (
     <div>
-      <PageHeader
-        eyebrow="Student Dashboard"
-        title={`Welcome back, ${student.name.split(" ")[0]}`}
-        subtitle={`${getProgram(student.programId)?.name ?? student.field} · ${student.year} — this is your living record of demonstrated capability.`}
-      />
+      {/* HERO */}
+      <div className="relative mb-6 overflow-hidden rounded-3xl bg-night shadow-xl shadow-ink-950/10">
+        <div className="bg-grid pointer-events-none absolute inset-0 opacity-50" />
+        <div className="pointer-events-none absolute -top-24 right-1/4 h-72 w-72 rounded-full bg-teal-500/20 blur-3xl" />
+        <div className="relative grid gap-6 p-6 sm:p-8 lg:grid-cols-[1fr_auto] lg:items-center">
+          <div className="flex items-center gap-4">
+            <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-teal-400 to-teal-600 text-lg font-bold text-ink-950 shadow-lg shadow-teal-500/30">
+              {student.initials}
+            </span>
+            <div className="min-w-0">
+              <div className="text-xs font-semibold tracking-wide text-teal-300 uppercase">
+                {getProgram(student.programId)?.name ?? student.field} · {student.year}
+              </div>
+              <h1 className="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
+                {greeting()}, {student.name.split(" ")[0]}
+              </h1>
+              <p className="mt-1 text-sm text-white/70">Your living record of demonstrated capability.</p>
+            </div>
+          </div>
+          {currentProject ? (
+            <Link
+              to={`/student/projects/${currentProject.id}`}
+              className="group flex items-center gap-3 rounded-2xl border border-teal-400/40 bg-teal-500/10 px-4 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:border-teal-300 hover:bg-teal-500/15 lg:max-w-sm"
+            >
+              <span className="relative flex h-3 w-3 shrink-0">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-teal-400 opacity-60 motion-reduce:animate-none" />
+                <span className="relative inline-flex h-3 w-3 rounded-full bg-teal-400" />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[11px] font-semibold tracking-wide text-teal-300 uppercase">Continue where you left off</span>
+                <span className="block truncate text-sm font-semibold text-white">{currentProject.title}</span>
+              </span>
+              <span className="ml-auto text-teal-300 transition-transform duration-200 group-hover:translate-x-1">→</span>
+            </Link>
+          ) : (
+            <Link
+              to="/student/challenges"
+              className="rounded-full bg-teal-500 px-5 py-2.5 text-center text-sm font-semibold text-ink-950 transition-all duration-200 hover:-translate-y-0.5 hover:bg-teal-400 hover:shadow-lg hover:shadow-teal-500/25"
+            >
+              Discover challenges →
+            </Link>
+          )}
+        </div>
+      </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         <StatTile label="Active Projects" value={myProjects.filter((p) => p.status === "In Progress").length} />
@@ -91,8 +125,11 @@ export default function StudentDashboard() {
           <BarList items={skillRatingItems} max={100} emptyMessage="No skill signals yet — submit evidence to start building your profile." />
         </div>
         <div className="rounded-2xl border border-ink-200 bg-surface p-5">
-          <h2 className="mb-4 font-semibold text-ink-900">Rating Strength</h2>
-          <SegmentedBar segments={ratingBandSegments} emptyMessage="No skill signals yet." />
+          <div className="mb-4 flex items-baseline justify-between gap-2">
+            <h2 className="font-semibold text-ink-900">Skill Levels</h2>
+            <span className="text-xs text-ink-400">Tap a level to see its skills</span>
+          </div>
+          <SkillLevels items={skillLevelItems} emptyMessage="No skill signals yet — submit evidence to start building your profile." />
         </div>
       </div>
 

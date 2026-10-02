@@ -1,4 +1,5 @@
-import { Route, Routes } from "react-router-dom"
+import { useEffect } from "react"
+import { Route, Routes, useLocation } from "react-router-dom"
 import { PublicLayout } from "./components/layout/PublicLayout"
 import { AppShell } from "./components/layout/AppShell"
 
@@ -38,8 +39,19 @@ import CompanySubmission from "./pages/company/CompanySubmission"
 
 import NotFound from "./pages/NotFound"
 
+/** New page, new scroll position — React Router doesn't reset it on its own. */
+function ScrollToTop() {
+  const { pathname } = useLocation()
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "instant" })
+  }, [pathname])
+  return null
+}
+
 export default function App() {
   return (
+    <>
+    <ScrollToTop />
     <Routes>
       <Route element={<PublicLayout />}>
         <Route path="/" element={<Landing />} />
@@ -85,5 +97,6 @@ export default function App() {
 
       <Route path="*" element={<NotFound />} />
     </Routes>
+    </>
   )
 }

@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Link, NavLink, Navigate, Outlet } from "react-router-dom"
+import { Link, NavLink, Navigate, Outlet, useLocation } from "react-router-dom"
 import type { ReactNode } from "react"
 import { Wordmark } from "../ui/Wordmark"
 import { DemoSwitcher } from "./DemoSwitcher"
@@ -57,12 +57,21 @@ export function AppShell({ role }: { role: Exclude<Role, "guest"> }) {
   const { session, student, university, company } = useDemoUser()
   const { notifications, markNotificationsRead } = useStore()
   const [notifOpen, setNotifOpen] = useState(false)
+  const { pathname } = useLocation()
 
   const identity =
     role === "student" ? student?.name : role === "university" ? university?.name : company?.name
   const identitySub =
     role === "student" ? student?.field : role === "university" ? university?.city : company?.industry
+  const identityInitials =
+    role === "student" ? student?.initials : role === "university" ? university?.shortName.slice(0, 3) : company?.logoInitials
 
+  // Signed in as a different kind of account (e.g. just switched via the account menu,
+  // whose navigate() lands a beat after the session change): go to that account's home,
+  // not the login screen.
+  if (session.role !== role && session.role !== "guest") {
+    return <Navigate to={`/${session.role}`} replace />
+  }
   // No session for this area, or the account no longer exists in the database.
   if (session.role !== role || !identity) {
     return <Navigate to="/login" replace />
@@ -81,10 +90,23 @@ export function AppShell({ role }: { role: Exclude<Role, "guest"> }) {
       <AmbientConstellation />
       <aside className="relative z-10 hidden w-64 shrink-0 flex-col border-r border-ink-100 bg-surface px-4 py-5 md:flex">
         <Wordmark />
-        <div className="mt-6 rounded-xl bg-ink-50 px-3 py-2.5">
-          <div className="text-[11px] font-semibold tracking-wide text-teal-600 uppercase">{ROLE_LABEL[role]} view</div>
-          <div className="mt-0.5 truncate text-sm font-semibold text-ink-900">{identity}</div>
-          <div className="truncate text-xs text-ink-500">{identitySub}</div>
+        <div className="group relative mt-6 overflow-hidden rounded-2xl bg-night px-3 py-3">
+          <div className="bg-grid pointer-events-none absolute inset-0 opacity-60" />
+          <div className="pointer-events-none absolute -top-10 -right-10 h-24 w-24 rounded-full bg-teal-500/25 blur-2xl transition-transform duration-500 group-hover:scale-150" />
+          <div className="relative flex items-center gap-3">
+            <span
+              className={`flex h-10 w-10 shrink-0 items-center justify-center bg-gradient-to-br from-teal-400 to-teal-600 text-xs font-bold text-ink-950 shadow-lg shadow-teal-500/20 ${
+                role === "student" ? "rounded-full" : "rounded-xl"
+              }`}
+            >
+              {identityInitials}
+            </span>
+            <div className="min-w-0">
+              <div className="text-[10px] font-semibold tracking-wider text-teal-300 uppercase">{ROLE_LABEL[role]} view</div>
+              <div className="truncate text-sm font-semibold text-white">{identity}</div>
+              <div className="truncate text-[11px] text-white/55">{identitySub}</div>
+            </div>
+          </div>
         </div>
         <nav className="mt-6 flex flex-1 flex-col gap-1">
           {NAV[role].map((item) => (
@@ -93,13 +115,22 @@ export function AppShell({ role }: { role: Exclude<Role, "guest"> }) {
               to={item.to}
               end={item.to === `/${role}`}
               className={({ isActive }) =>
-                `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-                  isActive ? "bg-night text-white" : "text-ink-600 hover:bg-ink-50"
+                `group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
+                  isActive ? "bg-night text-white shadow-md shadow-ink-950/10" : "text-ink-600 hover:translate-x-0.5 hover:bg-ink-50 hover:text-ink-900"
                 }`
               }
             >
-              {item.icon}
-              {item.label}
+              {({ isActive }) => (
+                <>
+                  <span
+                    className={`absolute top-1/2 -left-4 h-6 w-1 -translate-y-1/2 rounded-r-full bg-teal-400 transition-all duration-300 ${
+                      isActive ? "opacity-100" : "h-0 opacity-0"
+                    }`}
+                  />
+                  <span className={`transition-transform duration-200 group-hover:scale-110 ${isActive ? "text-teal-300" : ""}`}>{item.icon}</span>
+                  {item.label}
+                </>
+              )}
             </NavLink>
           ))}
         </nav>
@@ -118,10 +149,12 @@ export function AppShell({ role }: { role: Exclude<Role, "guest"> }) {
             <div className="relative">
               <button
                 onClick={toggleNotifications}
-                className="relative rounded-full border border-ink-200 p-2 text-ink-500 hover:border-teal-400"
+                className="relative rounded-full border border-ink-200 p-2 text-ink-500 transition-colors hover:border-teal-400 hover:text-teal-600"
                 aria-label={unread > 0 ? `Notifications (${unread} unread)` : "Notifications"}
               >
-                <Icon d="M15 17h5l-1.4-2.1a2 2 0 01-.3-1V11a6 6 0 10-12 0v2.9c0 .36-.1.7-.3 1L4 17h5m6 0a3 3 0 11-6 0m6 0H9" />
+                <span className={`block ${unread > 0 ? "animate-bell" : ""}`}>
+                  <Icon d="M15 17h5l-1.4-2.1a2 2 0 01-.3-1V11a6 6 0 10-12 0v2.9c0 .36-.1.7-.3 1L4 17h5m6 0a3 3 0 11-6 0m6 0H9" />
+                </span>
                 {unread > 0 && (
                   <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-teal-500 px-1 text-[9px] font-bold text-white">
                     {unread > 9 ? "9+" : unread}
@@ -131,7 +164,11 @@ export function AppShell({ role }: { role: Exclude<Role, "guest"> }) {
               {notifOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={closeNotifications} />
-                  <div className="absolute right-0 z-50 mt-2 max-h-96 w-80 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-xl border border-ink-200 bg-surface p-2 shadow-xl">
+                  <div className="animate-pop-in absolute right-0 z-50 mt-2 max-h-96 w-80 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-2xl border border-ink-200 bg-surface p-2 shadow-2xl shadow-ink-950/10">
+                    <div className="flex items-center justify-between px-3 pt-1 pb-2">
+                      <span className="text-xs font-semibold tracking-wide text-ink-400 uppercase">Notifications</span>
+                      {unread > 0 && <span className="rounded-full bg-teal-100 px-2 py-0.5 text-[10px] font-bold text-teal-700">{unread} new</span>}
+                    </div>
                     {notifications.length === 0 && <p className="px-3 py-4 text-center text-sm text-ink-400">No notifications yet.</p>}
                     {notifications.map((n) => {
                       const body = (
@@ -145,7 +182,7 @@ export function AppShell({ role }: { role: Exclude<Role, "guest"> }) {
                         </>
                       )
                       return n.link ? (
-                        <Link key={n.id} to={n.link} onClick={closeNotifications} className="block rounded-lg px-3 py-2 text-sm hover:bg-ink-50">
+                        <Link key={n.id} to={n.link} onClick={closeNotifications} className={`block rounded-xl px-3 py-2 text-sm transition-colors hover:bg-ink-50 ${!n.read ? "bg-teal-100/40" : ""}`}>
                           {body}
                         </Link>
                       ) : (
@@ -161,7 +198,9 @@ export function AppShell({ role }: { role: Exclude<Role, "guest"> }) {
           </div>
         </header>
         <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
-          <Outlet />
+          <div key={pathname} className="animate-page-enter">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>
