@@ -4,19 +4,13 @@ import { useDemoUser } from "../../state/demoUser"
 import { useStore } from "../../state/store"
 import { StatusBadge } from "../../components/ui/StatusBadge"
 import { CountUp } from "../../hooks/useCountUp"
+import { PIPELINE } from "../../lib/pipeline"
 import { bestRating, challengeUniversityIds } from "../../lib/selectors"
 import { daysUntil, formatRelative } from "../../lib/format"
 import type { ChallengeStatus } from "../../types"
 
-const STAGES: { status: ChallengeStatus; short: string }[] = [
-  { status: "Draft", short: "Draft" },
-  { status: "Sent to University", short: "Sent" },
-  { status: "University Assigned", short: "Assigned" },
-  { status: "In Progress", short: "In progress" },
-  { status: "Submissions Under Review", short: "Uni review" },
-  { status: "Confirmed to Company", short: "Ready for you" },
-  { status: "Company Reviewed", short: "Reviewed" },
-]
+// The company's own view of the shared pipeline: "Confirmed to Company" is what's ready for them.
+const STAGES = PIPELINE.map((s) => (s.status === "Confirmed to Company" ? { ...s, short: "Ready for you" } : s))
 const stageIndex = (s: ChallengeStatus) => STAGES.findIndex((x) => x.status === s)
 
 // Only work a university has confirmed is visible to the company — same rule as Talent Discovery.

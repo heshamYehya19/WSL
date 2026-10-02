@@ -1,19 +1,24 @@
 import { useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 import { useStore } from "../../state/store"
-import { PageHeader } from "../../components/ui/PageHeader"
-import { SkillChip } from "../../components/ui/SkillChip"
 import { EmptyState } from "../../components/ui/EmptyState"
+import { MatchRing, PageHero, Pills, SearchInput } from "../../components/ui/ListKit"
 import { bestRating } from "../../lib/selectors"
 import type { SkillSignal } from "../../types"
 
 const CONFIRMED_STATUSES = ["Confirmed to Company", "Company Reviewed"]
+
+type Sort = "score" | "skills" | "verified"
+
+const selectClass =
+  "rounded-2xl border border-ink-200 bg-surface px-4 py-2.5 text-sm shadow-sm outline-none transition-all focus:border-teal-400 focus:ring-4 focus:ring-teal-400/15"
 
 export default function TalentDiscovery() {
   const { skillSignals, projects, students, universities, getUniversity } = useStore()
   const [query, setQuery] = useState("")
   const [field, setField] = useState("All")
   const [uniFilter, setUniFilter] = useState("All")
+  const [sort, setSort] = useState<Sort>("score")
 
   const fields = ["All", ...Array.from(new Set(students.map((s) => s.field))).sort()]
   const unis = useMemo(() => [{ id: "All", name: "All universities" }, ...universities.map((u) => ({ id: u.id, name: u.name }))], [universities])
@@ -22,67 +27,173 @@ export default function TalentDiscovery() {
 
   // Discoverable = the university has confirmed at least one project of theirs to a company.
   const confirmedProjectIds = new Set(projects.filter((p) => CONFIRMED_STATUSES.includes(p.status)).map((p) => p.id))
+  const discoverable = skillSignals.filter((s) => confirmedProjectIds.has(s.projectId))
+
+  // Most-proven skills across the network, offered as one-click search suggestions.
+  const skillFreq = new Map<string, number>()
+  for (const s of discoverable) skillFreq.set(s.skill, (skillFreq.get(s.skill) ?? 0) + 1)
+  const suggestions = [...skillFreq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([s]) => s)
+  const toggleSkill = (skill: string) => {
+    const has = queryTerms.includes(skill.toLowerCase())
+    const terms = has ? queryTerms.filter((t) => t !== skill.toLowerCase()) : [...queryTerms, skill.toLowerCase()]
+    setQuery(terms.map((t) => suggestions.find((s) => s.toLowerCase() === t) ?? t).join(" + "))
+  }
 
   const results = students
-    .map((s) => ({
-      student: s,
-      signals: skillSignals.filter((sig) => sig.studentId === s.id && confirmedProjectIds.has(sig.projectId)) as SkillSignal[],
-    }))
-    .filter(({ signals }) => signals.length > 0)
+    .map((s) => {
+      const signals = discoverable.filter((sig) => sig.studentId === s.id) as SkillSignal[]
+      const best = new Map<string, SkillSignal>()
+      for (const sig of signals) if (!best.has(sig.skill) || bestRating(sig) > bestRating(best.get(sig.skill)!)) best.set(sig.skill, sig)
+      const top = [...best.values()].sort((a, b) => bestRating(b) - bestRating(a))
+      const avg = top.length ? Math.round(top.reduce((sum, v) => sum + bestRating(v), 0) / top.length) : 0
+      const verified = top.filter((v) => v.companyRating !== undefined).length
+      return { student: s, top, avg, verified }
+    })
+    .filter(({ top }) => top.length > 0)
     .filter(({ student }) => field === "All" || student.field === field)
     .filter(({ student }) => uniFilter === "All" || student.universityId === uniFilter)
-    .filter(({ signals }) => queryTerms.length === 0 || queryTerms.every((t) => signals.some((v) => v.skill.toLowerCase().includes(t))))
+    .filter(({ top }) => queryTerms.length === 0 || queryTerms.every((t) => top.some((v) => v.skill.toLowerCase().includes(t))))
+    .sort((a, b) => (sort === "skills" ? b.top.length - a.top.length : sort === "verified" ? b.verified - a.verified : 0) || b.avg - a.avg)
+
+  const totalCandidates = new Set(discoverable.map((s) => s.studentId)).size
 
   return (
     <div>
-      <PageHeader
+      <PageHero
         eyebrow="Talent Discovery"
         title="Find talent through demonstrated capability"
-        subtitle="No opaque matching score — every result below is backed by rated skills and viewable evidence, confirmed by a university."
+        subtitle="No opaque matching score — every candidate is backed by rated skills and viewable evidence, confirmed by a university."
+        stats={[
+          { label: "discoverable candidates", value: totalCandidates, accent: true },
+          { label: "skills proven", value: skillFreq.size },
+          { label: "universities", value: universities.length },
+        ]}
       />
 
-      <div className="mb-6 flex flex-wrap gap-3">
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search rated skills, e.g. Python + Machine Learning"
-          className="min-w-64 flex-1 rounded-xl border border-ink-200 bg-surface px-4 py-2.5 text-sm outline-none focus:border-teal-400"
-        />
-        <select value={field} onChange={(e) => setField(e.target.value)} className="rounded-xl border border-ink-200 bg-surface px-4 py-2.5 text-sm outline-none focus:border-teal-400">
-          {fields.map((f) => <option key={f} value={f}>{f === "All" ? "All majors" : f}</option>)}
-        </select>
-        <select value={uniFilter} onChange={(e) => setUniFilter(e.target.value)} className="rounded-xl border border-ink-200 bg-surface px-4 py-2.5 text-sm outline-none focus:border-teal-400">
-          {unis.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-        </select>
+      <div className="mb-6 space-y-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <SearchInput value={query} onChange={setQuery} placeholder="Search rated skills, e.g. Python + Machine Learning" />
+          <select value={field} onChange={(e) => setField(e.target.value)} className={selectClass} aria-label="Major">
+            {fields.map((f) => <option key={f} value={f}>{f === "All" ? "All majors" : f}</option>)}
+          </select>
+          <select value={uniFilter} onChange={(e) => setUniFilter(e.target.value)} className={selectClass} aria-label="University">
+            {unis.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+          </select>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {suggestions.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="mr-1 text-[11px] font-semibold tracking-wide text-ink-400 uppercase">Popular</span>
+              {suggestions.map((s) => {
+                const on = queryTerms.includes(s.toLowerCase())
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => toggleSkill(s)}
+                    aria-pressed={on}
+                    className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-all duration-200 active:scale-95 ${
+                      on ? "border-teal-500 bg-teal-500 text-ink-950" : "border-dashed border-ink-300 text-ink-500 hover:-translate-y-0.5 hover:border-teal-400 hover:text-teal-600"
+                    }`}
+                  >
+                    {on ? "✓ " : "+ "}
+                    {s}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+          <Pills<Sort>
+            label="Sort"
+            value={sort}
+            onChange={setSort}
+            options={[
+              { value: "score", label: "Top score" },
+              { value: "skills", label: "Most skills" },
+              { value: "verified", label: "Verified" },
+            ]}
+          />
+        </div>
       </div>
 
       {results.length === 0 ? (
         <EmptyState title="No matches" description={'Try a broader search — for example just "Python".'} />
       ) : (
-        <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-          {results.map(({ student, signals }) => {
-            const uni = getUniversity(student.universityId)
-            const project = projects.find((p) => confirmedProjectIds.has(p.id) && p.studentId === student.id)
-            return (
-              <Link key={student.id} to={`/company/talent/${student.id}`} className="rounded-2xl border border-ink-200 bg-surface p-5 hover:border-teal-400">
-                <div className="flex items-center gap-2.5">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-night text-xs font-bold text-teal-300">{student.initials}</span>
-                  <div>
-                    <p className="text-sm font-semibold text-ink-900">{student.name}</p>
-                    <p className="text-xs text-ink-400">{student.field} · {uni?.shortName}</p>
+        <>
+          <p className="mb-3 text-xs text-ink-400">
+            {results.length} candidate{results.length === 1 ? "" : "s"}
+            {queryTerms.length > 0 && " with every searched skill"}
+          </p>
+          <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+            {results.map(({ student, top, avg, verified }, i) => {
+              const uni = getUniversity(student.universityId)
+              const project = projects.find((p) => confirmedProjectIds.has(p.id) && p.studentId === student.id)
+              const open = student.availability !== "Not Available"
+              return (
+                <Link
+                  key={student.id}
+                  to={`/company/talent/${student.id}`}
+                  style={{ animationDelay: `${i * 50}ms` }}
+                  className="animate-fade-in-up group relative flex flex-col overflow-hidden rounded-2xl border border-ink-200 bg-surface p-5 transition-all duration-300 hover:-translate-y-1 hover:border-teal-400 hover:shadow-xl hover:shadow-teal-500/10"
+                >
+                  <div className="pointer-events-none absolute -top-16 -right-16 h-32 w-32 rounded-full bg-teal-400/10 blur-2xl transition-transform duration-500 group-hover:scale-150" />
+                  <div className="relative flex items-center gap-3">
+                    <span className="relative shrink-0">
+                      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-teal-400 to-teal-600 text-sm font-bold text-ink-950 shadow-md shadow-teal-500/20 transition-transform duration-300 group-hover:scale-110">
+                        {student.initials}
+                      </span>
+                      <span
+                        title={student.availability}
+                        className={`absolute -right-0.5 -bottom-0.5 h-3.5 w-3.5 rounded-full border-2 border-surface ${open ? "bg-verified-500" : "bg-ink-300"}`}
+                      />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-semibold text-ink-900 transition-colors group-hover:text-teal-600">{student.name}</p>
+                      <p className="truncate text-xs text-ink-400">
+                        {student.field} · {uni?.shortName} · {student.year}
+                      </p>
+                    </div>
+                    <MatchRing pct={avg} label={`Average rated score: ${avg}`} />
                   </div>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {signals.map((v) => (
-                    <SkillChip key={v.id} skill={v.skill} rating={bestRating(v)} size="sm" />
-                  ))}
-                </div>
-                {project && <p className="mt-3 text-xs text-ink-400">Project: {project.title}</p>}
-                <p className="mt-3 text-sm font-medium text-teal-600">View Evidence →</p>
-              </Link>
-            )
-          })}
-        </div>
+
+                  <div className="relative mt-4 space-y-2">
+                    {top.slice(0, 3).map((v) => {
+                      const hit = queryTerms.some((t) => v.skill.toLowerCase().includes(t))
+                      return (
+                        <div key={v.id}>
+                          <div className="mb-0.5 flex items-center justify-between text-[11px]">
+                            <span className={`font-medium ${hit ? "text-teal-600" : "text-ink-700"}`}>
+                              {v.skill}
+                              {v.companyRating !== undefined && <span className="ml-1 text-verified-600" title="Company verified">✓</span>}
+                            </span>
+                            <span className="font-bold text-ink-900 tabular-nums">{bestRating(v)}</span>
+                          </div>
+                          <div className="h-1.5 overflow-hidden rounded-full bg-ink-100">
+                            <div
+                              className={`h-full rounded-full transition-[width] duration-700 ${hit ? "bg-teal-500" : "bg-gradient-to-r from-teal-500 to-teal-300"}`}
+                              style={{ width: `${bestRating(v)}%` }}
+                            />
+                          </div>
+                        </div>
+                      )
+                    })}
+                    {top.length > 3 && <p className="text-[11px] text-ink-400">+{top.length - 3} more rated skill{top.length - 3 === 1 ? "" : "s"}</p>}
+                  </div>
+
+                  <div className="relative mt-auto pt-4">
+                    {project && <p className="truncate text-[11px] text-ink-400">Latest: {project.title}</p>}
+                    <div className="mt-3 flex items-center justify-between border-t border-ink-100 pt-3">
+                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-verified-600">
+                        {verified > 0 ? `✓ ${verified} company verified` : <span className="font-medium text-ink-400">AI rated, university confirmed</span>}
+                      </span>
+                      <span className="text-xs font-semibold text-teal-600 transition-transform duration-200 group-hover:translate-x-1">View evidence →</span>
+                    </div>
+                  </div>
+                </Link>
+              )
+            })}
+          </div>
+        </>
       )}
     </div>
   )
