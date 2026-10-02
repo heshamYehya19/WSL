@@ -97,6 +97,33 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Native form controls (select popups, scrollbars, date pickers) follow
+   color-scheme, not our CSS variables — so tell the browser which theme we're in. */
+:root {
+  color-scheme: light;
+}
+:root.dark {
+  color-scheme: dark;
+}
+
+/* Every <select> and its option list picks up the themed surface. In @layer base
+   so per-component bg-* utilities still win. */
+@layer base {
+  select {
+    background-color: var(--color-surface);
+    color: var(--color-ink-900);
+  }
+  select option,
+  select optgroup {
+    background-color: var(--color-surface);
+    color: var(--color-ink-900);
+  }
+  input,
+  textarea {
+    color: inherit;
+  }
+}
+
 body {
   background-color: var(--color-ink-50);
   color: var(--color-ink-900);
@@ -209,4 +236,108 @@ body {
   .animate-fade-in-up {
     animation: none;
   }
+}
+
+/* ---------------------------------------------------------------- polish */
+
+/* Popovers (account menu, notifications) grow out of their trigger. */
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.animate-pop-in {
+  transform-origin: top right;
+  animation: pop-in 0.18s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+
+/* Each in-app page fades up as you navigate to it. */
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-page-enter {
+  animation: page-enter 0.35s ease-out both;
+}
+
+/* Bell rings briefly when there's something unread. */
+@keyframes bell-ring {
+  0%, 60%, 100% { transform: rotate(0); }
+  10%, 30% { transform: rotate(14deg); }
+  20%, 40% { transform: rotate(-12deg); }
+  50% { transform: rotate(6deg); }
+}
+.animate-bell {
+  transform-origin: 50% 15%;
+  animation: bell-ring 2.4s ease-in-out 0.6s 2;
+}
+
+/* Toasts slide up from the bottom edge. */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-toast-in {
+  animation: toast-in 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+
+/* Gentle float for empty-state illustrations. */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-pop-in,
+  .animate-page-enter,
+  .animate-bell,
+  .animate-toast-in,
+  .animate-float {
+    animation: none;
+  }
+}
+
+/* Slim, theme-aware scrollbars. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-ink-200) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-ink-200);
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-teal-400);
+}
+
+/* One consistent keyboard focus ring across the site. */
+:where(a, button, select, input, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-teal-400);
+  outline-offset: 2px;
 }

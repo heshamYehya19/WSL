@@ -1,7 +1,9 @@
 import type { ReactNode } from "react"
+import { Link } from "react-router-dom"
 import { ConstellationField } from "./ConstellationField"
 
 function AudienceCard({
+  to,
   icon,
   title,
   subtitle,
@@ -9,6 +11,7 @@ function AudienceCard({
   className = "",
   highlighted = false,
 }: {
+  to: string
   icon: ReactNode
   title: string
   subtitle: string
@@ -17,8 +20,9 @@ function AudienceCard({
   highlighted?: boolean
 }) {
   return (
-    <div
-      className={`w-40 shrink-0 rounded-2xl border p-3 shadow-xl backdrop-blur-sm sm:w-44 ${
+    <Link
+      to={to}
+      className={`group/card block w-40 shrink-0 rounded-2xl border p-3 shadow-xl backdrop-blur-sm transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:z-30 hover:-translate-y-1 hover:scale-110 hover:border-teal-300/70 hover:bg-night hover:shadow-2xl hover:shadow-teal-500/25 focus-visible:z-30 focus-visible:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-300 motion-reduce:transition-none motion-reduce:hover:scale-100 sm:w-44 ${
         highlighted ? "z-20 border-teal-400/40 bg-night/95" : "z-10 border-white/10 bg-night/80"
       } ${className}`}
     >
@@ -36,10 +40,10 @@ function AudienceCard({
             <div className="truncate text-[10px] leading-tight text-ink-400">{subtitle}</div>
           </div>
         </div>
-        <span className="shrink-0 text-xs text-ink-500">›</span>
+        <span className="shrink-0 text-xs text-ink-500 transition-all duration-300 group-hover/card:translate-x-0.5 group-hover/card:text-teal-300">›</span>
       </div>
       {children}
-    </div>
+    </Link>
   )
 }
 
@@ -90,21 +94,21 @@ export function HeroNetwork() {
       <ConstellationField className="absolute inset-0 h-full w-full" />
 
       <div className="relative flex flex-col items-center gap-3 px-1 py-8 sm:flex-row sm:items-start sm:justify-center sm:gap-3 sm:py-14">
-        <AudienceCard icon={<UserIcon />} title="Students" subtitle="Interactive skill cards" className="sm:mt-8">
+        <AudienceCard to="/for-students" icon={<UserIcon />} title="Students" subtitle="Interactive skill cards" className="sm:mt-8">
           <div className="grid grid-cols-2 gap-1.5">
             <MiniThumb label="Proof of Project" />
             <MiniThumb label="Certificate" />
           </div>
         </AudienceCard>
 
-        <AudienceCard highlighted icon={<CapIcon />} title="Universities" subtitle="Expand through skill cards">
+        <AudienceCard to="/for-universities" highlighted icon={<CapIcon />} title="Universities" subtitle="Expand through skill cards">
           <div className="rounded-lg bg-white/5 p-2">
             <div className="text-[10px] font-medium text-teal-200">Skill Alignment Tool</div>
             <div className="mt-1.5 h-10 rounded bg-gradient-to-r from-teal-500/30 via-teal-400/20 to-transparent" />
           </div>
         </AudienceCard>
 
-        <AudienceCard icon={<BuildingIcon />} title="Organizations" subtitle="Expand their skill cards" className="sm:mt-8">
+        <AudienceCard to="/for-companies" icon={<BuildingIcon />} title="Organizations" subtitle="Expand their skill cards" className="sm:mt-8">
           <div className="rounded-lg bg-white/5 p-2">
             <div className="text-[10px] font-medium text-teal-200">AI Talent Matcher</div>
             <div className="mt-1 text-[9px] leading-tight text-ink-400">
