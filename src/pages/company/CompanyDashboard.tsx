@@ -5,12 +5,12 @@ import { PageHeader } from "../../components/ui/PageHeader"
 import { StatTile } from "../../components/ui/Card"
 import { StatusBadge } from "../../components/ui/StatusBadge"
 import { BarList } from "../../components/ui/BarList"
-import { getUniversity } from "../../lib/selectors"
+import { challengeUniversityIds } from "../../lib/selectors"
 import { formatRelative } from "../../lib/format"
 
 export default function CompanyDashboard() {
   const { company } = useDemoUser()
-  const { challenges, projects } = useStore()
+  const { challenges, projects, getUniversity } = useStore()
   if (!company) return null
 
   const myChallenges = challenges.filter((c) => c.organizationId === company.id)
@@ -68,7 +68,7 @@ export default function CompanyDashboard() {
         </div>
         <div className="space-y-3">
           {myChallenges.slice(0, 5).map((c, i) => {
-            const uni = c.preferredUniversityId ? getUniversity(c.preferredUniversityId) : undefined
+            const uniNames = challengeUniversityIds(c).map((u) => getUniversity(u)?.shortName).join(", ")
             const studentCount = myProjects.filter((p) => p.challengeId === c.id).length
             return (
               <Link
@@ -80,7 +80,7 @@ export default function CompanyDashboard() {
                 <div>
                   <p className="font-semibold text-ink-900">{c.title}</p>
                   <p className="text-xs text-ink-400">
-                    {uni ? uni.shortName : "Awaiting university match"} · {studentCount} student{studentCount === 1 ? "" : "s"} · updated {formatRelative(c.history[c.history.length - 1].at)}
+                    {uniNames || "Open to any university"} · {studentCount} student{studentCount === 1 ? "" : "s"} · updated {formatRelative(c.history[c.history.length - 1].at)}
                   </p>
                 </div>
                 <StatusBadge status={c.status} />

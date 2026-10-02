@@ -58,7 +58,7 @@ export default function HowItWorks() {
       <PageHeader
         eyebrow="How It Works"
         title="One loop, seven steps, three roles"
-        subtitle="Every step below is a real, clickable part of the WSL demo — switch personas to walk the whole loop yourself."
+        subtitle="Every step below is a working part of WSL — sign in as a student, university, or company to walk the whole loop yourself."
       />
 
       <div className="space-y-4">
@@ -103,7 +103,7 @@ export default function HowItWorks() {
             to="/login"
             className="mt-4 inline-block rounded-full bg-night px-6 py-2.5 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-teal-600 hover:shadow-lg hover:shadow-teal-600/20 active:translate-y-0"
           >
-            Start the Demo
+            Get Started
           </Link>
         </div>
       </Reveal>

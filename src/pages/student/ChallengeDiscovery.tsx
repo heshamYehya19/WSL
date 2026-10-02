@@ -5,28 +5,25 @@ import { useStore } from "../../state/store"
 import { PageHeader } from "../../components/ui/PageHeader"
 import { StatusBadge } from "../../components/ui/StatusBadge"
 import { EmptyState } from "../../components/ui/EmptyState"
-import { getOrg } from "../../lib/selectors"
+import { assignmentFor, canStudentSee, statusAtUniversity } from "../../lib/selectors"
 import { daysUntil } from "../../lib/format"
-
-const OPEN_STATUSES = ["University Assigned", "In Progress", "Submissions Under Review", "Confirmed to Company", "Company Reviewed"]
 
 export default function ChallengeDiscovery() {
   const { student } = useDemoUser()
-  const { challenges } = useStore()
+  const { challenges, projects, students, getOrg } = useStore()
   const [query, setQuery] = useState("")
   const [industry, setIndustry] = useState("All")
 
   const visible = useMemo(() => {
     return challenges.filter((c) => {
-      if (!OPEN_STATUSES.includes(c.status)) return false
-      if (c.visibility !== "Public" && c.preferredUniversityId !== student?.universityId) return false
+      if (!student || !canStudentSee(c, student)) return false
       if (industry !== "All" && c.industry !== industry) return false
       if (query && !`${c.title} ${c.requiredSkills.join(" ")}`.toLowerCase().includes(query.toLowerCase())) return false
       return true
     })
   }, [challenges, student, industry, query])
 
-  const industries = ["All", ...Array.from(new Set(challenges.map((c) => c.industry)))]
+  const industries = ["All", ...Array.from(new Set(challenges.filter((c) => student && canStudentSee(c, student)).map((c) => c.industry))).sort()]
 
   return (
     <div>
@@ -83,11 +80,11 @@ export default function ChallengeDiscovery() {
                 <p className="mt-3 line-clamp-2 text-xs text-ink-500">{c.learningOutcomes[0]}</p>
                 <div className="mt-4 flex items-center justify-between border-t border-ink-100 pt-3 text-xs text-ink-400">
                   <span>{c.difficulty}</span>
-                  <span>{c.assignedProgram ?? "Any program"}</span>
+                  <span>{assignmentFor(c, student?.universityId)?.program}</span>
                   <span>{dLeft > 0 ? `${dLeft}d left` : "Closed"}</span>
                 </div>
                 <div className="mt-2">
-                  <StatusBadge status={c.status} />
+                  <StatusBadge status={statusAtUniversity(c, student!.universityId, projects, students)} />
                 </div>
               </Link>
             )

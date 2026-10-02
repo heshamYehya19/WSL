@@ -4,17 +4,20 @@ import { useDemoUser } from "../../state/demoUser"
 import { useStore } from "../../state/store"
 import { StatusBadge } from "../../components/ui/StatusBadge"
 import { ConfidenceMeter } from "../../components/ui/ConfidenceMeter"
-import { challengeFor, getOrg, getStudent, skillsForProject } from "../../lib/selectors"
+import { challengeFor, skillsForProject } from "../../lib/selectors"
 import { formatDate } from "../../lib/format"
 
 export default function ProjectMonitoring() {
   const { id } = useParams()
-  const { university, session } = useDemoUser()
-  const { projects, challenges, evidence, skillSignals, addFeedback, confirmToCompany, mentorFor } = useStore()
+  const { university } = useDemoUser()
+  const { projects, challenges, evidence, skillSignals, addFeedback, confirmToCompany, getOrg, getStudent, getProgram, getStaff, isUniversityStudent } =
+    useStore()
   const [note, setNote] = useState("")
   const [confirmNote, setConfirmNote] = useState("")
+  const [saving, setSaving] = useState(false)
 
-  const project = projects.find((p) => p.id === id)
+  // Universities only monitor their own students' projects.
+  const project = projects.find((p) => p.id === id && university && isUniversityStudent(p.studentId, university.id))
   if (!project || !university) {
     return (
       <div className="py-20 text-center">
@@ -27,22 +30,24 @@ export default function ProjectMonitoring() {
   const org = getOrg(project.organizationId)
   const challenge = challengeFor(challenges, project)
   const student = getStudent(project.studentId)
-  const mentor = mentorFor(university.id)
+  const program = student ? getProgram(student.programId) : undefined
+  const mentor = program ? getStaff(program.coordinatorId) : undefined
   const projectSignals = skillsForProject(skillSignals, project.id)
   const readyToConfirm = project.status === "Submissions Under Review"
   const alreadyConfirmed = project.status === "Confirmed to Company" || project.status === "Company Reviewed"
 
-  const submitFeedback = (e: React.FormEvent) => {
+  const submitFeedback = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!note.trim() || session.role !== "university") return
-    addFeedback(project.id, mentor.name, mentor.role, note.trim())
-    setNote("")
+    if (!note.trim()) return
+    setSaving(true)
+    if (await addFeedback(project.id, note.trim())) setNote("")
+    setSaving(false)
   }
 
-  const handleConfirm = () => {
-    addFeedback(project.id, mentor.name, mentor.role, confirmNote.trim() || "Reviewed and confirmed to the company.")
-    confirmToCompany(project.id)
-    setConfirmNote("")
+  const handleConfirm = async () => {
+    setSaving(true)
+    if (await confirmToCompany(project.id, confirmNote.trim())) setConfirmNote("")
+    setSaving(false)
   }
 
   return (
@@ -65,10 +70,10 @@ export default function ProjectMonitoring() {
                 <span className="flex h-9 w-9 items-center justify-center rounded-full bg-night text-xs font-bold text-teal-300">{student?.initials}</span>
                 <div>
                   <Link to={`/university/students/${project.studentId}`} className="text-sm font-semibold text-ink-900 hover:text-teal-600">{student?.name}</Link>
-                  <p className="text-xs text-ink-400">{student?.field}</p>
+                  <p className="text-xs text-ink-400">{program?.name ?? student?.field} · {student?.year} · No. {student?.studentNumber}</p>
                 </div>
               </div>
-              <p className="mt-3 text-xs text-ink-400">Worked individually — not as part of a team.</p>
+              <p className="mt-3 text-xs text-ink-400">Worked individually — not as part of a team.{mentor ? ` Program mentor: ${mentor.name}.` : ""}</p>
             </div>
           </div>
 
@@ -95,8 +100,8 @@ export default function ProjectMonitoring() {
           <div>
             <h3 className="mb-3 font-semibold text-ink-900">Feedback</h3>
             <div className="space-y-2">
-              {project.feedback.map((f, i) => (
-                <div key={i} className="rounded-xl border border-ink-200 bg-surface p-4">
+              {project.feedback.map((f) => (
+                <div key={f.id} className="rounded-xl border border-ink-200 bg-surface p-4">
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-semibold text-ink-900">{f.author} <span className="font-normal text-ink-400">· {f.role}</span></p>
                     <p className="text-xs text-ink-400">{formatDate(f.at)}</p>
@@ -109,10 +114,10 @@ export default function ProjectMonitoring() {
               <input
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
-                placeholder="Leave feedback for the student..."
+                placeholder={mentor ? `Leave feedback as ${mentor.name}...` : "Leave feedback for the student..."}
                 className="flex-1 rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-teal-400"
               />
-              <button type="submit" className="rounded-lg bg-night px-4 py-2 text-sm font-semibold text-white hover:bg-teal-600">Send</button>
+              <button type="submit" disabled={saving || !note.trim()} className="rounded-lg bg-night px-4 py-2 text-sm font-semibold text-white hover:bg-teal-600 disabled:opacity-40">Send</button>
             </form>
           </div>
         </div>
@@ -144,9 +149,10 @@ export default function ProjectMonitoring() {
                   placeholder="Optional note..."
                   className="mb-2 w-full rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-teal-400"
                 />
-                <button onClick={handleConfirm} className="w-full rounded-lg bg-night px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-600">
-                  Confirm to Company
+                <button onClick={handleConfirm} disabled={saving} className="w-full rounded-lg bg-night px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-600 disabled:opacity-50">
+                  {saving ? "Confirming…" : "Confirm to Company"}
                 </button>
+                {mentor && <p className="mt-2 text-xs text-ink-500">Signed by {mentor.name}, {mentor.title}.</p>}
               </div>
             )}
 

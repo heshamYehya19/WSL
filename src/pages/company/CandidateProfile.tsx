@@ -1,10 +1,11 @@
 import { Link, useParams } from "react-router-dom"
 import { PageHeader } from "../../components/ui/PageHeader"
 import { SkillRecordBody } from "../../components/profile/SkillRecordBody"
-import { getStudent, getUniversity } from "../../lib/selectors"
+import { useStore } from "../../state/store"
 
 export default function CandidateProfile() {
   const { id } = useParams()
+  const { getStudent, getUniversity, getProgram } = useStore()
   const student = id ? getStudent(id) : undefined
 
   if (!student) {
@@ -17,11 +18,14 @@ export default function CandidateProfile() {
   }
 
   const uni = getUniversity(student.universityId)
+  const program = getProgram(student.programId)
 
   return (
     <div className="mx-auto max-w-4xl">
       <Link to="/company/talent" className="text-sm text-ink-400 hover:text-teal-600">← Back to Talent Discovery</Link>
-      <PageHeader eyebrow={uni?.name} title={student.name} subtitle={`${student.field} · ${student.year} · ${student.availability}`} />
+      <PageHeader eyebrow={uni?.name} title={student.name} subtitle={`${program?.name ?? student.field} · ${student.year} · GPA ${student.gpa.toFixed(2)} · ${student.availability}`} />
+
+      {student.bio && <p className="mb-6 max-w-2xl text-sm leading-relaxed text-ink-600">{student.bio}</p>}
 
       <div className="mb-8 rounded-xl border border-ink-200 bg-ink-50 px-5 py-4 text-sm text-ink-600">
         Every skill below was rated by WSL's automatic AI review from submitted evidence, and confirmed by a university before reaching you. Open a project to see the exact evidence behind it and give your own rating — this is not a self-reported CV.

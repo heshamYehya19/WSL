@@ -25,5 +25,9 @@ dist-ssr
 
 # Re-fetchable raw training data cache (scripts/ml/train.py repopulates this
 # from GitHub/Wikipedia on a clean run) — the trained model artifacts that
-# actually ship with the app live in src/lib/ml/*.json, not here.
+# actually ship with the app live in server/ml/*.json, not here.
 scripts/ml/cache/
+
+# SQLite temporary files (the database itself, data/wsl.db, is committed)
+*.db-wal
+*.db-shm

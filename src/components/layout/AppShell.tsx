@@ -1,10 +1,12 @@
 import { useState } from "react"
-import { NavLink, Navigate, Outlet } from "react-router-dom"
+import { Link, NavLink, Navigate, Outlet } from "react-router-dom"
 import type { ReactNode } from "react"
 import { Wordmark } from "../ui/Wordmark"
 import { DemoSwitcher } from "./DemoSwitcher"
 import { ThemeToggle } from "../ui/ThemeToggle"
 import { useDemoUser } from "../../state/demoUser"
+import { useStore } from "../../state/store"
+import { formatRelative } from "../../lib/format"
 import { AmbientConstellation } from "../ui/AmbientConstellation"
 import type { Role } from "../../types"
 
@@ -53,16 +55,26 @@ const ROLE_LABEL: Record<Exclude<Role, "guest">, string> = {
 
 export function AppShell({ role }: { role: Exclude<Role, "guest"> }) {
   const { session, student, university, company } = useDemoUser()
+  const { notifications, markNotificationsRead } = useStore()
   const [notifOpen, setNotifOpen] = useState(false)
-
-  if (session.role !== role) {
-    return <Navigate to="/login" replace />
-  }
 
   const identity =
     role === "student" ? student?.name : role === "university" ? university?.name : company?.name
   const identitySub =
     role === "student" ? student?.field : role === "university" ? university?.city : company?.industry
+
+  // No session for this area, or the account no longer exists in the database.
+  if (session.role !== role || !identity) {
+    return <Navigate to="/login" replace />
+  }
+
+  const unread = notifications.filter((n) => !n.read).length
+  // Opening the panel shows what's new; closing it marks everything as read.
+  const closeNotifications = () => {
+    if (unread > 0) markNotificationsRead()
+    setNotifOpen(false)
+  }
+  const toggleNotifications = () => (notifOpen ? closeNotifications() : setNotifOpen(true))
 
   return (
     <div className="relative isolate flex min-h-screen bg-ink-50">
@@ -105,27 +117,41 @@ export function AppShell({ role }: { role: Exclude<Role, "guest"> }) {
           <div className="flex items-center gap-3">
             <div className="relative">
               <button
-                onClick={() => setNotifOpen((o) => !o)}
+                onClick={toggleNotifications}
                 className="relative rounded-full border border-ink-200 p-2 text-ink-500 hover:border-teal-400"
-                aria-label="Notifications"
+                aria-label={unread > 0 ? `Notifications (${unread} unread)` : "Notifications"}
               >
                 <Icon d="M15 17h5l-1.4-2.1a2 2 0 01-.3-1V11a6 6 0 10-12 0v2.9c0 .36-.1.7-.3 1L4 17h5m6 0a3 3 0 11-6 0m6 0H9" />
-                <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-teal-500 text-[9px] font-bold text-white">
-                  2
-                </span>
+                {unread > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-teal-500 px-1 text-[9px] font-bold text-white">
+                    {unread > 9 ? "9+" : unread}
+                  </span>
+                )}
               </button>
               {notifOpen && (
                 <>
-                  <div className="fixed inset-0 z-40" onClick={() => setNotifOpen(false)} />
-                  <div className="absolute right-0 z-50 mt-2 w-72 rounded-xl border border-ink-200 bg-surface p-2 shadow-xl">
-                    <div className="rounded-lg px-3 py-2 text-sm hover:bg-ink-50">
-                      <div className="font-medium text-ink-800">WSL rated a new submission</div>
-                      <div className="text-xs text-ink-500">A student's evidence was rated automatically and is ready for your review.</div>
-                    </div>
-                    <div className="rounded-lg px-3 py-2 text-sm hover:bg-ink-50">
-                      <div className="font-medium text-ink-800">Challenge assigned</div>
-                      <div className="text-xs text-ink-500">A university assigned a submitted challenge to its students.</div>
-                    </div>
+                  <div className="fixed inset-0 z-40" onClick={closeNotifications} />
+                  <div className="absolute right-0 z-50 mt-2 max-h-96 w-80 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-xl border border-ink-200 bg-surface p-2 shadow-xl">
+                    {notifications.length === 0 && <p className="px-3 py-4 text-center text-sm text-ink-400">No notifications yet.</p>}
+                    {notifications.map((n) => {
+                      const body = (
+                        <>
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="font-medium text-ink-800">{n.title}</span>
+                            {!n.read && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-teal-500" />}
+                          </div>
+                          <div className="text-xs text-ink-500">{n.body}</div>
+                          <div className="mt-0.5 text-[11px] text-ink-400">{formatRelative(n.createdAt)}</div>
+                        </>
+                      )
+                      return n.link ? (
+                        <Link key={n.id} to={n.link} onClick={closeNotifications} className="block rounded-lg px-3 py-2 text-sm hover:bg-ink-50">
+                          {body}
+                        </Link>
+                      ) : (
+                        <div key={n.id} className="rounded-lg px-3 py-2 text-sm">{body}</div>
+                      )
+                    })}
                   </div>
                 </>
               )}

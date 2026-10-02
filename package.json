@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "start": "node server/index.ts",
+    "db:reset": "node server/reset.ts",
     "lint": "oxlint",
     "preview": "vite preview"
   },
@@ -24,5 +26,8 @@
     "tailwindcss": "^4.3.3",
     "typescript": "~6.0.2",
     "vite": "^6.4.3"
+  },
+  "engines": {
+    "node": ">=22.18"
   }
 }

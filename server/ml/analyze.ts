@@ -1,7 +1,7 @@
 // Real content analysis for WSL's "AI rating" — replaces the old hash-based
-// fake in lib/ai.ts. Two small models (trained in scripts/ml/train.py from
+// fake in server/ai.ts. Two small models (trained in scripts/ml/train.py from
 // real GitHub source files + Wikipedia articles, see that file for how) run
-// entirely client-side:
+// server-side, synchronously, whenever a student requests a rating:
 //
 //   - language model: does the submitted text actually contain code in the
 //     language a skill requires (e.g. "does this contain Python?"), via a
@@ -22,12 +22,23 @@
 // given the small training corpora available (this is intentionally a
 // "simple" model, not production-grade).
 
-import { classify, dot, loadLanguageModel, loadTopicModel, vectorizeChar, vectorizeWord } from "./vectorize"
+import { classify, dot, loadLanguageModel, loadTopicModel, vectorizeChar, vectorizeWord } from "./vectorize.ts"
 
 const LANGUAGE_SKILL_MAP: Record<string, string[]> = {
   "python": ["Python"],
+  "java": ["Java"],
+  "sql": ["SQL"],
+  "react": ["JavaScript", "TypeScript", "HTML"],
+  "node.js": ["JavaScript", "TypeScript"],
   "frontend development": ["JavaScript", "TypeScript", "HTML"],
+  "web development": ["JavaScript", "TypeScript", "HTML"],
 }
+
+// Skills that are checked BOTH for real code (above) AND for topical vocabulary
+// match (against a Wikipedia reference in topic-model.json) — the stronger of
+// the two signals wins, since e.g. a Figma-only submission can still
+// legitimately demonstrate "Web Development" without a single line of code.
+const HYBRID_SKILLS = new Set(["frontend development", "web development"])
 
 const MIN_CONTENT_CHARS = 30
 const INSUFFICIENT_RATING = 14
@@ -61,8 +72,8 @@ interface Signal {
   note: string
 }
 
-async function languageSignal(skill: string, targetClasses: string[], text: string): Promise<Signal> {
-  const model = await loadLanguageModel()
+function languageSignal(skill: string, targetClasses: string[], text: string): Signal {
+  const model = loadLanguageModel()
   const vec = vectorizeChar(text, model)
   const probs = classify(vec, model)
   const matchProb = targetClasses.reduce((sum, c) => sum + (probs[c] ?? 0), 0)
@@ -81,8 +92,8 @@ async function languageSignal(skill: string, targetClasses: string[], text: stri
   return { rating, note }
 }
 
-async function topicSignal(skill: string, text: string): Promise<Signal> {
-  const model = await loadTopicModel()
+function topicSignal(skill: string, text: string): Signal {
+  const model = loadTopicModel()
   const ref = model.skills[skill]
   if (!ref) return { rating: clampRating(50), note: "No reference model for this skill yet." }
   const vec = vectorizeWord(text, model)
@@ -114,15 +125,16 @@ function evidenceText(e: EvidenceLike): string {
   return [e.title, e.description, e.content].filter(Boolean).join(". ").trim()
 }
 
-async function scoreSkillAgainst(skill: string, text: string): Promise<Signal> {
+function scoreSkillAgainst(skill: string, text: string): Signal {
   const key = skill.trim().toLowerCase()
   const targetClasses = LANGUAGE_SKILL_MAP[key]
-  const hasTopic = key === "frontend development" // also has a Wikipedia topic reference
+  const hasTopic = HYBRID_SKILLS.has(key)
 
   if (targetClasses && !hasTopic) return languageSignal(skill, targetClasses, text)
 
   if (targetClasses && hasTopic) {
-    const [lang, topic] = await Promise.all([languageSignal(skill, targetClasses, text), topicSignal(skill, text)])
+    const lang = languageSignal(skill, targetClasses, text)
+    const topic = topicSignal(skill, text)
     return lang.rating >= topic.rating ? lang : topic
   }
 
@@ -138,23 +150,21 @@ async function scoreSkillAgainst(skill: string, text: string): Promise<Signal> {
  * same project. Automatic and informational only — never blocks or gates
  * the submission.
  */
-export async function simulateAIReview(requiredSkills: string[], submittedEvidence: EvidenceLike[]): Promise<SimulatedRating[]> {
+export function simulateAIReview(requiredSkills: string[], submittedEvidence: EvidenceLike[]): SimulatedRating[] {
   if (submittedEvidence.length === 0) return []
 
-  return Promise.all(
-    requiredSkills.map(async (skill) => {
-      let best: Signal & { evidenceId: string } = { rating: -1, note: "", evidenceId: submittedEvidence[0].id }
+  return requiredSkills.map((skill) => {
+    let best: Signal & { evidenceId: string } = { rating: -1, note: "", evidenceId: submittedEvidence[0].id }
 
-      for (const item of submittedEvidence) {
-        const text = evidenceText(item)
-        const candidate =
-          text.length < MIN_CONTENT_CHARS
-            ? { rating: INSUFFICIENT_RATING, note: `Not enough content in "${item.title}" to verify ${skill} (${text.length} characters).` }
-            : await scoreSkillAgainst(skill, text)
-        if (candidate.rating > best.rating) best = { ...candidate, evidenceId: item.id }
-      }
+    for (const item of submittedEvidence) {
+      const text = evidenceText(item)
+      const candidate =
+        text.length < MIN_CONTENT_CHARS
+          ? { rating: INSUFFICIENT_RATING, note: `Not enough content in "${item.title}" to verify ${skill} (${text.length} characters).` }
+          : scoreSkillAgainst(skill, text)
+      if (candidate.rating > best.rating) best = { ...candidate, evidenceId: item.id }
+    }
 
-      return { skill, rating: best.rating, note: best.note, evidenceIds: [best.evidenceId] }
-    }),
-  )
+    return { skill, rating: best.rating, note: best.note, evidenceIds: [best.evidenceId] }
+  })
 }

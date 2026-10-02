@@ -4,27 +4,19 @@ import { useStore } from "../../state/store"
 import { PageHeader } from "../../components/ui/PageHeader"
 import { SkillChip } from "../../components/ui/SkillChip"
 import { EmptyState } from "../../components/ui/EmptyState"
-import { students } from "../../data/seed"
-import { bestRating, getUniversity } from "../../lib/selectors"
+import { bestRating } from "../../lib/selectors"
 import type { SkillSignal } from "../../types"
 
 const CONFIRMED_STATUSES = ["Confirmed to Company", "Company Reviewed"]
 
 export default function TalentDiscovery() {
-  const { skillSignals, projects } = useStore()
+  const { skillSignals, projects, students, universities, getUniversity } = useStore()
   const [query, setQuery] = useState("")
   const [field, setField] = useState("All")
   const [uniFilter, setUniFilter] = useState("All")
 
-  const fields = ["All", ...Array.from(new Set(students.map((s) => s.field)))]
-  const unis = useMemo(() => {
-    const map = new Map<string, string>()
-    students.forEach((s) => {
-      const u = getUniversity(s.universityId)
-      if (u) map.set(u.id, u.name)
-    })
-    return [{ id: "All", name: "All" }, ...Array.from(map, ([id, name]) => ({ id, name }))]
-  }, [])
+  const fields = ["All", ...Array.from(new Set(students.map((s) => s.field))).sort()]
+  const unis = useMemo(() => [{ id: "All", name: "All universities" }, ...universities.map((u) => ({ id: u.id, name: u.name }))], [universities])
 
   const queryTerms = query.toLowerCase().split(/[,+]/).map((t) => t.trim()).filter(Boolean)
 
@@ -57,7 +49,7 @@ export default function TalentDiscovery() {
           className="min-w-64 flex-1 rounded-xl border border-ink-200 bg-surface px-4 py-2.5 text-sm outline-none focus:border-teal-400"
         />
         <select value={field} onChange={(e) => setField(e.target.value)} className="rounded-xl border border-ink-200 bg-surface px-4 py-2.5 text-sm outline-none focus:border-teal-400">
-          {fields.map((f) => <option key={f} value={f}>{f}</option>)}
+          {fields.map((f) => <option key={f} value={f}>{f === "All" ? "All majors" : f}</option>)}
         </select>
         <select value={uniFilter} onChange={(e) => setUniFilter(e.target.value)} className="rounded-xl border border-ink-200 bg-surface px-4 py-2.5 text-sm outline-none focus:border-teal-400">
           {unis.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}

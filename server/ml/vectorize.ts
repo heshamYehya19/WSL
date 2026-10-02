@@ -1,3 +1,8 @@
+// This runs server-side (see server/ai.ts), loaded once as a static import —
+// no bundle-size reason to defer loading, unlike a browser build.
+import languageModelData from "./language-model.json" with { type: "json" }
+import topicModelData from "./topic-model.json" with { type: "json" }
+
 // Re-implements, byte-for-byte, the two scikit-learn TF-IDF transforms used by
 // scripts/ml/train.py (see that file for how these JSON artifacts were produced):
 //
@@ -94,15 +99,10 @@ export function classify(vec: Float64Array, model: LanguageModel): Record<string
   return out
 }
 
-let languageModelPromise: Promise<LanguageModel> | null = null
-let topicModelPromise: Promise<TopicModel> | null = null
-
-export function loadLanguageModel(): Promise<LanguageModel> {
-  languageModelPromise ??= import("./language-model.json").then((m) => m.default as LanguageModel)
-  return languageModelPromise
+export function loadLanguageModel(): LanguageModel {
+  return languageModelData as LanguageModel
 }
 
-export function loadTopicModel(): Promise<TopicModel> {
-  topicModelPromise ??= import("./topic-model.json").then((m) => m.default as TopicModel)
-  return topicModelPromise
+export function loadTopicModel(): TopicModel {
+  return topicModelData as TopicModel
 }

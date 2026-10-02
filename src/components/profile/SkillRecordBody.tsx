@@ -2,7 +2,7 @@ import { Link } from "react-router-dom"
 import { useStore } from "../../state/store"
 import { SkillChip } from "../ui/SkillChip"
 import { StatusBadge } from "../ui/StatusBadge"
-import { bestRating, challengeFor, getOrg, skillsForProject, studentProjects, studentSignals } from "../../lib/selectors"
+import { bestRating, challengeFor, skillsForProject, studentProjects, studentSignals } from "../../lib/selectors"
 
 export function SkillRecordBody({
   studentId,
@@ -11,7 +11,7 @@ export function SkillRecordBody({
   studentId: string
   projectHref: (projectId: string) => string
 }) {
-  const { projects, challenges, evidence, skillSignals } = useStore()
+  const { projects, challenges, evidence, skillSignals, getOrg } = useStore()
   const mySignals = studentSignals(skillSignals, studentId)
   const myProjects = studentProjects(projects, studentId).sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
 

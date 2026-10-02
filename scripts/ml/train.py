@@ -1,6 +1,6 @@
 """
 Trains the two small ML models that power WSL's real "AI rating" analysis
-(src/lib/ml/analyze.ts), replacing the old hash-based fake rating.
+(server/ml/analyze.ts), replacing the old hash-based fake rating.
 
 Model 1 — code language classifier
   Char n-gram TF-IDF + multinomial Logistic Regression, trained on real
@@ -17,8 +17,8 @@ Model 2 — skill-topic relevance
   to each reference vector via cosine similarity.
 
 Both models are exported as plain JSON (vocabulary + idf + weights) into
-src/lib/ml/, small enough to ship in the browser bundle and re-implement
-exactly in TypeScript (see src/lib/ml/analyze.ts) with no server needed.
+server/ml/, loaded server-side (see server/ml/analyze.ts) when a student
+requests a rating — nothing runs client-side.
 
 Run: python scripts/ml/train.py
 Requires: numpy, scikit-learn (already installed in this environment).
@@ -39,7 +39,7 @@ from sklearn.metrics import classification_report, accuracy_score
 
 ROOT = Path(__file__).resolve().parents[2]
 CACHE_DIR = Path(__file__).resolve().parent / "cache"
-OUT_DIR = ROOT / "src" / "lib" / "ml"
+OUT_DIR = ROOT / "server" / "ml"
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -58,6 +58,21 @@ TOPIC_SKILLS = {
     "Frontend Development": "Front-end web development",
     "Problem Solving": "Problem solving",
     "Research": "Research",
+    "Natural Language Processing": "Natural language processing",
+    "Network Security": "Network security",
+    "Risk Assessment": "Risk assessment",
+    "Linux": "Linux",
+    "Technical Writing": "Technical writing",
+    "REST API Design": "Representational state transfer",
+    "Security Awareness": "Security awareness",
+    "Software Testing": "Software testing",
+    "Time-Series Forecasting": "Time series",
+    "Access Control": "Access control",
+    "Power BI": "Power BI",
+    "Business Analysis": "Business analysis",
+    "Process Modeling": "Business process modeling",
+    "Mobile Development": "Mobile app development",
+    "Web Development": "Web development",
 }
 
 UA = {"User-Agent": "wsl-hackathon-mvp-training-script/1.0"}
@@ -65,8 +80,18 @@ UA = {"User-Agent": "wsl-hackathon-mvp-training-script/1.0"}
 
 def http_get_json(url: str) -> dict:
     req = urllib.request.Request(url, headers=UA)
-    with urllib.request.urlopen(req, timeout=20) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+    for attempt in range(5):
+        try:
+            with urllib.request.urlopen(req, timeout=20) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            if e.code == 429 and attempt < 4:
+                wait = 5 * (attempt + 1)
+                print(f"  (429 rate limited, waiting {wait}s)")
+                time.sleep(wait)
+                continue
+            raise
+    raise RuntimeError("unreachable")
 
 
 def http_get_text(url: str) -> str:
@@ -79,6 +104,36 @@ def http_get_text(url: str) -> str:
         except UnicodeDecodeError:
             continue
     return raw.decode("utf-8", errors="ignore")
+
+
+# linguist's samples/ dir only has ~11 real Java files — too few for the
+# classifier to tell Java apart from JavaScript (they share a lot of surface
+# syntax). Supplement with real files from a large, stable, permissively
+# licensed Java project for a less confusable training signal.
+SUPPLEMENTARY_SOURCES = {
+    "Java": [("apache/commons-lang", "src/main/java/org/apache/commons/lang3")],
+}
+
+
+def fetch_github_dir_files(repo: str, path: str, limit: int) -> list[str]:
+    print(f"[fetch] listing {repo}/{path} ...")
+    encoded_path = urllib.parse.quote(path)
+    listing = http_get_json(f"https://api.github.com/repos/{repo}/contents/{encoded_path}")
+    files = [f for f in listing if f.get("type") == "file" and f.get("download_url")]
+    texts = []
+    for f in files[:limit]:
+        if f.get("size", 0) > MAX_FILE_BYTES or f.get("size", 0) < 20:
+            continue
+        try:
+            text = http_get_text(f["download_url"])
+        except Exception as e:
+            print(f"  ! skip {f['name']}: {e}")
+            continue
+        if text.strip():
+            texts.append(text)
+        time.sleep(0.03)
+    print(f"  -> {len(texts)} usable files")
+    return texts
 
 
 def fetch_code_samples() -> dict:
@@ -109,6 +164,8 @@ def fetch_code_samples() -> dict:
                 texts.append(text)
             time.sleep(0.03)
         print(f"  -> {len(texts)} usable files")
+        for repo, path in SUPPLEMENTARY_SOURCES.get(lang, []):
+            texts.extend(fetch_github_dir_files(repo, path, MAX_FILES_PER_LANGUAGE))
         samples[lang] = texts
 
     cache_file.write_text(json.dumps(samples), encoding="utf-8")
@@ -132,7 +189,7 @@ def fetch_wiki_extracts() -> dict:
         pages = data["query"]["pages"]
         page = next(iter(pages.values()))
         extracts[skill] = page.get("extract", "")
-        time.sleep(0.1)
+        time.sleep(1.5)
 
     cache_file.write_text(json.dumps(extracts), encoding="utf-8")
     return extracts

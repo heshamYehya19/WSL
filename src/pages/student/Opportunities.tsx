@@ -2,14 +2,14 @@ import { Link } from "react-router-dom"
 import { useDemoUser } from "../../state/demoUser"
 import { useStore } from "../../state/store"
 import { PageHeader } from "../../components/ui/PageHeader"
-import { bestRating, getOrg, studentSignals } from "../../lib/selectors"
-import { opportunities } from "../../data/seed"
+import { bestRating, studentSignals } from "../../lib/selectors"
+import { formatRelative } from "../../lib/format"
 
 const MATCH_THRESHOLD = 75
 
 export default function Opportunities() {
   const { student } = useDemoUser()
-  const { skillSignals } = useStore()
+  const { skillSignals, opportunities, getOrg } = useStore()
   if (!student) return null
 
   const ratedNames = new Set(studentSignals(skillSignals, student.id).filter((s) => bestRating(s) >= MATCH_THRESHOLD).map((s) => s.skill))
@@ -31,7 +31,7 @@ export default function Opportunities() {
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <h3 className="font-semibold text-ink-900">{o.title}</h3>
-                  <p className="text-xs text-ink-400">{org?.name} · {o.type} · {o.location}</p>
+                  <p className="text-xs text-ink-400">{org?.name} · {o.type} · {o.location} · posted {formatRelative(o.postedAt)}</p>
                 </div>
                 {matched.length > 0 && (
                   <span className="rounded-full bg-teal-100 px-2.5 py-1 text-xs font-semibold text-teal-700">{matched.length} skill match</span>
