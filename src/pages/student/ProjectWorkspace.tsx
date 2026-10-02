@@ -7,19 +7,20 @@ import { ConfidenceMeter } from "../../components/ui/ConfidenceMeter"
 import { EmptyState } from "../../components/ui/EmptyState"
 import { challengeFor, projectEvidence, skillsForProject } from "../../lib/selectors"
 import { formatDate, formatRelative } from "../../lib/format"
-import type { EvidenceType } from "../../types"
 
-const EVIDENCE_TYPES: EvidenceType[] = [
-  "Project Report",
-  "GitHub Repository",
-  "Code",
-  "Presentation",
-  "Prototype",
-  "Documentation",
-  "Analysis",
-  "Dataset / Model",
-  "Video Walkthrough",
-]
+type SubmittableType = "GitHub Repository" | "Code" | "Documentation" | "Dataset / Model"
+
+const EVIDENCE_TYPES: SubmittableType[] = ["GitHub Repository", "Code", "Documentation", "Dataset / Model"]
+
+// What the single adaptive submission field means per evidence type — a link
+// to where the work lives for everything except "Code", which is pasted in
+// directly since that's the whole point of the evidence.
+const SUBMISSION_FIELD: Record<SubmittableType, { kind: "link" | "code"; label: string; placeholder: string }> = {
+  "GitHub Repository": { kind: "link", label: "Repository link", placeholder: "github.com/you/project" },
+  "Code": { kind: "code", label: "Code", placeholder: "Paste the real code this evidence is backed by — this is what WSL's AI model actually analyzes." },
+  "Documentation": { kind: "link", label: "Document link", placeholder: "docs.google.com/document/..." },
+  "Dataset / Model": { kind: "link", label: "Dataset link", placeholder: "docs.google.com/spreadsheets/... or a link to your data" },
+}
 
 const TABS = ["Overview", "Evidence & AI Rating", "Feedback"] as const
 
@@ -29,7 +30,7 @@ export default function ProjectWorkspace() {
   const { projects, challenges, evidence, skillSignals, addEvidence, runAIReview, toggleTask, getOrg } = useStore()
   const [tab, setTab] = useState<(typeof TABS)[number]>("Overview")
   const [analyzing, setAnalyzing] = useState(false)
-  const [form, setForm] = useState({ type: "Project Report" as EvidenceType, title: "", description: "", link: "", content: "" })
+  const [form, setForm] = useState({ type: "GitHub Repository" as SubmittableType, title: "", link: "", content: "" })
   const [submitting, setSubmitting] = useState(false)
 
   // Students only ever open their own project workspaces.
@@ -53,19 +54,22 @@ export default function ProjectWorkspace() {
   // Once the university confirms the submission it is locked — evidence and tasks become read-only.
   const locked = project.status === "Confirmed to Company" || project.status === "Company Reviewed"
 
+  const field = SUBMISSION_FIELD[form.type]
+  const submissionValue = field.kind === "code" ? form.content : form.link
+  const canSubmit = form.title.trim().length > 0 && submissionValue.trim().length > 0
+
   const submitEvidence = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.title.trim() || !form.link.trim()) return
+    if (!canSubmit) return
     setSubmitting(true)
     const ok = await addEvidence(project.id, {
       type: form.type,
       title: form.title.trim(),
-      description: form.description.trim(),
-      link: form.link.trim(),
-      content: form.content.trim(),
+      link: field.kind === "link" ? form.link.trim() : "",
+      content: field.kind === "code" ? form.content.trim() : "",
     })
     setSubmitting(false)
-    if (ok) setForm({ type: "Project Report", title: "", description: "", link: "", content: "" })
+    if (ok) setForm({ type: "GitHub Repository", title: "", link: "", content: "" })
   }
 
   const handleAnalyze = () => {
@@ -177,7 +181,7 @@ export default function ProjectWorkspace() {
                   <label className="mb-1 block text-xs font-medium text-ink-500">Evidence type</label>
                   <select
                     value={form.type}
-                    onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as EvidenceType }))}
+                    onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as SubmittableType, link: "", content: "" }))}
                     className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-teal-400"
                   >
                     {EVIDENCE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -193,35 +197,25 @@ export default function ProjectWorkspace() {
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-ink-500">Description</label>
-                  <textarea
-                    value={form.description}
-                    onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                    rows={2}
-                    placeholder="What does this evidence show?"
-                    className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-teal-400"
-                  />
+                  <label className="mb-1 block text-xs font-medium text-ink-500">{field.label} — required</label>
+                  {field.kind === "code" ? (
+                    <textarea
+                      value={form.content}
+                      onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))}
+                      rows={8}
+                      placeholder={field.placeholder}
+                      className="w-full rounded-lg border border-ink-200 px-3 py-2 font-mono text-xs outline-none focus:border-teal-400"
+                    />
+                  ) : (
+                    <input
+                      value={form.link}
+                      onChange={(e) => setForm((f) => ({ ...f, link: e.target.value }))}
+                      placeholder={field.placeholder}
+                      className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-teal-400"
+                    />
+                  )}
                 </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-ink-500">Link (repo, doc, deck...) — required</label>
-                  <input
-                    value={form.link}
-                    onChange={(e) => setForm((f) => ({ ...f, link: e.target.value }))}
-                    placeholder="github.com/you/project"
-                    className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-teal-400"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-ink-500">Code / content snippet (optional)</label>
-                  <textarea
-                    value={form.content}
-                    onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))}
-                    rows={5}
-                    placeholder="Paste real code or a detailed excerpt here — this is what WSL's AI model actually analyzes to verify each required skill."
-                    className="w-full rounded-lg border border-ink-200 px-3 py-2 font-mono text-xs outline-none focus:border-teal-400"
-                  />
-                </div>
-                <button type="submit" disabled={submitting || !form.title.trim() || !form.link.trim()} className="w-full rounded-lg bg-night px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-600 disabled:opacity-40">
+                <button type="submit" disabled={submitting || !canSubmit} className="w-full rounded-lg bg-night px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-600 disabled:opacity-40">
                   {submitting ? "Saving…" : "Add Evidence"}
                 </button>
               </form>
@@ -233,8 +227,7 @@ export default function ProjectWorkspace() {
                 <div key={e.id} className="rounded-xl border border-ink-200 bg-surface p-4">
                   <span className="rounded-md bg-ink-50 px-2 py-0.5 text-[11px] font-semibold text-ink-600">{e.type}</span>
                   <p className="mt-1.5 text-sm font-medium text-ink-900">{e.title}</p>
-                  <p className="text-xs text-ink-500">{e.description}</p>
-                  <p className="mt-1 text-xs text-teal-600">{e.link}</p>
+                  {e.link && <p className="mt-1 text-xs text-teal-600">{e.link}</p>}
                   {e.content && (
                     <pre className="mt-2 max-h-24 overflow-hidden rounded-lg bg-ink-50 px-2.5 py-2 font-mono text-[11px] text-ink-600">{e.content}</pre>
                   )}

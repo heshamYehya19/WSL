@@ -38,12 +38,15 @@ const LANGUAGE_SKILL_MAP: Record<string, string[]> = {
   "javascript": ["JavaScript"],
   "typescript": ["TypeScript"],
   "html": ["HTML"],
-  "react": ["JavaScript", "TypeScript", "HTML"],
+  "css": ["CSS"],
+  "react": ["JavaScript", "TypeScript", "HTML", "CSS"],
   "node.js": ["JavaScript", "TypeScript"],
-  "frontend development": ["JavaScript", "TypeScript", "HTML"],
-  "web development": ["JavaScript", "TypeScript", "HTML"],
+  "frontend development": ["JavaScript", "TypeScript", "HTML", "CSS"],
+  "web development": ["JavaScript", "TypeScript", "HTML", "CSS"],
   "c++": ["C++"],
   "c#": ["C#"],
+  ".net": ["C#"],
+  "asp.net": ["C#"],
   "ruby": ["Ruby"],
   "swift": ["Swift"],
   "ios development": ["Swift", "Objective-C"],
@@ -55,12 +58,15 @@ const LANGUAGE_SKILL_MAP: Record<string, string[]> = {
   "go": ["Go"],
   "golang": ["Go"],
   "rust": ["Rust"],
+  "dart": ["Dart"],
+  "flutter": ["Dart"],
+  "mobile development": ["Swift", "Objective-C", "Dart"],
 }
 
 // Skills that can legitimately be demonstrated without code at all (e.g. a
 // Figma-only submission can still show real "Web Development" work) — for
 // these, missing the language entirely doesn't force the hard cap below.
-const HYBRID_SKILLS = new Set(["frontend development", "web development"])
+const HYBRID_SKILLS = new Set(["frontend development", "web development", "mobile development"])
 
 const MIN_CONTENT_CHARS = 30
 const INSUFFICIENT_RATING = 14
@@ -275,6 +281,41 @@ function scoreSkillAgainst(skill: string, text: string, challengeText: string): 
   return { rating, note: `${lang.note} ${problem.note}` }
 }
 
+function buildChallengeText(challenge: ChallengeContext): string {
+  return [challenge.problemDescription, ...challenge.objectives, challenge.expectedOutput].filter(Boolean).join(". ")
+}
+
+// Below this, a submission has essentially no detectable vocabulary overlap
+// with the challenge's own problem text at all — measured examples: code or
+// prose addressing a genuinely different problem lands at ~0.00, while even
+// sparse but real on-topic content lands at ~0.15+ (see scaleProblemOverlap).
+// Used only to reject obvious off-topic submissions at intake, not to rate —
+// kept well below the rating scale's own LOW_ANCHOR so it never blocks
+// legitimate, merely-sparse evidence.
+const REJECT_THRESHOLD = 0.03
+
+export interface RelevanceCheck {
+  /** False only when there's enough submitted text to judge and it shows no
+   * meaningful overlap with the challenge's own problem statement. */
+  relevant: boolean
+  overlapPct: number
+}
+
+/**
+ * Checked at evidence submission time, separately from rating: does this
+ * submission have anything to do with what this specific challenge asked
+ * for at all? Unlike simulateAIReview (which only ever informs a rating),
+ * this is an explicit accept/reject gate for obviously off-topic content —
+ * e.g. code or a report for an entirely different assignment. Short
+ * submissions (below MIN_CONTENT_CHARS) can't be judged either way and are
+ * always accepted, since a bare link or short title is too thin a signal.
+ */
+export function checkRelevance(challenge: ChallengeContext, text: string): RelevanceCheck {
+  if (text.trim().length < MIN_CONTENT_CHARS) return { relevant: true, overlapPct: -1 }
+  const overlap = cosineOverlap(termFreq(tokenize(buildChallengeText(challenge))), termFreq(tokenize(text)))
+  return { relevant: overlap >= REJECT_THRESHOLD, overlapPct: Math.round(overlap * 100) }
+}
+
 /**
  * Analyzes a student's submitted evidence against each skill a challenge
  * requires, returning a 0-100 rating per skill grounded in the actual
@@ -283,12 +324,13 @@ function scoreSkillAgainst(skill: string, text: string, challengeText: string): 
  * right language in the abstract"). Each skill is scored against every
  * individual evidence item and takes the strongest match, so one real code
  * sample isn't drowned out by other, unrelated evidence on the same project.
- * Automatic and informational only — never blocks or gates the submission.
+ * Informational only — never blocks or gates the submission itself (see
+ * checkRelevance for the separate accept/reject gate run at intake).
  */
 export function simulateAIReview(requiredSkills: string[], submittedEvidence: EvidenceLike[], challenge: ChallengeContext): SimulatedRating[] {
   if (submittedEvidence.length === 0) return []
 
-  const challengeText = [challenge.problemDescription, ...challenge.objectives, challenge.expectedOutput].filter(Boolean).join(". ")
+  const challengeText = buildChallengeText(challenge)
 
   return requiredSkills.map((skill) => {
     let best: Signal & { evidenceId: string } = { rating: -1, note: "", evidenceId: submittedEvidence[0].id }

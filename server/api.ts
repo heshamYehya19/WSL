@@ -2,7 +2,8 @@ import { randomUUID } from "node:crypto"
 import type { IncomingMessage, ServerResponse } from "node:http"
 import type { DatabaseSync } from "node:sqlite"
 import { getDb, resetDatabase, transaction } from "./db.ts"
-import { simulateAIReview } from "./ai.ts"
+import { checkRelevance, simulateAIReview } from "./ai.ts"
+import type { ChallengeContext } from "./ai.ts"
 import type {
   AppNotification,
   Challenge,
@@ -36,10 +37,10 @@ const PIPELINE_ORDER: ChallengeStatus[] = [
 const rank = (s: string) => PIPELINE_ORDER.indexOf(s as ChallengeStatus)
 
 const SCREEN_NOTE = "WSL automatically screened this challenge for private or confidential data — none found."
-const EVIDENCE_TYPES: EvidenceType[] = [
-  "Project Report", "GitHub Repository", "Code", "Presentation", "Prototype",
-  "Documentation", "Analysis", "Dataset / Model", "Video Walkthrough",
-]
+// The full EvidenceType union (src/types.ts) still covers older evidence types
+// still on record (Project Report, Presentation, ...) so historical data keeps
+// rendering; only these four are offered for new submissions.
+const SUBMITTABLE_EVIDENCE_TYPES: EvidenceType[] = ["GitHub Repository", "Code", "Documentation", "Dataset / Model"]
 const DIFFICULTIES = ["Foundational", "Intermediate", "Advanced"]
 const SENSITIVITIES = ["None (Public Dataset)", "Low", "Moderate", "High (NDA Required)"]
 const VISIBILITIES = ["Public", "University Only", "Restricted"]
@@ -378,6 +379,11 @@ function projectContext(db: DatabaseSync, projectId: string) {
   }
 }
 
+function challengeContextFor(db: DatabaseSync, challengeId: string): ChallengeContext {
+  const row = one(db, "SELECT problem_description, objectives, expected_output FROM challenges WHERE id = ?", challengeId)!
+  return { problemDescription: String(row.problem_description), objectives: parseList(row.objectives), expectedOutput: String(row.expected_output) }
+}
+
 /** The faculty member who mentors the student's program. */
 function coordinatorFor(db: DatabaseSync, programId: string) {
   const row = one(db, "SELECT st.id, st.name FROM programs p JOIN staff st ON st.id = p.coordinator_id WHERE p.id = ?", programId)
@@ -539,17 +545,28 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
       const p = projectContext(db, id)
       if (p.studentId !== student.id) throw new ApiError(403, "You can only add evidence to your own projects.")
       if (rank(p.status) >= rank("Confirmed to Company")) throw new ApiError(409, "This submission was already confirmed to the company.")
-      const evType = oneOf(body.type, EVIDENCE_TYPES, "evidence type", "")
+      const evType = oneOf(body.type, SUBMITTABLE_EVIDENCE_TYPES, "evidence type", "")
       if (!evType) throw new ApiError(400, "Evidence type is required.")
+      const title = text(body.title, "Title", { required: true, max: 200 })
+      // "Code" evidence is pasted directly — everything else is a link to
+      // where the actual work lives (repo, document, or dataset).
+      const isCode = evType === "Code"
+      const link = isCode ? "" : text(body.link, "Link", { required: true, max: 500 })
+      const content = isCode ? text(body.content, "Code", { required: true, max: 20000 }) : null
+
+      const checkText = [title, content].filter(Boolean).join(". ")
+      const relevance = checkRelevance(challengeContextFor(db, p.challengeId), checkText)
+      if (!relevance.relevant) {
+        throw new ApiError(
+          400,
+          `This doesn't look like it addresses “${p.challengeTitle}” — WSL couldn't find a meaningful connection between what you submitted and this challenge's stated problem (${relevance.overlapPct}% match). Please submit evidence for this specific challenge.`,
+        )
+      }
+
       exec(
         db,
         "INSERT INTO evidence (id, project_id, student_id, type, title, description, link, content, submitted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        newId("ev"), id, student.id, evType,
-        text(body.title, "Title", { required: true, max: 200 }),
-        text(body.description, "Description", { max: 1000 }),
-        text(body.link, "Link", { required: true, max: 500 }),
-        text(body.content, "Content", { max: 20000 }) || null,
-        nowIso(),
+        newId("ev"), id, student.id, evType, title, "", link, content, nowIso(),
       )
     },
   },
@@ -574,9 +591,8 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
       }))
       if (ev.length === 0) throw new ApiError(409, "Submit at least one piece of evidence first.")
 
-      const chal = one(db, "SELECT required_skills, problem_description, objectives, expected_output FROM challenges WHERE id = ?", p.challengeId)!
-      const skills = parseList(chal.required_skills)
-      const challenge = { problemDescription: String(chal.problem_description), objectives: parseList(chal.objectives), expectedOutput: String(chal.expected_output) }
+      const skills = parseList(one(db, "SELECT required_skills FROM challenges WHERE id = ?", p.challengeId)!.required_skills)
+      const challenge = challengeContextFor(db, p.challengeId)
       const rated = new Set(all(db, "SELECT skill FROM skill_signals WHERE project_id = ?", id).map((r) => String(r.skill)))
       const results = simulateAIReview(skills, ev, challenge).filter((r) => !rated.has(r.skill))
       const now = nowIso()

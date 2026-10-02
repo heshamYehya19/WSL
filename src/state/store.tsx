@@ -35,7 +35,7 @@ interface StoreContextValue extends Snapshot {
   submitDraft: (id: string) => Promise<boolean>
   assignChallenge: (id: string, programId: string) => Promise<boolean>
   startProject: (challengeId: string) => Promise<string | undefined>
-  addEvidence: (projectId: string, input: { type: EvidenceType; title: string; description: string; link: string; content: string }) => Promise<boolean>
+  addEvidence: (projectId: string, input: { type: EvidenceType; title: string; link: string; content: string }) => Promise<boolean>
   runAIReview: (projectId: string) => Promise<boolean>
   confirmToCompany: (projectId: string, note: string) => Promise<boolean>
   submitCompanyReview: (projectId: string, ratings: Record<string, number>, note: string) => Promise<boolean>

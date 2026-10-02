@@ -45,10 +45,10 @@ CACHE_DIR.mkdir(parents=True, exist_ok=True)
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 CODE_LANGUAGES = [
-    "Python", "JavaScript", "TypeScript", "HTML", "SQL", "Java",
-    "C++", "C#", "Ruby", "Swift", "Shell", "Perl", "PHP", "Objective-C", "Go", "Rust",
+    "Python", "JavaScript", "TypeScript", "HTML", "CSS", "SQL", "Java",
+    "C++", "C#", "Ruby", "Swift", "Shell", "Perl", "PHP", "Objective-C", "Go", "Rust", "Dart",
 ]
-MAX_FILE_BYTES = 60_000
+MAX_FILE_BYTES = 150_000
 MAX_FILES_PER_LANGUAGE = 60
 
 # Conceptual (non-code) skills that appear in WSL's challenge data — matched
@@ -127,6 +127,19 @@ SUPPLEMENTARY_SOURCES = {
         ("nestjs/nest", "packages/common/decorators/core", ".ts"),
     ],
     "Objective-C": [("AFNetworking/AFNetworking", "AFNetworking", ".m")],
+    "C#": [("JamesNK/Newtonsoft.Json", "Src/Newtonsoft.Json", ".cs")],
+    "CSS": [
+        ("twbs/bootstrap", "dist/css", ".css"),
+        ("animate-css/animate.css", "source", ".css"),
+    ],
+    "Dart": [("flutter/flutter", "packages/flutter/lib/src/widgets", ".dart")],
+}
+
+# Same idea, but for sources where the real files of interest are scattered
+# across many subdirectories (e.g. one-endpoint-per-folder ASP.NET Core
+# samples) rather than sitting in one flat directory.
+RECURSIVE_SUPPLEMENTARY_SOURCES = {
+    "C#": [("dotnet-architecture/eShopOnWeb", "main", "src/PublicApi", ".cs")],
 }
 
 
@@ -134,7 +147,11 @@ def fetch_github_dir_files(repo: str, path: str, ext: str, limit: int) -> list[s
     print(f"[fetch] listing {repo}/{path} ...")
     encoded_path = urllib.parse.quote(path)
     listing = http_get_json(f"https://api.github.com/repos/{repo}/contents/{encoded_path}")
-    files = [f for f in listing if f.get("type") == "file" and f.get("download_url") and f["name"].endswith(ext) and "test" not in f["name"].lower()]
+    files = [
+        f for f in listing
+        if f.get("type") == "file" and f.get("download_url") and f["name"].endswith(ext)
+        and "test" not in f["name"].lower() and ".min." not in f["name"].lower()
+    ]
     texts = []
     for f in files[:limit]:
         if f.get("size", 0) > MAX_FILE_BYTES or f.get("size", 0) < 20:
@@ -143,6 +160,31 @@ def fetch_github_dir_files(repo: str, path: str, ext: str, limit: int) -> list[s
             text = http_get_text(f["download_url"])
         except Exception as e:
             print(f"  ! skip {f['name']}: {e}")
+            continue
+        if text.strip():
+            texts.append(text)
+        time.sleep(0.03)
+    print(f"  -> {len(texts)} usable files")
+    return texts
+
+
+def fetch_github_recursive_files(repo: str, branch: str, path_prefix: str, ext: str, limit: int) -> list[str]:
+    print(f"[fetch] recursive listing {repo}/{path_prefix} ...")
+    tree = http_get_json(f"https://api.github.com/repos/{repo}/git/trees/{branch}?recursive=1")
+    entries = [
+        e for e in tree.get("tree", [])
+        if e.get("type") == "blob" and e["path"].startswith(path_prefix) and e["path"].endswith(ext)
+        and "test" not in e["path"].lower() and ".min." not in e["path"].lower()
+    ]
+    texts = []
+    for e in entries[:limit]:
+        if e.get("size", 0) > MAX_FILE_BYTES or e.get("size", 0) < 20:
+            continue
+        raw_url = f"https://raw.githubusercontent.com/{repo}/{branch}/{urllib.parse.quote(e['path'])}"
+        try:
+            text = http_get_text(raw_url)
+        except Exception as ex:
+            print(f"  ! skip {e['path']}: {ex}")
             continue
         if text.strip():
             texts.append(text)
@@ -181,6 +223,8 @@ def fetch_code_samples() -> dict:
         print(f"  -> {len(texts)} usable files")
         for repo, path, ext in SUPPLEMENTARY_SOURCES.get(lang, []):
             texts.extend(fetch_github_dir_files(repo, path, ext, MAX_FILES_PER_LANGUAGE))
+        for repo, branch, path_prefix, ext in RECURSIVE_SUPPLEMENTARY_SOURCES.get(lang, []):
+            texts.extend(fetch_github_recursive_files(repo, branch, path_prefix, ext, MAX_FILES_PER_LANGUAGE))
         samples[lang] = texts
 
     cache_file.write_text(json.dumps(samples), encoding="utf-8")
