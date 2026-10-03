@@ -40,7 +40,7 @@ export default function Landing() {
                   to="/login"
                   className="rounded-full bg-teal-500 px-6 py-3 text-sm font-semibold text-ink-950 transition-all duration-200 hover:-translate-y-0.5 hover:bg-teal-400 hover:shadow-lg hover:shadow-teal-500/25 active:translate-y-0"
                 >
-                  Explore WSL
+                  Start with WSL
                 </Link>
                 <Link
                   to="/how-it-works"
@@ -49,40 +49,9 @@ export default function Landing() {
                   See How It Works
                 </Link>
               </div>
-              <div className="mt-4 flex justify-center lg:justify-start">
-                <Link
-                  to="/login"
-                  className="inline-flex items-center gap-2 rounded-full border border-dashed border-teal-400/40 px-5 py-2.5 text-sm font-semibold text-teal-300 transition-all duration-200 hover:-translate-y-0.5 hover:border-teal-300 hover:text-teal-200 active:translate-y-0"
-                >
-                  Try Our Skill Matcher
-                  <span className="rounded-full bg-teal-500/15 px-2 py-0.5 text-[10px] font-bold tracking-wide text-teal-300 uppercase">
-                    Beta
-                  </span>
-                </Link>
-              </div>
             </div>
             <HeroNetwork />
           </div>
-
-          <Link
-            to="/login"
-            className="group relative mt-14 flex flex-col items-center justify-between gap-2 rounded-2xl border border-white/10 bg-white/5 px-5 py-4 text-center transition-all duration-200 hover:-translate-y-0.5 hover:border-teal-400/30 sm:flex-row sm:text-left"
-          >
-            <div className="flex items-center gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-teal-500/15 text-teal-300">
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M4 19V9M10 19V5M16 19v-7M22 19v-3" />
-                </svg>
-              </span>
-              <div>
-                <div className="text-sm font-semibold text-white">Global Skill Dashboard</div>
-                <div className="text-xs text-ink-400">A live snapshot of skill signals across the network</div>
-              </div>
-            </div>
-            <span className="text-sm font-semibold text-teal-300 transition-colors group-hover:text-teal-200">
-              Preview →
-            </span>
-          </Link>
         </div>
       </section>
 
@@ -196,7 +165,7 @@ export default function Landing() {
               to="/login"
               className="rounded-full bg-teal-500 px-6 py-3 text-sm font-semibold text-ink-950 transition-all duration-200 hover:-translate-y-0.5 hover:bg-teal-400 hover:shadow-lg hover:shadow-teal-500/25 active:translate-y-0"
             >
-              Explore WSL
+              Start with WSL
             </Link>
             <Link
               to="/about"
