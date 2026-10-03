@@ -246,16 +246,23 @@ export default function ProjectWorkspace() {
               </p>
               {myEvidence.length === 0 ? (
                 <p className="mt-4 text-sm text-ink-400">Submit evidence first, then request a rating.</p>
-              ) : mySignals.length > 0 ? (
+              ) : locked ? (
                 <p className="mt-4 text-sm text-teal-300">Rating complete — see the results below.</p>
               ) : (
-                <button
-                  onClick={handleAnalyze}
-                  disabled={analyzing}
-                  className="mt-4 w-full rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-ink-950 hover:bg-teal-400 disabled:opacity-60"
-                >
-                  {analyzing ? "Rating your evidence…" : "Rate My Evidence with AI"}
-                </button>
+                <>
+                  {mySignals.length > 0 && (
+                    <p className="mt-4 text-sm text-teal-300">
+                      Rating complete — add more evidence and re-analyze anytime before your university confirms your submission.
+                    </p>
+                  )}
+                  <button
+                    onClick={handleAnalyze}
+                    disabled={analyzing}
+                    className="mt-3 w-full rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-ink-950 hover:bg-teal-400 disabled:opacity-60"
+                  >
+                    {analyzing ? "Rating your evidence…" : mySignals.length > 0 ? "Re-analyze My Evidence with AI" : "Rate My Evidence with AI"}
+                  </button>
+                </>
               )}
             </div>
 

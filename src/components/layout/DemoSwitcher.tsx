@@ -175,8 +175,14 @@ export function DemoSwitcher() {
               <button
                 onClick={async () => {
                   if (confirm("Reset all data back to its starting state? Everything submitted, rated, or changed by any account will be lost.")) {
-                    await resetDemo()
+                    const ok = await resetDemo()
+                    if (!ok) return
+                    // Sign out and return to the landing page — otherwise whatever
+                    // page/account you were on could still be pointing at a
+                    // project, challenge, or evidence ID that reset just deleted.
+                    signOut()
                     close()
+                    navigate("/")
                   }
                 }}
                 className="group rounded-xl px-2 py-2 text-xs font-medium text-ink-500 transition-colors hover:bg-ink-50 hover:text-ink-800"

@@ -593,12 +593,21 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
 
       const skills = parseList(one(db, "SELECT required_skills FROM challenges WHERE id = ?", p.challengeId)!.required_skills)
       const challenge = challengeContextFor(db, p.challengeId)
-      const rated = new Set(all(db, "SELECT skill FROM skill_signals WHERE project_id = ?", id).map((r) => String(r.skill)))
-      const results = simulateAIReview(skills, ev, challenge).filter((r) => !rated.has(r.skill))
+      // Re-analyzing (e.g. after the student adds more evidence) recomputes every
+      // required skill against ALL current evidence and overwrites prior results,
+      // rather than only ever rating a skill once — otherwise evidence submitted
+      // after the first rating could never be analyzed at all.
+      const results = simulateAIReview(skills, ev, challenge)
       const now = nowIso()
       for (const r of results) {
-        const sigId = newId("sig")
-        exec(db, "INSERT INTO skill_signals (id, project_id, student_id, skill, ai_rating, ai_note, analyzed_at) VALUES (?, ?, ?, ?, ?, ?, ?)", sigId, id, student.id, r.skill, r.rating, r.note, now)
+        const existing = one(db, "SELECT id FROM skill_signals WHERE project_id = ? AND skill = ?", id, r.skill)
+        const sigId = existing ? String(existing.id) : newId("sig")
+        if (existing) {
+          exec(db, "DELETE FROM skill_signal_evidence WHERE signal_id = ?", sigId)
+          exec(db, "UPDATE skill_signals SET ai_rating = ?, ai_note = ?, analyzed_at = ? WHERE id = ?", r.rating, r.note, now, sigId)
+        } else {
+          exec(db, "INSERT INTO skill_signals (id, project_id, student_id, skill, ai_rating, ai_note, analyzed_at) VALUES (?, ?, ?, ?, ?, ?, ?)", sigId, id, student.id, r.skill, r.rating, r.note, now)
+        }
         for (const evId of r.evidenceIds) exec(db, "INSERT INTO skill_signal_evidence (signal_id, evidence_id) VALUES (?, ?)", sigId, evId)
       }
       if (p.status === "In Progress") {
