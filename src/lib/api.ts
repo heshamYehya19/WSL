@@ -31,3 +31,21 @@ export function fetchSnapshot(session: DemoUserState) {
 export function mutate<R = null>(method: "POST" | "PATCH", path: string, session: DemoUserState, body?: unknown) {
   return request<{ result: R; snapshot: Snapshot }>(method, path, session, body ?? {})
 }
+
+/** Downloads a challenge's attached file. A plain link can't carry the actor header, so fetch it and hand the browser a blob. */
+export async function downloadChallengeFile(session: DemoUserState, challengeId: string, fileId: string, name: string) {
+  let res: Response
+  try {
+    res = await fetch(`/api/challenges/${encodeURIComponent(challengeId)}/files/${encodeURIComponent(fileId)}`, { headers: actorHeader(session) })
+  } catch {
+    throw new ApiRequestError("Can't reach the WSL server. Is it running?")
+  }
+  if (!res.ok) {
+    const data = await res.json().catch(() => null)
+    throw new ApiRequestError(data?.error ?? `Download failed (${res.status}).`)
+  }
+  const url = URL.createObjectURL(await res.blob())
+  const a = Object.assign(document.createElement("a"), { href: url, download: name })
+  a.click()
+  setTimeout(() => URL.revokeObjectURL(url), 10_000)
+}

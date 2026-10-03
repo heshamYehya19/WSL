@@ -4,6 +4,7 @@ import { useDemoUser } from "../../state/demoUser"
 import { useStore } from "../../state/store"
 import { PageHeader } from "../../components/ui/PageHeader"
 import { StatusBadge } from "../../components/ui/StatusBadge"
+import { ChallengeFileList, SharedDataNotice } from "../../components/ui/ChallengeFiles"
 import { assignmentFor, statusAtUniversity } from "../../lib/selectors"
 import { daysUntil, formatDate, formatRelative } from "../../lib/format"
 
@@ -62,6 +63,7 @@ export default function ChallengeReview() {
           <div className="rounded-2xl border border-ink-200 bg-surface p-5">
             <h3 className="mb-2 text-xs font-semibold tracking-wide text-teal-600 uppercase">Problem</h3>
             <p className="text-sm leading-relaxed text-ink-700">{challenge.problemDescription}</p>
+            <ChallengeFileList challenge={challenge} kind="description" />
           </div>
           <div className="rounded-2xl border border-ink-200 bg-surface p-5">
             <h3 className="mb-2 text-xs font-semibold tracking-wide text-teal-600 uppercase">Required Skills</h3>
@@ -82,8 +84,10 @@ export default function ChallengeReview() {
           <div className="rounded-2xl border border-ink-200 bg-surface p-5">
             <h3 className="mb-2 text-xs font-semibold tracking-wide text-teal-600 uppercase">Data Sensitivity &amp; Expected Output</h3>
             <p className="text-sm text-ink-700"><strong>{challenge.dataSensitivity}</strong> · {challenge.datasetAvailability}</p>
+            <ChallengeFileList challenge={challenge} kind="dataset" />
             <p className="mt-2 text-sm text-ink-700">{challenge.expectedOutput}</p>
             <p className="mt-2 text-xs text-ink-400">WSL already screened this challenge automatically for private or confidential data.</p>
+            <SharedDataNotice challenge={challenge} companyName={org?.name} />
           </div>
 
           <div className="rounded-2xl border border-ink-200 bg-surface p-5">

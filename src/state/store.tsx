@@ -1,8 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
 import type { ReactNode } from "react"
-import { fetchSnapshot, mutate } from "../lib/api"
+import { downloadChallengeFile, fetchSnapshot, mutate } from "../lib/api"
 import { useSession } from "./session"
-import type { Availability, ChallengeVisibility, CompanyActionKind, DataSensitivity, Difficulty, EvidenceType, SuggestedLevel, Snapshot } from "../types"
+import type { Availability, ChallengeFileKind, ChallengeVisibility, CompanyActionKind, DataSensitivity, Difficulty, EvidenceType, ScreeningFinding, SuggestedLevel, Snapshot } from "../types"
 
 export interface NewChallengeInput {
   title: string
@@ -18,7 +18,14 @@ export interface NewChallengeInput {
   preferredUniversityId: string | null
   contactId: string
   asDraft: boolean
+  /** Base64-encoded file contents. */
+  files: { kind: ChallengeFileKind; name: string; data: string }[]
+  /** Set once the company has seen WSL's screening findings and chosen to share anyway. */
+  confirmSensitiveData: boolean
 }
+
+/** Either the new challenge's id, or — if WSL's screening flagged personal data that wasn't confirmed yet — what it found. */
+export type CreateChallengeResult = { id: string } | { findings: ScreeningFinding[] }
 
 interface StoreContextValue extends Snapshot {
   getOrg: (id: string) => Snapshot["organizations"][number] | undefined
@@ -31,7 +38,7 @@ interface StoreContextValue extends Snapshot {
 
   // Every action writes to the database and resolves once the fresh snapshot is in.
   // On failure the error is shown to the user and the promise resolves to undefined.
-  createChallenge: (input: NewChallengeInput) => Promise<string | undefined>
+  createChallenge: (input: NewChallengeInput) => Promise<CreateChallengeResult | undefined>
   submitDraft: (id: string) => Promise<boolean>
   assignChallenge: (id: string, programId: string) => Promise<boolean>
   startProject: (challengeId: string) => Promise<string | undefined>
@@ -56,6 +63,7 @@ interface StoreContextValue extends Snapshot {
   updateStudentProfile: (studentId: string, input: { bio: string; availability: Availability }) => Promise<boolean>
   markNotificationsRead: () => Promise<boolean>
   resetDemo: () => Promise<boolean>
+  downloadFile: (challengeId: string, fileId: string, name: string) => Promise<void>
 }
 
 const StoreContext = createContext<StoreContextValue | null>(null)
@@ -129,7 +137,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       studentsOfUniversity: (universityId) => snapshot.students.filter((s) => s.universityId === universityId),
       isUniversityStudent: (studentId, universityId) => studentById.get(studentId)?.universityId === universityId,
 
-      createChallenge: (input) => run<{ id: string }>("POST", "/challenges", input).then((r) => (r.ok ? r.result.id : undefined)),
+      createChallenge: (input) => run<CreateChallengeResult>("POST", "/challenges", input).then((r) => (r.ok ? r.result : undefined)),
       submitDraft: (id) => ok(run("POST", `/challenges/${id}/submit`)),
       assignChallenge: (id, programId) => ok(run("POST", `/challenges/${id}/assign`, { programId })),
       startProject: (challengeId) => run<{ id: string }>("POST", `/challenges/${challengeId}/start`).then((r) => (r.ok ? r.result.id : undefined)),
@@ -148,6 +156,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       updateStudentProfile: (studentId, input) => ok(run("PATCH", `/students/${studentId}`, input)),
       markNotificationsRead: () => ok(run("POST", "/notifications/read")),
       resetDemo: () => ok(run("POST", "/reset")),
+      downloadFile: (challengeId, fileId, name) =>
+        downloadChallengeFile(session, challengeId, fileId, name).catch((err: Error) => setToast(err.message)),
     }
   }, [snapshot, session, apply])
 

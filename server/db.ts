@@ -21,6 +21,8 @@ const CHALLENGE_COLUMNS = `
   learning_outcomes       TEXT NOT NULL, -- JSON array of strings
   dataset_availability    TEXT NOT NULL,
   data_sensitivity        TEXT NOT NULL,
+  -- JSON summary of personal data WSL's screening found and the company chose to share anyway (NULL = none found).
+  shared_sensitive_data   TEXT,
   deadline                TEXT NOT NULL,
   preferred_university_id TEXT REFERENCES universities(id),
   visibility              TEXT NOT NULL CHECK (visibility IN ('Public', 'University Only', 'Restricted')),
@@ -95,6 +97,20 @@ CREATE TABLE IF NOT EXISTS students (
 
 CREATE TABLE IF NOT EXISTS challenges (
 ${CHALLENGE_COLUMNS}
+);
+
+-- Files a company attached: a challenge description document and/or datasets for students.
+CREATE TABLE IF NOT EXISTS challenge_files (
+  id           TEXT PRIMARY KEY,
+  challenge_id TEXT NOT NULL REFERENCES challenges(id) ON DELETE CASCADE,
+  kind         TEXT NOT NULL CHECK (kind IN ('description', 'dataset')),
+  name         TEXT NOT NULL,
+  mime         TEXT NOT NULL,
+  size         INTEGER NOT NULL,
+  data         BLOB NOT NULL,
+  -- Text extracted at upload; a description file's text feeds the AI relevance check.
+  text         TEXT NOT NULL DEFAULT '',
+  uploaded_at  TEXT NOT NULL
 );
 
 -- An open challenge can be assigned independently by several universities, each to one
@@ -251,6 +267,7 @@ CREATE INDEX IF NOT EXISTS idx_projects_student ON projects (student_id);
 CREATE INDEX IF NOT EXISTS idx_evidence_project ON evidence (project_id);
 CREATE INDEX IF NOT EXISTS idx_signals_project ON skill_signals (project_id);
 CREATE INDEX IF NOT EXISTS idx_company_actions_company ON company_actions (company_id);
+CREATE INDEX IF NOT EXISTS idx_challenge_files_challenge ON challenge_files (challenge_id);
 `
 
 const TABLES_IN_DROP_ORDER = [
@@ -267,6 +284,7 @@ const TABLES_IN_DROP_ORDER = [
   "projects",
   "challenge_history",
   "challenge_assignments",
+  "challenge_files",
   "challenges",
   "students",
   "company_contacts",
@@ -294,7 +312,7 @@ export function getDb(): DatabaseSync {
   return db
 }
 
-const SCHEMA_VERSION = 6
+const SCHEMA_VERSION = 7
 
 /**
  * Brings databases created by older versions up to date without losing their data.
@@ -317,6 +335,9 @@ const SCHEMA_VERSION = 6
  *     "Confirmed to Company" -> "Skills Pending Verification", "Company Reviewed" ->
  *     "Completed" (a one-time best-effort approximation — the old rows have no
  *     per-skill resolution data to map from; `npm run db:reset` is the clean path).
+ * v7: challenges gained `shared_sensitive_data` (what the privacy screen flagged and the
+ *     company confirmed sharing). Attached files live in the new challenge_files table,
+ *     which CREATE TABLE IF NOT EXISTS adds on its own.
  */
 function migrate(db: DatabaseSync) {
   const { user_version: version } = db.prepare("PRAGMA user_version").get() as { user_version: number }
@@ -376,6 +397,10 @@ function migrate(db: DatabaseSync) {
         db.exec(`UPDATE ${table} SET status = 'Completed' WHERE status = 'Company Reviewed'`)
       }
     })
+  }
+  // Runs before the v2 rebuild below, which copies every CHALLENGE_COLUMNS column from the old table.
+  if (version < 7 && !columns.includes("shared_sensitive_data")) {
+    db.exec("ALTER TABLE challenges ADD COLUMN shared_sensitive_data TEXT")
   }
   if (columns.includes("assigned_university_id")) {
     // Rebuild the table without the old columns (foreign keys are still off at this point).

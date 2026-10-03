@@ -37,6 +37,32 @@ export type DataSensitivity = "None (Public Dataset)" | "Low" | "Moderate" | "Hi
 
 export type Difficulty = "Foundational" | "Intermediate" | "Advanced"
 
+/** "description" replaces/accompanies the written problem description; "dataset" is data for students to work with. */
+export type ChallengeFileKind = "description" | "dataset"
+
+/** A file a company attached to a challenge. The bytes are fetched separately, with an access check. */
+export interface ChallengeFile {
+  id: string
+  kind: ChallengeFileKind
+  name: string
+  mime: string
+  size: number
+  uploadedAt: string
+}
+
+export type ScreeningKind = "phone" | "email" | "nationalId" | "address" | "birthDate" | "card" | "iban" | "personName" | "unreadable"
+
+/** Personal data WSL's automatic screening found in a challenge's text or attached files. */
+export interface ScreeningFinding {
+  kind: ScreeningKind
+  label: string
+  count: number
+  /** Where it was found: a field label, a file name, or a file + column. */
+  sources: string[]
+  /** Up to three masked samples, e.g. "07•••••567". */
+  examples: string[]
+}
+
 export type StudentMajor =
   | "Artificial Intelligence"
   | "Software Engineering"
@@ -113,6 +139,12 @@ export interface Challenge {
   learningOutcomes: string[]
   datasetAvailability: string
   dataSensitivity: DataSensitivity
+  files: ChallengeFile[]
+  /**
+   * What WSL's screening flagged and the company confirmed was OK to share anyway —
+   * null when the screening found nothing.
+   */
+  sharedSensitiveData: { kind: ScreeningKind; label: string; count: number }[] | null
   deadline: string
   preferredUniversityId: string | null
   contactId: string

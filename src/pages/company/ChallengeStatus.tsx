@@ -2,6 +2,7 @@ import { Link, useParams } from "react-router-dom"
 import { useStore } from "../../state/store"
 import { useDemoUser } from "../../state/demoUser"
 import { StatusBadge } from "../../components/ui/StatusBadge"
+import { ChallengeFileList, SharedDataNotice } from "../../components/ui/ChallengeFiles"
 import { challengeUniversityIds } from "../../lib/selectors"
 import { PIPELINE_ORDER } from "../../lib/pipeline"
 import { formatDate, formatRelative } from "../../lib/format"
@@ -92,6 +93,15 @@ export default function ChallengeStatus() {
           )}
         </div>
       </div>
+
+      {(challenge.files.length > 0 || challenge.sharedSensitiveData) && (
+        <div className="mt-6 rounded-2xl border border-ink-200 bg-surface p-6">
+          <h3 className="text-xs font-semibold tracking-wide text-teal-600 uppercase">Attached Files</h3>
+          <ChallengeFileList challenge={challenge} kind="description" />
+          <ChallengeFileList challenge={challenge} kind="dataset" />
+          <SharedDataNotice challenge={challenge} companyName="You" />
+        </div>
+      )}
 
       {challenge.status !== "Draft" && (
         <div className="mt-6 rounded-2xl border border-ink-200 bg-surface p-6">

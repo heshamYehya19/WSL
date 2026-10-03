@@ -4,6 +4,7 @@ import { useDemoUser } from "../../state/demoUser"
 import { useStore } from "../../state/store"
 import { PageHeader } from "../../components/ui/PageHeader"
 import { StatusBadge } from "../../components/ui/StatusBadge"
+import { ChallengeFileList, SharedDataNotice } from "../../components/ui/ChallengeFiles"
 import { formatDate, daysUntil } from "../../lib/format"
 import { assignmentFor, canStudentSee, statusAtUniversity } from "../../lib/selectors"
 
@@ -59,6 +60,7 @@ export default function ChallengeDetails() {
         <div className="rounded-2xl border border-ink-200 bg-surface px-6 lg:col-span-2">
           <Section title="The Problem">
             <p className="text-sm leading-relaxed text-ink-700">{challenge.problemDescription}</p>
+            <ChallengeFileList challenge={challenge} kind="description" />
           </Section>
           <Section title="Objectives">
             <ul className="space-y-1.5">
@@ -82,6 +84,7 @@ export default function ChallengeDetails() {
           </Section>
           <Section title="Data Available">
             <p className="text-sm text-ink-700">{challenge.datasetAvailability}</p>
+            <ChallengeFileList challenge={challenge} kind="dataset" />
           </Section>
           <Section title="Submission Requirements">
             <div className="flex flex-wrap gap-1.5">
@@ -95,6 +98,7 @@ export default function ChallengeDetails() {
               Data sensitivity: <strong>{challenge.dataSensitivity}</strong>. Visibility: <strong>{challenge.visibility}</strong>.
               {" "}WSL automatically screened this challenge for private or confidential data before it reached your university.
             </p>
+            <SharedDataNotice challenge={challenge} companyName={org?.name} />
           </Section>
           <Section title="Learning Outcomes">
             <ul className="space-y-1.5">

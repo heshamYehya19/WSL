@@ -5,9 +5,13 @@ import { getDb, resetDatabase, transaction } from "./db.ts"
 import { checkRelevance, simulateAIReview } from "./ai.ts"
 import type { ChallengeContext } from "./ai.ts"
 import { rank } from "../src/lib/pipeline.ts"
+import { MAX_DATASET_FILES, MAX_FILE_BYTES, prepareFile, screenChallenge, summarizeFindings, UploadError } from "./screening.ts"
+import type { PreparedFile } from "./screening.ts"
 import type {
   AppNotification,
   Challenge,
+  ChallengeFile,
+  ChallengeFileKind,
   ChallengeStatus,
   CompanyAction,
   CompanyContact,
@@ -20,6 +24,7 @@ import type {
   Program,
   Project,
   ProjectMember,
+  ScreeningFinding,
   SkillSignal,
   SkillSignalStatus,
   Snapshot,
@@ -30,7 +35,13 @@ import type {
 
 // ---------------------------------------------------------------- shared rules
 
-const SCREEN_NOTE = "WSL automatically screened this challenge for private or confidential data — none found."
+/** The history note recorded when a challenge is sent on, reflecting what the privacy screen actually found. */
+function screenNote(sharedSensitiveData: unknown, companyName: string): string {
+  const shared = sharedSensitiveData ? (JSON.parse(String(sharedSensitiveData)) as ScreeningFinding[]) : []
+  if (shared.length === 0) return "WSL automatically screened this challenge for private or confidential data — none found."
+  return `WSL's automatic screen flagged possible personal data (${summarizeFindings(shared)}). ${companyName} reviewed the warning and confirmed it's OK to share.`
+}
+
 // The full EvidenceType union (src/types.ts) still covers older evidence types
 // still on record (Project Report, Presentation, ...) so historical data keeps
 // rendering; only these four are offered for new submissions.
@@ -199,6 +210,8 @@ function buildSnapshot(db: DatabaseSync, actor: Actor): Snapshot {
   })
 
   const historyRows = all(db, "SELECT * FROM challenge_history ORDER BY id")
+  // Metadata only — file contents are served one at a time by GET /challenges/:id/files/:fileId.
+  const fileRows = all(db, "SELECT id, challenge_id, kind, name, mime, size, uploaded_at FROM challenge_files ORDER BY uploaded_at, name")
   const assignmentRows = all(
     db,
     "SELECT a.*, p.name AS program_name FROM challenge_assignments a JOIN programs p ON p.id = a.program_id ORDER BY a.assigned_at",
@@ -222,6 +235,17 @@ function buildSnapshot(db: DatabaseSync, actor: Actor): Snapshot {
     learningOutcomes: parseList(r.learning_outcomes),
     datasetAvailability: String(r.dataset_availability),
     dataSensitivity: r.data_sensitivity as Challenge["dataSensitivity"],
+    files: fileRows
+      .filter((f) => f.challenge_id === r.id)
+      .map((f): ChallengeFile => ({
+        id: String(f.id),
+        kind: f.kind as ChallengeFileKind,
+        name: String(f.name),
+        mime: String(f.mime),
+        size: Number(f.size),
+        uploadedAt: String(f.uploaded_at),
+      })),
+    sharedSensitiveData: r.shared_sensitive_data ? (JSON.parse(String(r.shared_sensitive_data)) as Challenge["sharedSensitiveData"]) : null,
     deadline: String(r.deadline),
     preferredUniversityId: (r.preferred_university_id as string | null) ?? null,
     contactId: String(r.contact_id),
@@ -484,7 +508,13 @@ function projectContext(db: DatabaseSync, projectId: string) {
 
 function challengeContextFor(db: DatabaseSync, challengeId: string): ChallengeContext {
   const row = one(db, "SELECT problem_description, objectives, expected_output FROM challenges WHERE id = ?", challengeId)!
-  return { problemDescription: String(row.problem_description), objectives: parseList(row.objectives), expectedOutput: String(row.expected_output) }
+  // A description document holds the full problem statement, so students' work is matched against it too.
+  const docText = all(db, "SELECT text FROM challenge_files WHERE challenge_id = ? AND kind = 'description'", challengeId).map((f) => String(f.text))
+  return {
+    problemDescription: [String(row.problem_description), ...docText].join("\n"),
+    objectives: parseList(row.objectives),
+    expectedOutput: String(row.expected_output),
+  }
 }
 
 /** The faculty member who mentors the student's program. */
@@ -492,6 +522,59 @@ function coordinatorFor(db: DatabaseSync, programId: string) {
   const row = one(db, "SELECT st.id, st.name FROM programs p JOIN staff st ON st.id = p.coordinator_id WHERE p.id = ?", programId)
   if (!row) throw new ApiError(500, "This program has no coordinator on record.")
   return { id: String(row.id), name: String(row.name) }
+}
+
+/** Who may download a challenge's attached files: the same accounts that can see the challenge itself. */
+function canAccessChallengeFiles(db: DatabaseSync, actor: Actor, challengeId: string): boolean {
+  const c = one(db, "SELECT company_id, status, preferred_university_id FROM challenges WHERE id = ?", challengeId)
+  if (!c) return false
+  switch (actor.role) {
+    case "company":
+      return c.company_id === actor.id
+    case "university":
+      return c.status !== "Draft" && (!c.preferred_university_id || c.preferred_university_id === actor.id)
+    case "student":
+      return !!one(
+        db,
+        "SELECT 1 FROM challenge_assignments a JOIN students s ON s.university_id = a.university_id WHERE a.challenge_id = ? AND s.id = ?",
+        challengeId,
+        actor.id,
+      )
+    default:
+      return false
+  }
+}
+
+const FILE_KINDS: ChallengeFileKind[] = ["description", "dataset"]
+
+/** Decodes and validates a challenge's uploaded files (sent as base64 in the JSON body). */
+async function prepareChallengeFiles(actor: Actor, body: Body): Promise<PreparedFile[]> {
+  requireRole(actor, "company")
+  if (body.files === undefined || body.files === null) return []
+  if (!Array.isArray(body.files)) throw new ApiError(400, "Files must be a list.")
+  const files: PreparedFile[] = []
+  for (const f of body.files as Record<string, unknown>[]) {
+    const kind = f?.kind as ChallengeFileKind
+    if (!FILE_KINDS.includes(kind)) throw new ApiError(400, "Unknown file kind.")
+    if (typeof f.name !== "string" || typeof f.data !== "string") throw new ApiError(400, "Each file needs a name and contents.")
+    try {
+      files.push(await prepareFile(kind, f.name, Buffer.from(f.data, "base64")))
+    } catch (err) {
+      if (err instanceof UploadError) throw new ApiError(400, err.message)
+      throw err
+    }
+  }
+  if (files.filter((f) => f.kind === "description").length > 1) throw new ApiError(400, "Attach one challenge description file at most.")
+  if (files.filter((f) => f.kind === "dataset").length > MAX_DATASET_FILES) throw new ApiError(400, `Attach up to ${MAX_DATASET_FILES} dataset files.`)
+  return files
+}
+
+/** A readable summary of a description document, for when the company didn't write one. */
+function summaryFromDocument(text: string): string {
+  const flat = text.replace(/\s+/g, " ").trim()
+  if (flat.length <= 600) return flat
+  const cut = flat.slice(0, 600)
+  return `${cut.slice(0, Math.max(cut.lastIndexOf(" "), 400))}…`
 }
 
 function notifyUniversitiesOfNewChallenge(db: DatabaseSync, challengeId: string) {
@@ -507,16 +590,32 @@ function notifyUniversitiesOfNewChallenge(db: DatabaseSync, challengeId: string)
 // ------------------------------------------------------------------- mutations
 
 type Body = Record<string, unknown>
-type Handler = (db: DatabaseSync, actor: Actor, params: string[], body: Body) => unknown
+type Handler = (db: DatabaseSync, actor: Actor, params: string[], body: Body, prepared: never) => unknown
 
-const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
+// `prepare` does any async work (e.g. reading uploaded files) before the handler's
+// synchronous database transaction starts; its result is passed to the handler.
+const routes: { method: string; pattern: RegExp; prepare?: (actor: Actor, body: Body) => Promise<unknown>; handler: Handler }[] = [
   {
     method: "POST",
     pattern: /^\/challenges$/,
-    handler: (db, actor, _p, body) => {
+    prepare: prepareChallengeFiles,
+    // Runs WSL's privacy screen over the text and files first. If it finds personal data and the
+    // company hasn't confirmed sharing it (confirmSensitiveData), nothing is saved and the findings
+    // come back as { findings } so the company can review them and resubmit.
+    handler: (db, actor, _p, body, files: PreparedFile[]) => {
       const company = requireRole(actor, "company")
       const title = text(body.title, "Title", { required: true, max: 160 })
-      const problem = text(body.problemDescription, "Problem description", { required: true })
+      const descriptionFile = files.find((f) => f.kind === "description")
+      let problem = text(body.problemDescription, "Problem description", { required: !descriptionFile })
+      if (!problem && descriptionFile) {
+        if (descriptionFile.text.replace(/\s/g, "").length < 20) {
+          throw new ApiError(
+            400,
+            `WSL couldn't read the text in “${descriptionFile.name}”, so add a short written description too — it's what students' work is matched against.`,
+          )
+        }
+        problem = summaryFromDocument(descriptionFile.text)
+      }
       const skills = textList(body.requiredSkills, "Required skills")
       const outcomes = textList(body.learningOutcomes, "Learning outcomes")
       const preferred = typeof body.preferredUniversityId === "string" && body.preferredUniversityId ? body.preferredUniversityId : null
@@ -535,25 +634,45 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
       if (Number.isNaN(deadline.getTime())) throw new ApiError(400, "Invalid deadline.")
       if (deadline.getTime() < Date.now()) throw new ApiError(400, "The deadline must be in the future.")
 
-      const companyRow = one(db, "SELECT industry FROM companies WHERE id = ?", company.id)!
+      const companyRow = one(db, "SELECT name, industry FROM companies WHERE id = ?", company.id)!
+      const industry = text(body.industry, "Industry", { max: 120 }) || String(companyRow.industry)
+      const datasetAvailability = text(body.datasetAvailability, "Dataset availability", { max: 300 })
+
+      // Screened whatever sensitivity level the company declared — "Low" is a claim, not a check.
+      const findings = screenChallenge({
+        fields: [
+          { label: "Title", text: title },
+          { label: "Problem description", text: text(body.problemDescription, "Problem description") },
+          { label: "Required skills", text: skills.join(", ") },
+          { label: "Learning outcomes", text: outcomes.join("\n") },
+          { label: "Dataset availability", text: datasetAvailability },
+          { label: "Industry", text: industry },
+        ],
+        files,
+      })
+      if (findings.length > 0 && body.confirmSensitiveData !== true) return { findings }
+      const shared = findings.length > 0 ? JSON.stringify(findings.map(({ kind, label, count }) => ({ kind, label, count }))) : null
+
       const asDraft = body.asDraft === true
       const id = newId("chal")
       const now = nowIso()
       exec(
         db,
         `INSERT INTO challenges (id, company_id, contact_id, title, problem_description, objectives, expected_output, industry, difficulty,
-          required_skills, learning_outcomes, dataset_availability, data_sensitivity, deadline, preferred_university_id, visibility,
-          submission_requirements, status, created_at, submitted_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          required_skills, learning_outcomes, dataset_availability, data_sensitivity, shared_sensitive_data, deadline, preferred_university_id,
+          visibility, submission_requirements, status, created_at, submitted_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         id, company.id, contactId, title, problem,
         JSON.stringify(outcomes.length ? outcomes : ["Explore the problem", "Prototype a solution", "Present findings"]),
         "A working prototype or analysis plus a short report, as detailed in submission requirements.",
-        text(body.industry, "Industry", { max: 120 }) || String(companyRow.industry),
+        industry,
         oneOf(body.difficulty, DIFFICULTIES, "difficulty", "Intermediate"),
         JSON.stringify(skills.length ? skills : ["Problem Solving"]),
         JSON.stringify(outcomes.length ? outcomes : ["Apply classroom concepts to a real operational problem"]),
-        text(body.datasetAvailability, "Dataset availability", { max: 300 }) || "To be confirmed during WSL's automatic screening.",
+        datasetAvailability ||
+          (files.some((f) => f.kind === "dataset") ? "See the attached dataset files." : "To be confirmed during WSL's automatic screening."),
         oneOf(body.dataSensitivity, SENSITIVITIES, "data sensitivity", "Low"),
+        shared,
         deadline.toISOString(),
         preferred,
         oneOf(body.visibility, VISIBILITIES, "visibility", "Public"),
@@ -562,9 +681,13 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
         now,
         asDraft ? null : now,
       )
+      const insertFile = db.prepare(
+        "INSERT INTO challenge_files (id, challenge_id, kind, name, mime, size, data, text, uploaded_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      )
+      for (const f of files) insertFile.run(newId("file"), id, f.kind, f.name, f.mime, f.data.length, f.data, f.text.slice(0, 200_000), now)
       exec(db, "INSERT INTO challenge_history (challenge_id, status, at, note) VALUES (?, 'Draft', ?, NULL)", id, now)
       if (!asDraft) {
-        exec(db, "INSERT INTO challenge_history (challenge_id, status, at, note) VALUES (?, 'Sent to University', ?, ?)", id, now, SCREEN_NOTE)
+        exec(db, "INSERT INTO challenge_history (challenge_id, status, at, note) VALUES (?, 'Sent to University', ?, ?)", id, now, screenNote(shared, String(companyRow.name)))
         notifyUniversitiesOfNewChallenge(db, id)
       }
       return { id }
@@ -575,12 +698,17 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
     pattern: /^\/challenges\/([^/]+)\/submit$/,
     handler: (db, actor, [id]) => {
       const company = requireRole(actor, "company")
-      const c = one(db, "SELECT status, deadline FROM challenges WHERE id = ? AND company_id = ?", id, company.id)
+      const c = one(
+        db,
+        "SELECT c.status, c.deadline, c.shared_sensitive_data, co.name AS company FROM challenges c JOIN companies co ON co.id = c.company_id WHERE c.id = ? AND c.company_id = ?",
+        id,
+        company.id,
+      )
       if (!c) throw new ApiError(404, "Challenge not found.")
       if (c.status !== "Draft") throw new ApiError(409, "Only drafts can be submitted.")
       if (new Date(String(c.deadline)).getTime() < Date.now()) throw new ApiError(409, "This draft's deadline has already passed.")
       exec(db, "UPDATE challenges SET submitted_at = ? WHERE id = ?", nowIso(), id)
-      pushHistory(db, id, "Sent to University", SCREEN_NOTE)
+      pushHistory(db, id, "Sent to University", screenNote(c.shared_sensitive_data, String(c.company)))
       notifyUniversitiesOfNewChallenge(db, id)
     },
   },
@@ -937,9 +1065,17 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
 
 // ---------------------------------------------------------------------- server
 
+// Uploads arrive base64-encoded (~4/3 of their size): room for a description file plus every dataset.
+const MAX_BODY_BYTES = Math.ceil(((MAX_DATASET_FILES + 1) * MAX_FILE_BYTES * 4) / 3) + 1024 * 1024
+
 async function readBody(req: IncomingMessage): Promise<Body> {
   const chunks: Buffer[] = []
-  for await (const chunk of req) chunks.push(chunk as Buffer)
+  let size = 0
+  for await (const chunk of req) {
+    size += (chunk as Buffer).length
+    if (size <= MAX_BODY_BYTES) chunks.push(chunk as Buffer)
+  }
+  if (size > MAX_BODY_BYTES) throw new ApiError(413, "That upload is too large.")
   if (chunks.length === 0) return {}
   try {
     const parsed = JSON.parse(Buffer.concat(chunks).toString("utf8"))
@@ -973,6 +1109,22 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
       return true
     }
 
+    const fileMatch = req.method === "GET" ? /^\/challenges\/([^/]+)\/files\/([^/]+)$/.exec(path) : null
+    if (fileMatch) {
+      const [challengeId, fileId] = fileMatch.slice(1).map(decodeURIComponent)
+      if (!canAccessChallengeFiles(db, actor, challengeId)) throw new ApiError(403, "You don't have access to this challenge's files.")
+      const file = one(db, "SELECT name, mime, data FROM challenge_files WHERE id = ? AND challenge_id = ?", fileId, challengeId)
+      if (!file) throw new ApiError(404, "File not found.")
+      const name = String(file.name)
+      res.statusCode = 200
+      res.setHeader("Content-Type", String(file.mime))
+      res.setHeader("Content-Disposition", `attachment; filename="${name.replace(/[^\x20-\x7e]|"/g, "_")}"; filename*=UTF-8''${encodeURIComponent(name)}`)
+      res.setHeader("X-Content-Type-Options", "nosniff")
+      res.setHeader("Cache-Control", "no-store")
+      res.end(Buffer.from(file.data as Uint8Array))
+      return true
+    }
+
     if (req.method === "POST" && path === "/reset") {
       if (!isDemoMode()) throw new ApiError(403, "Reset is only available in demo mode.")
       resetDatabase()
@@ -984,7 +1136,8 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
       const match = route.method === req.method ? route.pattern.exec(path) : null
       if (!match) continue
       const body = await readBody(req)
-      const result = transaction(db, () => route.handler(db, actor, match.slice(1).map(decodeURIComponent), body))
+      const prepared = route.prepare ? await route.prepare(actor, body) : undefined
+      const result = transaction(db, () => route.handler(db, actor, match.slice(1).map(decodeURIComponent), body, prepared as never))
       send(res, 200, { result: result ?? null, snapshot: buildSnapshot(db, actor) })
       return true
     }

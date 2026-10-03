@@ -63,6 +63,21 @@ Ownership checks on every write are real and independent of this; what's missing
 deployment is proof the request came from that account. Set `WSL_DEMO_MODE=false` to disable the
 one genuinely destructive action available in this mode, resetting the database.
 
+## Attached files & privacy screening
+
+When submitting a challenge, a company can upload a challenge description document (PDF, DOC,
+DOCX) instead of writing one, and up to three dataset files (CSV, TSV, XLSX, JSON, TXT; 10 MB
+each). Files are stored in SQLite (`challenge_files`) and served by
+`GET /api/challenges/:id/files/:fileId` only to accounts that can see the challenge.
+
+Every challenge, both its text and its files, is screened in `server/screening.ts` for personal
+data (phone numbers, emails, national ID / passport numbers, addresses, dates of birth, card and
+IBAN numbers, and name/phone/address columns in tables), whatever sensitivity level the company
+picked. If anything is found, nothing is saved: the company sees what was found (masked) and
+either goes back to edit or confirms it's OK to share. A confirmed challenge carries a notice for
+universities and students, and its history records what was shared. A file WSL can't read (a
+scanned PDF, for example) is flagged the same way, because WSL can't vouch for what's in it.
+
 ## Stack
 
 - React + TypeScript + Vite, React Router, Tailwind CSS v4
