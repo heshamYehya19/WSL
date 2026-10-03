@@ -6,14 +6,18 @@ import { StatusBadge } from "../../components/ui/StatusBadge"
 import { EmptyState } from "../../components/ui/EmptyState"
 import { SkillChip } from "../../components/ui/SkillChip"
 import { PageHero, Pills, StageTrack } from "../../components/ui/ListKit"
-import { bestRating, challengeFor, skillsForProject } from "../../lib/selectors"
+import { challengeFor, skillsForProject } from "../../lib/selectors"
 import { formatDate } from "../../lib/format"
 import type { Project } from "../../types"
 
 type Tab = "all" | "active" | "review" | "done"
 
 const TAB_OF = (p: Project): Exclude<Tab, "all"> =>
-  p.status === "Company Reviewed" ? "done" : p.status === "In Progress" ? "active" : "review"
+  p.status === "Verified" || p.status === "Completed" || p.status === "Company Feedback Received"
+    ? "done"
+    : p.status === "In Progress"
+      ? "active"
+      : "review"
 
 /** What the student should expect next at each stage. */
 function nextStep(p: Project, evidenceCount: number) {
@@ -23,13 +27,16 @@ function nextStep(p: Project, evidenceCount: number) {
       if (left > 0) return { text: `${left} task${left === 1 ? "" : "s"} left — keep going`, tone: "teal" as const }
       return evidenceCount === 0
         ? { text: "All tasks done — submit your evidence", tone: "teal" as const }
-        : { text: "Ready to submit for university review", tone: "teal" as const }
-    case "Submissions Under Review":
-      return { text: "Your university is reviewing your work", tone: "amber" as const }
-    case "Confirmed to Company":
-      return { text: "Confirmed — waiting on the company's rating", tone: "amber" as const }
-    case "Company Reviewed":
-      return { text: "Complete — the company rated your work", tone: "verified" as const }
+        : { text: "Ready to submit for AI evidence analysis", tone: "teal" as const }
+    case "Evidence Under Review":
+      return { text: "Your university mentor is reviewing each skill signal", tone: "amber" as const }
+    case "Skills Pending Verification":
+      return { text: "Some skill signals are still awaiting a mentor decision", tone: "amber" as const }
+    case "Verified":
+    case "Completed":
+      return { text: "Confirmed — waiting on the company's feedback", tone: "amber" as const }
+    case "Company Feedback Received":
+      return { text: "Complete — the company left feedback on your work", tone: "verified" as const }
     default:
       return { text: p.status, tone: "teal" as const }
   }
@@ -83,7 +90,7 @@ export default function MyProjects() {
   const count = (t: Tab) => (t === "all" ? myProjects.length : myProjects.filter((p) => TAB_OF(p) === t).length)
   const shown = myProjects.filter((p) => tab === "all" || TAB_OF(p) === tab)
 
-  const ratings = skillSignals.filter((s) => s.studentId === student.id).map(bestRating)
+  const ratings = skillSignals.filter((s) => s.studentId === student.id).map((s) => s.evidenceConfidence)
   const avg = ratings.length ? Math.round(ratings.reduce((a, b) => a + b, 0) / ratings.length) : 0
 
   return (
@@ -91,7 +98,7 @@ export default function MyProjects() {
       <PageHero
         eyebrow="My Projects"
         title="Your project workspaces"
-        subtitle="Everything you've built through WSL, from kickoff to rated submission."
+        subtitle="Everything you've built through WSL, from kickoff to verified evidence."
         action={
           <Link
             to="/student/challenges"
@@ -104,7 +111,7 @@ export default function MyProjects() {
           { label: "in progress", value: count("active"), accent: count("active") > 0 },
           { label: "in review", value: count("review") },
           { label: "completed", value: count("done") },
-          { label: "avg. score", value: avg },
+          { label: "avg. confidence", value: avg },
         ]}
       />
 
@@ -172,10 +179,10 @@ export default function MyProjects() {
 
                     <div className="mt-4 flex flex-wrap gap-1.5 sm:pl-16">
                       {signals.map((s) => (
-                        <SkillChip key={s.id} skill={s.skill} rating={bestRating(s)} size="sm" />
+                        <SkillChip key={s.id} skill={s.skill} rating={s.evidenceConfidence} size="sm" />
                       ))}
                       {pending.map((s) => (
-                        <span key={s} className="rounded-lg border border-dashed border-ink-200 px-2 py-1 text-xs text-ink-400" title="Not rated yet">
+                        <span key={s} className="rounded-lg border border-dashed border-ink-200 px-2 py-1 text-xs text-ink-400" title="No signal yet">
                           {s}
                         </span>
                       ))}

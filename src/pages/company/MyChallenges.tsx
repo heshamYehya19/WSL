@@ -16,9 +16,11 @@ const GROUP_OF: Record<Challenge["status"], Exclude<Group, "all">> = {
   "Sent to University": "moving",
   "University Assigned": "moving",
   "In Progress": "moving",
-  "Submissions Under Review": "moving",
-  "Confirmed to Company": "ready",
-  "Company Reviewed": "reviewed",
+  "Evidence Under Review": "moving",
+  "Skills Pending Verification": "moving",
+  Verified: "ready",
+  Completed: "ready",
+  "Company Feedback Received": "reviewed",
 }
 
 export default function MyChallenges() {
@@ -41,7 +43,7 @@ export default function MyChallenges() {
       <PageHero
         eyebrow="My Challenges"
         title="Challenges you've submitted"
-        subtitle="Track each problem from draft to rated evidence. Anything marked “Ready for you” has university-confirmed work waiting on your rating."
+        subtitle="Track each problem from draft to verified evidence. Anything marked “Ready for you” has university-confirmed work waiting on your review."
         action={
           <Link
             to="/company/submit"
@@ -53,7 +55,7 @@ export default function MyChallenges() {
         stats={[
           { label: "total", value: mine.length },
           { label: "in motion", value: count("moving") },
-          { label: "ready for your rating", value: count("ready"), accent: count("ready") > 0 },
+          { label: "ready for your review", value: count("ready"), accent: count("ready") > 0 },
           { label: "students engaged", value: new Set(projects.filter((p) => p.organizationId === company.id).map((p) => p.studentId)).size },
         ]}
       />
@@ -86,7 +88,7 @@ export default function MyChallenges() {
           {shown.map((c, i) => {
             const uniNames = challengeUniversityIds(c).map((u) => getUniversity(u)?.shortName).join(", ")
             const onIt = studentsOn(c.id)
-            const ready = c.status === "Confirmed to Company"
+            const ready = c.status === "Verified" || c.status === "Completed"
             return (
               <Link
                 key={c.id}
@@ -135,7 +137,7 @@ export default function MyChallenges() {
                     {onIt.length} student{onIt.length === 1 ? "" : "s"}
                   </span>
                   <span className="ml-auto">
-                    {c.status === "Draft" || c.status === "Company Reviewed" ? null : <DeadlinePill days={daysUntil(c.deadline)} />}
+                    {c.status === "Draft" || c.status === "Company Feedback Received" ? null : <DeadlinePill days={daysUntil(c.deadline)} />}
                   </span>
                 </div>
 
@@ -146,7 +148,7 @@ export default function MyChallenges() {
                         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-teal-400 opacity-60 motion-reduce:animate-none" />
                         <span className="relative inline-flex h-2 w-2 rounded-full bg-teal-500" />
                       </span>
-                      Confirmed work is waiting for your rating
+                      Confirmed evidence is waiting for your review
                     </span>
                     <span className="transition-transform duration-200 group-hover:translate-x-1">→</span>
                   </div>

@@ -224,9 +224,19 @@ function topicSignal(skill: string, text: string): Signal {
   return { rating, note }
 }
 
+export type SuggestedLevel = "Foundational" | "Intermediate" | "Advanced" | "Demonstrated"
+
+// A deterministic, tunable read of the same 0-100 confidence number — not a
+// second model. Presented to a mentor as a starting point, never as a verdict:
+// only a human verification decision can actually set a student's skill level.
+export function suggestedLevelFor(rating: number): SuggestedLevel {
+  return rating >= 80 ? "Demonstrated" : rating >= 60 ? "Advanced" : rating >= 35 ? "Intermediate" : "Foundational"
+}
+
 export interface SimulatedRating {
   skill: string
   rating: number
+  suggestedLevel: SuggestedLevel
   note: string
   evidenceIds: string[]
 }
@@ -344,6 +354,6 @@ export function simulateAIReview(requiredSkills: string[], submittedEvidence: Ev
       if (candidate.rating > best.rating) best = { ...candidate, evidenceId: item.id }
     }
 
-    return { skill, rating: best.rating, note: best.note, evidenceIds: [best.evidenceId] }
+    return { skill, rating: best.rating, suggestedLevel: suggestedLevelFor(best.rating), note: best.note, evidenceIds: [best.evidenceId] }
   })
 }

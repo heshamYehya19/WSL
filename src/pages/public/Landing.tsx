@@ -76,7 +76,7 @@ export default function Landing() {
               </span>
               <div>
                 <div className="text-sm font-semibold text-white">Global Skill Dashboard</div>
-                <div className="text-xs text-ink-400">A live snapshot of rated skills across the network</div>
+                <div className="text-xs text-ink-400">A live snapshot of skill signals across the network</div>
               </div>
             </div>
             <span className="text-sm font-semibold text-teal-300 transition-colors group-hover:text-teal-200">
@@ -108,7 +108,7 @@ export default function Landing() {
             <div className="mb-3 text-xs font-semibold tracking-wide text-teal-600 uppercase">For Students</div>
             <h3 className="text-lg font-bold text-ink-950">Turn your work into evidence of what you can do.</h3>
             <p className="mt-2 text-sm leading-relaxed text-ink-500">
-              Every real project you complete becomes rated, evidence-backed proof — not just another line on a CV.
+              Every real project you complete becomes verified, evidence-backed proof — not just another line on a CV.
             </p>
             <Link to="/for-students" className="mt-4 inline-block text-sm font-semibold text-teal-600 hover:underline">
               Learn more →
@@ -150,7 +150,7 @@ export default function Landing() {
             <p className="mt-4 leading-relaxed text-ink-600">
               Nothing today reliably connects what a university teaches to what an employer can verify.
               WSL closes that gap: real problems become learning projects, projects produce evidence, and
-              evidence becomes rated, living proof of capability.
+              evidence becomes verified, living proof of capability.
             </p>
             <div className="mt-6 rounded-xl border border-teal-500/30 bg-teal-50 px-5 py-4">
               <p className="font-semibold text-ink-900">
@@ -171,12 +171,12 @@ export default function Landing() {
               {showcase.signals.slice(0, 3).map((s) => (
                 <div key={s.id}>
                   <div className="mb-1 text-sm font-medium text-ink-800">{s.skill}</div>
-                  <ConfidenceMeter value={s.aiRating} label="AI rating" />
+                  <ConfidenceMeter value={s.evidenceConfidence} label="Evidence confidence" />
                 </div>
               ))}
             </div>
             <p className="mt-4 text-xs text-ink-400">
-              WSL rates each skill automatically the moment evidence is submitted — informational only, it never blocks anything.
+              WSL analyzes each skill signal automatically the moment evidence is submitted — informational only, it never blocks anything.
             </p>
           </Reveal>
           )}
@@ -189,7 +189,7 @@ export default function Landing() {
           <h2 className="text-2xl font-bold text-white sm:text-3xl">Don't just tell employers what you know.</h2>
           <h2 className="text-2xl font-bold text-teal-300 sm:text-3xl">Show them what you've done.</h2>
           <div className="mx-auto mt-8 flex max-w-xl flex-wrap justify-center gap-2">
-            {showcase?.signals.map((s) => <SkillChip key={s.id} skill={s.skill} rating={s.companyRating ?? s.aiRating} />)}
+            {showcase?.signals.map((s) => <SkillChip key={s.id} skill={s.skill} rating={s.evidenceConfidence} />)}
           </div>
           <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
             <Link

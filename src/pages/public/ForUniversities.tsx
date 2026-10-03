@@ -14,7 +14,7 @@ const POINTS = [
   },
   {
     title: "Full visibility into student work",
-    body: "Monitor every individual submission, see WSL's automatic ratings, and gauge your students' level before confirming their work.",
+    body: "Monitor every individual submission, see WSL's AI evidence analysis, and verify each skill signal yourself before confirming the work.",
   },
   {
     title: "WSL doesn't replace you",
@@ -61,7 +61,7 @@ export default function ForUniversities() {
             <StatTile label="Active Challenges" value={totals.activeChallenges} />
             <StatTile label="Student Projects" value={totals.projects} />
             <StatTile label="Evidence Items" value={totals.evidence} />
-            <StatTile label="Skills Rated" value={totals.skillsRated} />
+            <StatTile label="Skill Signals" value={totals.skillSignals} />
           </div>
           <p className="mt-2 text-xs text-ink-400">Counted live from the WSL platform.</p>
         </Reveal>

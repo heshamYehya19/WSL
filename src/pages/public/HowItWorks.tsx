@@ -2,17 +2,7 @@ import { Link } from "react-router-dom"
 import { PageHeader } from "../../components/ui/PageHeader"
 import { StatusBadge } from "../../components/ui/StatusBadge"
 import { Reveal } from "../../components/ui/Reveal"
-import type { ChallengeStatus } from "../../types"
-
-const STATUS_PIPELINE: ChallengeStatus[] = [
-  "Draft",
-  "Sent to University",
-  "University Assigned",
-  "In Progress",
-  "Submissions Under Review",
-  "Confirmed to Company",
-  "Company Reviewed",
-]
+import { PIPELINE_ORDER } from "../../lib/pipeline"
 
 const STAGES = [
   {
@@ -32,23 +22,28 @@ const STAGES = [
   },
   {
     who: "Student",
-    title: "Solves it on their own",
-    body: "Eligible students discover the challenge and start a project. Every project is individual work — never a team submission.",
+    title: "Solves it and submits evidence",
+    body: "Eligible students discover the challenge and start a project, submitting real code, documents, and data as evidence of their work.",
   },
   {
     who: "WSL",
-    title: "Rates the submission automatically",
-    body: "The moment evidence is submitted, WSL rates each required skill as a percentage. It's informational only and never blocks anything — it shows up on the student's dashboard right away.",
+    title: "Surfaces AI evidence signals",
+    body: "The moment evidence is submitted, WSL analyzes it for each required skill and shows an evidence-confidence signal — informational only, never a verdict, and it never blocks anything.",
   },
   {
     who: "University",
-    title: "Reviews and confirms",
-    body: "A university reviewer looks at the submission to gauge the student's level, then confirms it to the company.",
+    title: "Verifies each skill individually",
+    body: "A mentor inspects every skill signal on its own merits — the evidence, the AI's reasoning — and verifies it, asks for more evidence, or rejects it.",
+  },
+  {
+    who: "University",
+    title: "Confirms evidence to the company",
+    body: "Once every required skill has a decision, the mentor confirms the evidence is ready for the company to see — approval to share, not a claim that everything was verified.",
   },
   {
     who: "Company",
-    title: "Reviews and rates it too",
-    body: "The company opens the confirmed submission and gives its own rating, the same way WSL did.",
+    title: "Reviews evidence and gives feedback",
+    body: "The company opens the verified evidence and may leave structured feedback — it can never change what a university has already verified.",
   },
 ]
 
@@ -57,7 +52,7 @@ export default function HowItWorks() {
     <div className="mx-auto max-w-5xl px-4 py-14 sm:px-6">
       <PageHeader
         eyebrow="How It Works"
-        title="One loop, seven steps, three roles"
+        title="One loop, eight steps, three roles"
         subtitle="Every step below is a working part of WSL — sign in as a student, university, or company to walk the whole loop yourself."
       />
 
@@ -89,7 +84,7 @@ export default function HowItWorks() {
           Every company challenge moves through a visible, auditable pipeline — nothing reaches students silently.
         </p>
         <div className="flex flex-wrap gap-2">
-          {STATUS_PIPELINE.map((s) => (
+          {PIPELINE_ORDER.map((s) => (
             <StatusBadge key={s} status={s} className="transition-transform duration-150 hover:-translate-y-0.5" />
           ))}
         </div>

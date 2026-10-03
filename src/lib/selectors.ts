@@ -1,19 +1,15 @@
 import type { Challenge, ChallengeStatus, Evidence, Project, SkillSignal, Student } from "../types"
+import { rank } from "./pipeline"
 
 // Pure helpers over data that came from the database. Entity lookups (getOrg,
 // getStudent, ...) live on the store, since they need the loaded snapshot.
 
 export function studentProjects(projects: Project[], studentId: string) {
-  return projects.filter((p) => p.studentId === studentId)
+  return projects.filter((p) => p.studentId === studentId || p.members.some((m) => m.studentId === studentId))
 }
 
 export function studentSignals(signals: SkillSignal[], studentId: string) {
   return signals.filter((s) => s.studentId === studentId)
-}
-
-/** The best available rating for a signal — the company's own rating once given, otherwise WSL's automatic one. */
-export function bestRating(signal: SkillSignal): number {
-  return signal.companyRating ?? signal.aiRating
 }
 
 export function projectEvidence(evidence: Evidence[], projectId: string) {
@@ -38,16 +34,6 @@ export function isRoutedTo(challenge: Challenge, universityId: string) {
   return challenge.status !== "Draft" && (challenge.preferredUniversityId === null || challenge.preferredUniversityId === universityId)
 }
 
-const PIPELINE: ChallengeStatus[] = [
-  "Draft",
-  "Sent to University",
-  "University Assigned",
-  "In Progress",
-  "Submissions Under Review",
-  "Confirmed to Company",
-  "Company Reviewed",
-]
-
 /**
  * A challenge's status as one university sees it. An open challenge can be assigned by
  * several universities, so its global status (the company's view) says nothing about
@@ -57,11 +43,15 @@ export function statusAtUniversity(challenge: Challenge, universityId: string, p
   if (challenge.status === "Draft") return "Draft"
   if (!assignmentFor(challenge, universityId)) return "Sent to University"
   const ours = new Set(students.filter((s) => s.universityId === universityId).map((s) => s.id))
-  let rank = PIPELINE.indexOf("University Assigned")
+  // Tracks the actual furthest status reached (not just its rank), since "Verified" and
+  // "Completed" share a rank but are distinct, equally-final statuses worth telling apart.
+  let best: ChallengeStatus = "University Assigned"
   for (const p of projects) {
-    if (p.challengeId === challenge.id && ours.has(p.studentId)) rank = Math.max(rank, PIPELINE.indexOf(p.status))
+    if (p.challengeId === challenge.id && (ours.has(p.studentId) || p.members.some((m) => ours.has(m.studentId))) && rank(p.status) > rank(best)) {
+      best = p.status
+    }
   }
-  return PIPELINE[rank]
+  return best
 }
 
 /** Same rule the server enforces when a student starts a project: their own university must have assigned it. */

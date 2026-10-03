@@ -147,7 +147,7 @@ export default function UniversityChallenges() {
                       <span className="font-bold text-ink-800">{fit}</span> of {roster.length} students have practised these skills
                     </span>
                   )}
-                  <span className="ml-auto">{status !== "Company Reviewed" && <DeadlinePill days={days} />}</span>
+                  <span className="ml-auto">{status !== "Company Feedback Received" && <DeadlinePill days={days} />}</span>
                 </div>
 
                 {!mine && days > 0 && (

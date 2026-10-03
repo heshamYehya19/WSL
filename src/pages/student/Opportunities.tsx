@@ -4,10 +4,8 @@ import { useDemoUser } from "../../state/demoUser"
 import { useStore } from "../../state/store"
 import { EmptyState } from "../../components/ui/EmptyState"
 import { MatchRing, PageHero, Pills, SearchInput } from "../../components/ui/ListKit"
-import { bestRating, studentSignals } from "../../lib/selectors"
+import { studentSignals } from "../../lib/selectors"
 import { formatRelative } from "../../lib/format"
-
-const MATCH_THRESHOLD = 75
 
 export default function Opportunities() {
   const { student } = useDemoUser()
@@ -17,11 +15,11 @@ export default function Opportunities() {
   const [query, setQuery] = useState("")
   if (!student) return null
 
-  const ratedNames = new Set(studentSignals(skillSignals, student.id).filter((s) => bestRating(s) >= MATCH_THRESHOLD).map((s) => s.skill))
+  const verifiedNames = new Set(studentSignals(skillSignals, student.id).filter((s) => s.status === "Verified").map((s) => s.skill))
 
   const scored = opportunities
     .map((o) => {
-      const matched = o.requiredSkills.filter((s) => ratedNames.has(s))
+      const matched = o.requiredSkills.filter((s) => verifiedNames.has(s))
       return { o, matched, pct: o.requiredSkills.length ? Math.round((matched.length / o.requiredSkills.length) * 100) : 0 }
     })
     .sort((a, b) => b.pct - a.pct || new Date(b.o.postedAt).getTime() - new Date(a.o.postedAt).getTime())
@@ -39,12 +37,12 @@ export default function Opportunities() {
     <div>
       <PageHero
         eyebrow="Opportunities"
-        title="Opportunities matched to your rated skills"
-        subtitle={`Matching uses skills WSL or a company rated at ${MATCH_THRESHOLD}+ — never a hidden compatibility score. Prove more skills, unlock more matches.`}
+        title="Opportunities matched to your verified skills"
+        subtitle="Matching uses skills a university mentor has verified — never a hidden compatibility score. Verify more skills, unlock more matches."
         stats={[
           { label: "matched to you", value: matchedCount, accent: matchedCount > 0 },
           { label: "open roles", value: opportunities.length },
-          { label: `skills rated ${MATCH_THRESHOLD}+`, value: ratedNames.size },
+          { label: "skills verified", value: verifiedNames.size },
         ]}
       />
 
@@ -66,7 +64,7 @@ export default function Opportunities() {
       {shown.length === 0 ? (
         <EmptyState
           title={view === "matched" ? "No matches yet" : "No opportunities match"}
-          description={view === "matched" ? `Get a skill rated ${MATCH_THRESHOLD}+ on a project and matching roles will appear here.` : "Try a different search or filter."}
+          description={view === "matched" ? "Get a skill verified on a project and matching roles will appear here." : "Try a different search or filter."}
           action={
             view === "matched" ? (
               <Link to="/student/challenges" className="rounded-full bg-night px-4 py-2 text-sm font-semibold text-white hover:bg-teal-600">Find a challenge</Link>
@@ -77,7 +75,7 @@ export default function Opportunities() {
         <div className="grid gap-5 md:grid-cols-2">
           {shown.map(({ o, matched, pct }, i) => {
             const org = getOrg(o.organizationId)
-            const missing = o.requiredSkills.filter((s) => !ratedNames.has(s))
+            const missing = o.requiredSkills.filter((s) => !verifiedNames.has(s))
             return (
               <Link
                 key={o.id}
@@ -110,7 +108,7 @@ export default function Opportunities() {
 
                 <div className="mt-4 flex flex-wrap gap-1.5">
                   {o.requiredSkills.map((s) => {
-                    const has = ratedNames.has(s)
+                    const has = verifiedNames.has(s)
                     return (
                       <span
                         key={s}

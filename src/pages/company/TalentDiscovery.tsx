@@ -1,12 +1,12 @@
 import { useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 import { useStore } from "../../state/store"
+import { useDemoUser } from "../../state/demoUser"
 import { EmptyState } from "../../components/ui/EmptyState"
 import { MatchRing, PageHero, Pills, SearchInput } from "../../components/ui/ListKit"
-import { bestRating } from "../../lib/selectors"
 import type { SkillSignal } from "../../types"
 
-const CONFIRMED_STATUSES = ["Confirmed to Company", "Company Reviewed"]
+const CONFIRMED_STATUSES = ["Verified", "Completed", "Company Feedback Received"]
 
 type Sort = "score" | "skills" | "verified"
 
@@ -14,7 +14,8 @@ const selectClass =
   "rounded-2xl border border-ink-200 bg-surface px-4 py-2.5 text-sm shadow-sm outline-none transition-all focus:border-teal-400 focus:ring-4 focus:ring-teal-400/15"
 
 export default function TalentDiscovery() {
-  const { skillSignals, projects, students, universities, getUniversity } = useStore()
+  const { skillSignals, projects, students, universities, companyActions, getUniversity, toggleSavedStudent, toggleInterested } = useStore()
+  const { company } = useDemoUser()
   const [query, setQuery] = useState("")
   const [field, setField] = useState("All")
   const [uniFilter, setUniFilter] = useState("All")
@@ -43,10 +44,10 @@ export default function TalentDiscovery() {
     .map((s) => {
       const signals = discoverable.filter((sig) => sig.studentId === s.id) as SkillSignal[]
       const best = new Map<string, SkillSignal>()
-      for (const sig of signals) if (!best.has(sig.skill) || bestRating(sig) > bestRating(best.get(sig.skill)!)) best.set(sig.skill, sig)
-      const top = [...best.values()].sort((a, b) => bestRating(b) - bestRating(a))
-      const avg = top.length ? Math.round(top.reduce((sum, v) => sum + bestRating(v), 0) / top.length) : 0
-      const verified = top.filter((v) => v.companyRating !== undefined).length
+      for (const sig of signals) if (!best.has(sig.skill) || sig.evidenceConfidence > best.get(sig.skill)!.evidenceConfidence) best.set(sig.skill, sig)
+      const top = [...best.values()].sort((a, b) => b.evidenceConfidence - a.evidenceConfidence)
+      const avg = top.length ? Math.round(top.reduce((sum, v) => sum + v.evidenceConfidence, 0) / top.length) : 0
+      const verified = top.filter((v) => v.status === "Verified").length
       return { student: s, top, avg, verified }
     })
     .filter(({ top }) => top.length > 0)
@@ -62,17 +63,17 @@ export default function TalentDiscovery() {
       <PageHero
         eyebrow="Talent Discovery"
         title="Find talent through demonstrated capability"
-        subtitle="No opaque matching score — every candidate is backed by rated skills and viewable evidence, confirmed by a university."
+        subtitle="No opaque matching score — every candidate is backed by evidence-based skill signals, verified by a university."
         stats={[
           { label: "discoverable candidates", value: totalCandidates, accent: true },
-          { label: "skills proven", value: skillFreq.size },
+          { label: "skills signaled", value: skillFreq.size },
           { label: "universities", value: universities.length },
         ]}
       />
 
       <div className="mb-6 space-y-3">
         <div className="flex flex-wrap items-center gap-3">
-          <SearchInput value={query} onChange={setQuery} placeholder="Search rated skills, e.g. Python + Machine Learning" />
+          <SearchInput value={query} onChange={setQuery} placeholder="Search skill signals, e.g. Python + Machine Learning" />
           <select value={field} onChange={(e) => setField(e.target.value)} className={selectClass} aria-label="Major">
             {fields.map((f) => <option key={f} value={f}>{f === "All" ? "All majors" : f}</option>)}
           </select>
@@ -129,6 +130,8 @@ export default function TalentDiscovery() {
               const uni = getUniversity(student.universityId)
               const project = projects.find((p) => confirmedProjectIds.has(p.id) && p.studentId === student.id)
               const open = student.availability !== "Not Available"
+              const saved = company ? companyActions.some((a) => a.studentId === student.id && a.kind === "saved") : false
+              const interested = company ? companyActions.some((a) => a.studentId === student.id && a.kind === "interested") : false
               return (
                 <Link
                   key={student.id}
@@ -137,23 +140,53 @@ export default function TalentDiscovery() {
                   className="animate-fade-in-up group relative flex flex-col overflow-hidden rounded-2xl border border-ink-200 bg-surface p-5 transition-all duration-300 hover:-translate-y-1 hover:border-teal-400 hover:shadow-xl hover:shadow-teal-500/10"
                 >
                   <div className="pointer-events-none absolute -top-16 -right-16 h-32 w-32 rounded-full bg-teal-400/10 blur-2xl transition-transform duration-500 group-hover:scale-150" />
-                  <div className="relative flex items-center gap-3">
-                    <span className="relative shrink-0">
-                      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-teal-400 to-teal-600 text-sm font-bold text-ink-950 shadow-md shadow-teal-500/20 transition-transform duration-300 group-hover:scale-110">
-                        {student.initials}
+                  <div className="relative flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-3">
+                      <span className="relative shrink-0">
+                        <span className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-teal-400 to-teal-600 text-sm font-bold text-ink-950 shadow-md shadow-teal-500/20 transition-transform duration-300 group-hover:scale-110">
+                          {student.initials}
+                        </span>
+                        <span
+                          title={student.availability}
+                          className={`absolute -right-0.5 -bottom-0.5 h-3.5 w-3.5 rounded-full border-2 border-surface ${open ? "bg-verified-500" : "bg-ink-300"}`}
+                        />
                       </span>
-                      <span
-                        title={student.availability}
-                        className={`absolute -right-0.5 -bottom-0.5 h-3.5 w-3.5 rounded-full border-2 border-surface ${open ? "bg-verified-500" : "bg-ink-300"}`}
-                      />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-semibold text-ink-900 transition-colors group-hover:text-teal-600">{student.name}</p>
-                      <p className="truncate text-xs text-ink-400">
-                        {student.field} · {uni?.shortName} · {student.year}
-                      </p>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-semibold text-ink-900 transition-colors group-hover:text-teal-600">{student.name}</p>
+                        <p className="truncate text-xs text-ink-400">
+                          {student.field} · {uni?.shortName} · {student.year}
+                        </p>
+                        {verified > 0 && <p className="mt-0.5 text-[11px] font-semibold text-verified-600">✓ {verified} university-verified skill{verified === 1 ? "" : "s"}</p>}
+                      </div>
                     </div>
-                    <MatchRing pct={avg} label={`Average rated score: ${avg}`} />
+                    <MatchRing pct={avg} label={`Average evidence confidence: ${avg}`} />
+                  </div>
+
+                  <div className="relative mt-4 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        if (company) toggleSavedStudent(student.id)
+                      }}
+                      aria-pressed={saved}
+                      aria-label={saved ? `Remove ${student.name} from saved` : `Save ${student.name}`}
+                      className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${saved ? "border-teal-500 bg-teal-500 text-ink-950" : "border-ink-200 text-ink-500 hover:border-teal-400"}`}
+                    >
+                      {saved ? "✓ Saved" : "Save"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        if (company) toggleInterested(student.id)
+                      }}
+                      aria-pressed={interested}
+                      aria-label={interested ? `Remove interest in ${student.name}` : `Express interest in ${student.name}`}
+                      className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${interested ? "border-teal-500 bg-teal-500 text-ink-950" : "border-ink-200 text-ink-500 hover:border-teal-400"}`}
+                    >
+                      {interested ? "✓ Interested" : "Interested"}
+                    </button>
                   </div>
 
                   <div className="relative mt-4 space-y-2">
@@ -164,27 +197,27 @@ export default function TalentDiscovery() {
                           <div className="mb-0.5 flex items-center justify-between text-[11px]">
                             <span className={`font-medium ${hit ? "text-teal-600" : "text-ink-700"}`}>
                               {v.skill}
-                              {v.companyRating !== undefined && <span className="ml-1 text-verified-600" title="Company verified">✓</span>}
+                              {v.status === "Verified" && <span className="ml-1 text-verified-600" title="University Verified">✓</span>}
                             </span>
-                            <span className="font-bold text-ink-900 tabular-nums">{bestRating(v)}</span>
+                            <span className="font-bold text-ink-900 tabular-nums">{v.evidenceConfidence}</span>
                           </div>
                           <div className="h-1.5 overflow-hidden rounded-full bg-ink-100">
                             <div
                               className={`h-full rounded-full transition-[width] duration-700 ${hit ? "bg-teal-500" : "bg-gradient-to-r from-teal-500 to-teal-300"}`}
-                              style={{ width: `${bestRating(v)}%` }}
+                              style={{ width: `${v.evidenceConfidence}%` }}
                             />
                           </div>
                         </div>
                       )
                     })}
-                    {top.length > 3 && <p className="text-[11px] text-ink-400">+{top.length - 3} more rated skill{top.length - 3 === 1 ? "" : "s"}</p>}
+                    {top.length > 3 && <p className="text-[11px] text-ink-400">+{top.length - 3} more skill signal{top.length - 3 === 1 ? "" : "s"}</p>}
                   </div>
 
                   <div className="relative mt-auto pt-4">
                     {project && <p className="truncate text-[11px] text-ink-400">Latest: {project.title}</p>}
                     <div className="mt-3 flex items-center justify-between border-t border-ink-100 pt-3">
                       <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-verified-600">
-                        {verified > 0 ? `✓ ${verified} company verified` : <span className="font-medium text-ink-400">AI rated, university confirmed</span>}
+                        {verified > 0 ? `✓ ${verified} university verified` : <span className="font-medium text-ink-400">AI evidence signal, university confirmed</span>}
                       </span>
                       <span className="text-xs font-semibold text-teal-600 transition-transform duration-200 group-hover:translate-x-1">View evidence →</span>
                     </div>

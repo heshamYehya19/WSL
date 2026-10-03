@@ -4,20 +4,22 @@ import { useCountUp } from "../../hooks/useCountUp"
 export interface SkillLevelItem {
   key: string
   skill: string
+  /** Evidence confidence (0-100) — shown as a secondary number, not the tier itself. */
   rating: number
+  /** The authoritative tier — set server-side (suggestedLevelFor), never recomputed here. */
+  suggestedLevel: "Foundational" | "Intermediate" | "Advanced" | "Demonstrated"
 }
 
+// Same thresholds as server/ml/analyze.ts's suggestedLevelFor — kept in sync by hand
+// since this is a display-only mirror, not a second source of truth for the tier itself.
 const LEVELS = [
-  { key: "strong", label: "Strong", range: "80+", min: 80, dot: "bg-teal-600", ring: "ring-teal-600/40", text: "text-teal-600" },
-  { key: "solid", label: "Solid", range: "60–79", min: 60, dot: "bg-teal-400", ring: "ring-teal-400/40", text: "text-teal-500" },
-  { key: "developing", label: "Developing", range: "0–59", min: 0, dot: "bg-amber-400", ring: "ring-amber-400/40", text: "text-amber-500" },
+  { key: "Demonstrated", label: "Demonstrated", range: "80+", dot: "bg-teal-600", ring: "ring-teal-600/40", text: "text-teal-600" },
+  { key: "Advanced", label: "Advanced", range: "60–79", dot: "bg-teal-400", ring: "ring-teal-400/40", text: "text-teal-500" },
+  { key: "Intermediate", label: "Intermediate", range: "35–59", dot: "bg-amber-400", ring: "ring-amber-400/40", text: "text-amber-500" },
+  { key: "Foundational", label: "Foundational", range: "0–34", dot: "bg-ink-400", ring: "ring-ink-400/40", text: "text-ink-500" },
 ] as const
 
 type LevelKey = (typeof LEVELS)[number]["key"]
-
-function levelOf(rating: number): LevelKey {
-  return rating >= 80 ? "strong" : rating >= 60 ? "solid" : "developing"
-}
 
 function ScoreRing({ score }: { score: number }) {
   const shown = Math.round(useCountUp(score))
@@ -41,34 +43,35 @@ function ScoreRing({ score }: { score: number }) {
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span className="text-3xl font-bold text-ink-950 tabular-nums">{shown}</span>
-        <span className="text-[10px] font-medium tracking-wide text-ink-400 uppercase">Avg. score</span>
+        <span className="text-[10px] font-medium tracking-wide text-ink-400 uppercase">Avg. confidence</span>
       </div>
     </div>
   )
 }
 
 export function SkillLevels({ items, emptyMessage }: { items: SkillLevelItem[]; emptyMessage: string }) {
-  const counts = Object.fromEntries(LEVELS.map((l) => [l.key, items.filter((i) => levelOf(i.rating) === l.key).length])) as Record<LevelKey, number>
-  const defaultLevel = LEVELS.find((l) => counts[l.key] > 0)?.key ?? "strong"
+  const counts = Object.fromEntries(LEVELS.map((l) => [l.key, items.filter((i) => i.suggestedLevel === l.key).length])) as Record<LevelKey, number>
+  const defaultLevel = LEVELS.find((l) => counts[l.key] > 0)?.key ?? "Demonstrated"
   const [selected, setSelected] = useState<LevelKey>(defaultLevel)
 
   if (items.length === 0) return <p className="py-8 text-center text-sm text-ink-400">{emptyMessage}</p>
 
   const avg = Math.round(items.reduce((sum, i) => sum + i.rating, 0) / items.length)
   const level = LEVELS.find((l) => l.key === selected)!
-  const inLevel = items.filter((i) => levelOf(i.rating) === selected).sort((a, b) => b.rating - a.rating)
+  const inLevel = items.filter((i) => i.suggestedLevel === selected).sort((a, b) => b.rating - a.rating)
 
-  // The skill closest to crossing into the next level up — a concrete next step.
+  // The skill closest to crossing into the next tier up — a concrete next step.
+  // Mirrors suggestedLevelFor's thresholds (35/60/80), not an independent scheme.
   const nextUp = items
     .filter((i) => i.rating < 80)
-    .map((i) => ({ ...i, gap: (i.rating >= 60 ? 80 : 60) - i.rating, target: i.rating >= 60 ? "Strong" : "Solid" }))
+    .map((i) => ({ ...i, gap: (i.rating >= 60 ? 80 : i.rating >= 35 ? 60 : 35) - i.rating, target: i.rating >= 60 ? "Demonstrated" : i.rating >= 35 ? "Advanced" : "Intermediate" }))
     .sort((a, b) => a.gap - b.gap)[0]
 
   return (
     <div>
       <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-center">
         <ScoreRing score={avg} />
-        <div className="grid w-full flex-1 grid-cols-3 gap-2">
+        <div className="grid w-full flex-1 grid-cols-2 gap-2 sm:grid-cols-4">
           {LEVELS.map((l) => {
             const active = l.key === selected
             return (
@@ -119,8 +122,8 @@ export function SkillLevels({ items, emptyMessage }: { items: SkillLevelItem[]; 
             <span className="relative inline-flex h-2 w-2 rounded-full bg-teal-500" />
           </span>
           <span>
-            <span className="font-semibold text-ink-900">{nextUp.skill}</span> is {nextUp.gap} pt{nextUp.gap === 1 ? "" : "s"} from{" "}
-            <span className="font-semibold text-teal-600">{nextUp.target}</span> — one more strong project could get it there.
+            <span className="font-semibold text-ink-900">{nextUp.skill}</span> is {nextUp.gap} pt{nextUp.gap === 1 ? "" : "s"} of evidence confidence from{" "}
+            <span className="font-semibold text-teal-600">{nextUp.target}</span> — but only a university mentor's verification makes it official.
           </span>
         </div>
       )}

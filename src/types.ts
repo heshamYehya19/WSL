@@ -13,16 +13,23 @@ export type EvidenceType =
 
 // A lean, linear pipeline: company submits -> WSL's private-data screen (automatic,
 // invisible) -> university assigns it college-wide -> a student works it solo ->
-// WSL rates the submission automatically -> university reviews and confirms it to
-// the company -> the company reviews and rates it too.
+// AI surfaces evidence-backed skill signals -> a university mentor verifies/rejects/
+// requests more evidence on each one individually -> once every required skill has a
+// final decision, the mentor confirms the evidence for the company to see -> the
+// company may leave structured feedback (never affects verification).
+// "Verified" and "Completed" are parallel terminal branches (see src/lib/pipeline.ts):
+// Verified = every required skill was Verified; Completed = confirmed, but at least
+// one required skill was Rejected rather than Verified.
 export type ChallengeStatus =
   | "Draft"
   | "Sent to University"
   | "University Assigned"
   | "In Progress"
-  | "Submissions Under Review"
-  | "Confirmed to Company"
-  | "Company Reviewed"
+  | "Evidence Under Review"
+  | "Skills Pending Verification"
+  | "Verified"
+  | "Completed"
+  | "Company Feedback Received"
 
 export type ChallengeVisibility = "Public" | "University Only" | "Restricted"
 
@@ -138,16 +145,33 @@ export interface Evidence {
   submittedAt: string
 }
 
+export type SkillSignalStatus = "Pending Verification" | "Verified" | "More Evidence Requested" | "Rejected"
+export type SuggestedLevel = "Foundational" | "Intermediate" | "Advanced" | "Demonstrated"
+
 export interface SkillSignal {
   id: string
   projectId: string
   studentId: string
   skill: string
-  /** WSL's automatic rating (0-100). Generated the moment evidence is submitted — informational only, never blocks anything. */
-  aiRating: number
-  /** A short, concrete statistic behind the rating, e.g. "Detected Python code (92% confidence)...". */
+  /**
+   * How strongly WSL's analysis of submitted evidence supports this skill (0-100).
+   * Generated the moment evidence is submitted. This is NOT a measure of proficiency —
+   * it only reflects how much the evidence looks like it addresses the skill. Only a
+   * university mentor's decision (status/verifiedBy/verifiedAt below) means the skill
+   * is actually verified.
+   */
+  evidenceConfidence: number
+  /** AI's starting-point read of level, shown to the mentor — never shown as a verdict on its own. */
+  suggestedLevel: SuggestedLevel
+  /** Short, concrete statements behind the confidence score, e.g. "Detected Python code (92% confidence)...". */
   aiNote: string
-  /** The company's own rating (0-100), given after the university confirms the submission. */
+  status: SkillSignalStatus
+  /** Set once a mentor verifies/rejects/requests more evidence — resolves to a staff id. */
+  verifiedBy?: string
+  verifiedAt?: string
+  /** The mentor's own note — required for "More Evidence Requested"/"Rejected", optional for "Verified". */
+  reviewerNotes?: string
+  /** Deprecated — a per-skill company number from before this rework. Never written or read by new code; kept only so historical seed rows still read back. */
   companyRating?: number
   companyRatedAt?: string
   evidenceIds: string[]
@@ -170,17 +194,36 @@ export interface FeedbackEntry {
   at: string
 }
 
+/** An extra contributor on a team project, with their own attribution — see ProjectMember. */
+export interface ProjectMember {
+  studentId: string
+  /** What this member specifically contributed, e.g. "Data visualisation, research, and presentation." */
+  roleNote: string
+}
+
+/** A company's structured, written reaction to a project's verified evidence — never a rating, and never able to change a skill's verified status. */
+export interface CompanyFeedback {
+  strongTechnicalExecution: boolean
+  relevantForInternship: boolean
+  interestedInSpeaking: boolean
+  note: string
+  submittedAt: string
+}
+
 export interface Project {
   id: string
   challengeId: string
   title: string
   organizationId: string
-  /** Solo work only — one student per project. */
+  /** The project's owner. Solo is the default — most projects have no members beyond this. */
   studentId: string
+  /** Additional contributors on a team project. Empty for every solo project. */
+  members: ProjectMember[]
   status: ChallengeStatus
   startedAt: string
   tasks: ProjectTask[]
   feedback: FeedbackEntry[]
+  companyFeedback?: CompanyFeedback
 }
 
 export type Availability = "Open to Opportunities" | "Not Available" | "Open to Internships"
@@ -221,6 +264,20 @@ export interface AppNotification {
   createdAt: string
 }
 
+/** A lightweight company engagement action on a candidate — no email, no accept/reject flow. */
+export type CompanyActionKind = "saved" | "interested" | "invited"
+
+export interface CompanyAction {
+  id: string
+  organizationId: string
+  studentId: string
+  kind: CompanyActionKind
+  /** Required for "invited" — which of the company's own opportunities. */
+  opportunityId?: string
+  note?: string
+  createdAt: string
+}
+
 /** Everything the app renders, read fresh from the database. */
 export interface Snapshot {
   universities: University[]
@@ -233,6 +290,8 @@ export interface Snapshot {
   evidence: Evidence[]
   skillSignals: SkillSignal[]
   opportunities: Opportunity[]
+  /** Only the signed-in company's own actions. */
+  companyActions: CompanyAction[]
   /** Only the signed-in account's own notifications. */
   notifications: AppNotification[]
 }

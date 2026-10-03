@@ -1,12 +1,11 @@
 import { useStore } from "../state/store"
-import { bestRating } from "./selectors"
 import type { ChallengeStatus } from "../types"
 
-const SHOWCASE_ORDER: ChallengeStatus[] = ["Company Reviewed", "Confirmed to Company", "Submissions Under Review"]
+const SHOWCASE_ORDER: ChallengeStatus[] = ["Company Feedback Received", "Verified", "Completed", "Skills Pending Verification"]
 
 /**
  * A real submission from the database to illustrate the public pages: the most recent
- * company-reviewed project, else the most recent confirmed one, else one under review.
+ * project with company feedback, else the most recent verified/completed one, else one still being verified.
  */
 export function useShowcase() {
   const { projects, skillSignals, getOrg, getStudent, getUniversity, getProgram } = useStore()
@@ -17,7 +16,7 @@ export function useShowcase() {
       .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())[0]
     if (!project) continue
     const student = getStudent(project.studentId)
-    const signals = skillSignals.filter((s) => s.projectId === project.id).sort((a, b) => bestRating(b) - bestRating(a))
+    const signals = skillSignals.filter((s) => s.projectId === project.id).sort((a, b) => b.evidenceConfidence - a.evidenceConfidence)
     return {
       project,
       signals,
@@ -36,9 +35,9 @@ export function usePlatformTotals() {
   return {
     universities: universities.length,
     students: students.length,
-    activeChallenges: challenges.filter((c) => ["University Assigned", "In Progress", "Submissions Under Review"].includes(c.status)).length,
+    activeChallenges: challenges.filter((c) => ["University Assigned", "In Progress", "Evidence Under Review"].includes(c.status)).length,
     projects: projects.length,
     evidence: evidence.length,
-    skillsRated: skillSignals.length,
+    skillSignals: skillSignals.length,
   }
 }

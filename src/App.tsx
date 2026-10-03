@@ -1,4 +1,4 @@
-import { useEffect } from "react"
+import { lazy, useEffect } from "react"
 import { Route, Routes, useLocation } from "react-router-dom"
 import { PublicLayout } from "./components/layout/PublicLayout"
 import { AppShell } from "./components/layout/AppShell"
@@ -11,31 +11,34 @@ import ForUniversities from "./pages/public/ForUniversities"
 import ForCompanies from "./pages/public/ForCompanies"
 import DemoLogin from "./pages/public/DemoLogin"
 
-import StudentDashboard from "./pages/student/StudentDashboard"
-import ChallengeDiscovery from "./pages/student/ChallengeDiscovery"
-import ChallengeDetails from "./pages/student/ChallengeDetails"
-import MyProjects from "./pages/student/MyProjects"
-import ProjectWorkspace from "./pages/student/ProjectWorkspace"
-import MyProfile from "./pages/student/MyProfile"
-import Opportunities from "./pages/student/Opportunities"
-import OpportunityDetail from "./pages/student/OpportunityDetail"
+// Per-role pages are lazy-loaded — they're only ever reached after signing in
+// (via DemoLogin), so splitting them out keeps the public-page first paint small
+// without needing a loading flash on the pages people actually land on cold.
+const StudentDashboard = lazy(() => import("./pages/student/StudentDashboard"))
+const ChallengeDiscovery = lazy(() => import("./pages/student/ChallengeDiscovery"))
+const ChallengeDetails = lazy(() => import("./pages/student/ChallengeDetails"))
+const MyProjects = lazy(() => import("./pages/student/MyProjects"))
+const ProjectWorkspace = lazy(() => import("./pages/student/ProjectWorkspace"))
+const MyProfile = lazy(() => import("./pages/student/MyProfile"))
+const Opportunities = lazy(() => import("./pages/student/Opportunities"))
+const OpportunityDetail = lazy(() => import("./pages/student/OpportunityDetail"))
 
-import UniversityDashboard from "./pages/university/UniversityDashboard"
-import UniversityChallenges from "./pages/university/UniversityChallenges"
-import ChallengeReview from "./pages/university/ChallengeReview"
-import StudentProjects from "./pages/university/StudentProjects"
-import ProjectMonitoring from "./pages/university/ProjectMonitoring"
-import SubmissionsQueue from "./pages/university/SubmissionsQueue"
-import SkillsOverview from "./pages/university/SkillsOverview"
-import UniversityStudentDetail from "./pages/university/UniversityStudentDetail"
+const UniversityDashboard = lazy(() => import("./pages/university/UniversityDashboard"))
+const UniversityChallenges = lazy(() => import("./pages/university/UniversityChallenges"))
+const ChallengeReview = lazy(() => import("./pages/university/ChallengeReview"))
+const StudentProjects = lazy(() => import("./pages/university/StudentProjects"))
+const ProjectMonitoring = lazy(() => import("./pages/university/ProjectMonitoring"))
+const SubmissionsQueue = lazy(() => import("./pages/university/SubmissionsQueue"))
+const SkillsOverview = lazy(() => import("./pages/university/SkillsOverview"))
+const UniversityStudentDetail = lazy(() => import("./pages/university/UniversityStudentDetail"))
 
-import CompanyDashboard from "./pages/company/CompanyDashboard"
-import SubmitChallenge from "./pages/company/SubmitChallenge"
-import MyChallenges from "./pages/company/MyChallenges"
-import ChallengeStatus from "./pages/company/ChallengeStatus"
-import TalentDiscovery from "./pages/company/TalentDiscovery"
-import CandidateProfile from "./pages/company/CandidateProfile"
-import CompanySubmission from "./pages/company/CompanySubmission"
+const CompanyDashboard = lazy(() => import("./pages/company/CompanyDashboard"))
+const SubmitChallenge = lazy(() => import("./pages/company/SubmitChallenge"))
+const MyChallenges = lazy(() => import("./pages/company/MyChallenges"))
+const ChallengeStatus = lazy(() => import("./pages/company/ChallengeStatus"))
+const TalentDiscovery = lazy(() => import("./pages/company/TalentDiscovery"))
+const CandidateProfile = lazy(() => import("./pages/company/CandidateProfile"))
+const CompanySubmission = lazy(() => import("./pages/company/CompanySubmission"))
 
 import NotFound from "./pages/NotFound"
 

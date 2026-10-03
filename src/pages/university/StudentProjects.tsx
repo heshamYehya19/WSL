@@ -4,15 +4,15 @@ import { useDemoUser } from "../../state/demoUser"
 import { useStore } from "../../state/store"
 import { EmptyState } from "../../components/ui/EmptyState"
 import { PageHero, Pills, SearchInput } from "../../components/ui/ListKit"
-import { bestRating, challengeFor, skillsForProject } from "../../lib/selectors"
+import { challengeFor, skillsForProject } from "../../lib/selectors"
 import { formatRelative } from "../../lib/format"
 import type { ChallengeStatus } from "../../types"
 
-const COLUMNS: { status: ChallengeStatus; title: string; hint: string; dot: string; needsYou?: boolean }[] = [
-  { status: "In Progress", title: "In progress", hint: "Students are working", dot: "bg-sky-700" },
-  { status: "Submissions Under Review", title: "Needs you", hint: "Confirm to the company", dot: "bg-amber-500", needsYou: true },
-  { status: "Confirmed to Company", title: "With the company", hint: "Waiting on their rating", dot: "bg-teal-500" },
-  { status: "Company Reviewed", title: "Rated", hint: "Fully verified evidence", dot: "bg-verified-500" },
+const COLUMNS: { statuses: ChallengeStatus[]; title: string; hint: string; dot: string; needsYou?: boolean }[] = [
+  { statuses: ["In Progress"], title: "In progress", hint: "Students are working", dot: "bg-sky-700" },
+  { statuses: ["Evidence Under Review", "Skills Pending Verification"], title: "Needs you", hint: "Verify each skill, then confirm to the company", dot: "bg-amber-500", needsYou: true },
+  { statuses: ["Verified", "Completed"], title: "With the company", hint: "Waiting on their feedback", dot: "bg-teal-500" },
+  { statuses: ["Company Feedback Received"], title: "Feedback received", hint: "Fully verified evidence", dot: "bg-verified-500" },
 ]
 
 export default function StudentProjects() {
@@ -28,7 +28,7 @@ export default function StudentProjects() {
     .filter((p) => program === "all" || getStudent(p.studentId)?.programId === program)
     .filter((p) => !q || `${p.title} ${getStudent(p.studentId)?.name ?? ""} ${getOrg(p.organizationId)?.name ?? ""}`.toLowerCase().includes(q))
 
-  const byStatus = (s: ChallengeStatus) => filtered.filter((p) => p.status === s)
+  const byStatus = (statuses: ChallengeStatus[]) => filtered.filter((p) => statuses.includes(p.status))
   const programsInUse = university.programs.filter((pr) => uniProjects.some((p) => getStudent(p.studentId)?.programId === pr.id))
 
   return (
@@ -40,8 +40,12 @@ export default function StudentProjects() {
         stats={[
           { label: "projects", value: uniProjects.length },
           { label: "in progress", value: uniProjects.filter((p) => p.status === "In Progress").length },
-          { label: "need your confirmation", value: uniProjects.filter((p) => p.status === "Submissions Under Review").length, accent: uniProjects.some((p) => p.status === "Submissions Under Review") },
-          { label: "company rated", value: uniProjects.filter((p) => p.status === "Company Reviewed").length },
+          {
+            label: "need your review",
+            value: uniProjects.filter((p) => p.status === "Evidence Under Review" || p.status === "Skills Pending Verification").length,
+            accent: uniProjects.some((p) => p.status === "Evidence Under Review" || p.status === "Skills Pending Verification"),
+          },
+          { label: "company feedback received", value: uniProjects.filter((p) => p.status === "Company Feedback Received").length },
         ]}
       />
 
@@ -62,11 +66,11 @@ export default function StudentProjects() {
 
           <div className="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-4">
             {COLUMNS.map((col, ci) => {
-              const items = byStatus(col.status)
+              const items = byStatus(col.statuses)
               const glow = col.needsYou && items.length > 0
               return (
                 <section
-                  key={col.status}
+                  key={col.title}
                   style={{ animationDelay: `${ci * 70}ms` }}
                   className={`animate-fade-in-up flex flex-col rounded-2xl border p-3 transition-colors ${
                     glow ? "border-amber-400/60 bg-amber-100/40" : "border-ink-200 bg-ink-100/40"
@@ -98,7 +102,7 @@ export default function StudentProjects() {
                       const challenge = challengeFor(challenges, p)
                       const evCount = evidence.filter((e) => e.projectId === p.id).length
                       const signals = skillsForProject(skillSignals, p.id)
-                      const avg = signals.length ? Math.round(signals.reduce((sum, s) => sum + bestRating(s), 0) / signals.length) : null
+                      const avg = signals.length ? Math.round(signals.reduce((sum, s) => sum + s.evidenceConfidence, 0) / signals.length) : null
                       const done = p.tasks.filter((t) => t.done).length
                       return (
                         <Link
@@ -118,7 +122,7 @@ export default function StudentProjects() {
                             {avg !== null && (
                               <span
                                 className={`rounded-md px-1.5 py-0.5 text-[11px] font-bold tabular-nums ${avg >= 80 ? "bg-teal-600 text-white" : avg >= 60 ? "bg-teal-100 text-teal-700" : "bg-amber-100 text-amber-600"}`}
-                                title="Average rating"
+                                title="Average evidence confidence"
                               >
                                 {avg}
                               </span>
@@ -140,7 +144,7 @@ export default function StudentProjects() {
                           )}
                           <div className="mt-2.5 flex items-center justify-between text-[10px] text-ink-400">
                             <span>
-                              {evCount} evidence · {signals.length} rated
+                              {evCount} evidence · {signals.length} signal{signals.length === 1 ? "" : "s"}
                             </span>
                             <span>{formatRelative(p.startedAt)}</span>
                           </div>

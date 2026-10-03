@@ -3,18 +3,8 @@ import { useStore } from "../../state/store"
 import { useDemoUser } from "../../state/demoUser"
 import { StatusBadge } from "../../components/ui/StatusBadge"
 import { challengeUniversityIds } from "../../lib/selectors"
+import { PIPELINE_ORDER } from "../../lib/pipeline"
 import { formatDate, formatRelative } from "../../lib/format"
-import type { ChallengeStatus as ChallengeStatusType } from "../../types"
-
-const PIPELINE: ChallengeStatusType[] = [
-  "Draft",
-  "Sent to University",
-  "University Assigned",
-  "In Progress",
-  "Submissions Under Review",
-  "Confirmed to Company",
-  "Company Reviewed",
-]
 
 export default function ChallengeStatus() {
   const { id } = useParams()
@@ -34,9 +24,9 @@ export default function ChallengeStatus() {
   const uniNames = challengeUniversityIds(challenge).map((u) => getUniversity(u)?.name).join(", ")
   const preferred = challenge.preferredUniversityId ? getUniversity(challenge.preferredUniversityId) : undefined
   const relatedProjects = projects.filter((p) => p.challengeId === challenge.id)
-  const awaitingYou = relatedProjects.find((p) => p.status === "Confirmed to Company")
+  const awaitingYou = relatedProjects.find((p) => p.status === "Verified" || p.status === "Completed")
   const working = relatedProjects.filter((p) => p.status === "In Progress").length
-  const currentIdx = PIPELINE.indexOf(challenge.status)
+  const currentIdx = PIPELINE_ORDER.indexOf(challenge.status)
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -53,7 +43,7 @@ export default function ChallengeStatus() {
       <div className="rounded-2xl border border-ink-200 bg-surface p-6">
         <h3 className="mb-4 text-xs font-semibold tracking-wide text-teal-600 uppercase">Pipeline Progress</h3>
         <div className="flex flex-wrap gap-2">
-          {PIPELINE.map((s, i) => (
+          {PIPELINE_ORDER.map((s, i) => (
             <span key={s} className={`rounded-full border px-3 py-1 text-xs font-medium ${i <= currentIdx ? "border-teal-500 bg-teal-500 text-white" : "border-ink-200 text-ink-400"}`}>
               {s}
             </span>
@@ -80,20 +70,20 @@ export default function ChallengeStatus() {
               {working} student{working === 1 ? " is" : "s are"} working on this challenge, each on their own.
             </p>
           )}
-          {challenge.status === "Submissions Under Review" && (
-            <p className="text-sm text-ink-500">WSL has rated the submitted evidence automatically. The university is reviewing it next.</p>
+          {(challenge.status === "Evidence Under Review" || challenge.status === "Skills Pending Verification") && (
+            <p className="text-sm text-ink-500">WSL surfaced AI evidence signals for the submission. The university is verifying each skill next.</p>
           )}
           {awaitingYou ? (
             <div>
-              <p className="text-sm text-verified-600">✓ The university reviewed and confirmed a submission to you.</p>
+              <p className="text-sm text-verified-600">✓ The university verified and confirmed evidence to you.</p>
               <Link to={`/company/submissions/${awaitingYou.id}`} className="mt-2 inline-block text-sm font-semibold text-teal-600 hover:underline">
-                Review the submission →
+                Review the evidence →
               </Link>
             </div>
           ) : (
-            challenge.status === "Company Reviewed" && (
+            challenge.status === "Company Feedback Received" && (
               <div>
-                <p className="text-sm text-verified-600">✓ You've rated every confirmed submission.</p>
+                <p className="text-sm text-verified-600">✓ You've given feedback on every confirmed submission.</p>
                 <Link to="/company/talent" className="mt-2 inline-block text-sm font-semibold text-teal-600 hover:underline">
                   Open Talent Discovery →
                 </Link>
@@ -139,7 +129,7 @@ export default function ChallengeStatus() {
             {relatedProjects.map((p) => {
               const s = getStudent(p.studentId)
               const su = s ? getUniversity(s.universityId) : undefined
-              const canReview = p.status === "Confirmed to Company" || p.status === "Company Reviewed"
+              const canReview = p.status === "Verified" || p.status === "Completed" || p.status === "Company Feedback Received"
               return (
                 <div key={p.id} className="flex items-center justify-between rounded-lg border border-ink-100 px-4 py-2.5">
                   {canReview ? (

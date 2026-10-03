@@ -143,7 +143,7 @@ export function StageTrack({ status, from = 0, showLabel = false }: { status: Ch
             key={s.status}
             title={s.status}
             className={`h-1.5 flex-1 rounded-full transition-colors duration-500 ${
-              i < idx ? "bg-teal-500" : i === idx ? (status === "Company Reviewed" ? "bg-verified-500" : "bg-teal-400 animate-pulse motion-reduce:animate-none") : "bg-ink-100"
+              i < idx ? "bg-teal-500" : i === idx ? (status === "Verified" || status === "Completed" ? "bg-verified-500" : "bg-teal-400 animate-pulse motion-reduce:animate-none") : "bg-ink-100"
             }`}
           />
         ))}

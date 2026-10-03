@@ -22,15 +22,15 @@ const SUBMISSION_FIELD: Record<SubmittableType, { kind: "link" | "code"; label: 
   "Dataset / Model": { kind: "link", label: "Dataset link", placeholder: "docs.google.com/spreadsheets/... or a link to your data" },
 }
 
-const TABS = ["Overview", "Evidence & AI Rating", "Feedback"] as const
+const TABS = ["Overview", "Evidence & AI Analysis", "Feedback"] as const
 
 export default function ProjectWorkspace() {
   const { id } = useParams()
   const { student } = useDemoUser()
-  const { projects, challenges, evidence, skillSignals, addEvidence, runAIReview, toggleTask, getOrg } = useStore()
+  const { projects, challenges, evidence, skillSignals, addEvidence, runAIReview, toggleTask, getOrg, getStaff } = useStore()
   const [tab, setTab] = useState<(typeof TABS)[number]>("Overview")
   const [analyzing, setAnalyzing] = useState(false)
-  const [form, setForm] = useState({ type: "GitHub Repository" as SubmittableType, title: "", link: "", content: "" })
+  const [form, setForm] = useState({ type: "GitHub Repository" as SubmittableType, title: "", link: "", content: "", excerpt: "" })
   const [submitting, setSubmitting] = useState(false)
 
   // Students only ever open their own project workspaces.
@@ -51,8 +51,12 @@ export default function ProjectWorkspace() {
   const doneTasks = project.tasks.filter((t) => t.done).length
   const progressPct = project.tasks.length ? Math.round((doneTasks / project.tasks.length) * 100) : 0
 
-  // Once the university confirms the submission it is locked — evidence and tasks become read-only.
-  const locked = project.status === "Confirmed to Company" || project.status === "Company Reviewed"
+  // Once the university confirms the evidence it is locked — evidence and tasks become read-only.
+  const locked = project.status === "Verified" || project.status === "Completed" || project.status === "Company Feedback Received"
+  // A mentor's verification is durable — ai-review always skips an already-Verified
+  // signal (server/api.ts), so once every required skill is Verified, re-analysis is a
+  // guaranteed no-op even though the project itself isn't locked yet (confirm is still pending).
+  const allSignalsVerified = mySignals.length > 0 && mySignals.every((s) => s.status === "Verified")
 
   const field = SUBMISSION_FIELD[form.type]
   const submissionValue = field.kind === "code" ? form.content : form.link
@@ -66,10 +70,10 @@ export default function ProjectWorkspace() {
       type: form.type,
       title: form.title.trim(),
       link: field.kind === "link" ? form.link.trim() : "",
-      content: field.kind === "code" ? form.content.trim() : "",
+      content: field.kind === "code" ? form.content.trim() : form.excerpt.trim(),
     })
     setSubmitting(false)
-    if (ok) setForm({ type: "GitHub Repository", title: "", link: "", content: "" })
+    if (ok) setForm({ type: "GitHub Repository", title: "", link: "", content: "", excerpt: "" })
   }
 
   const handleAnalyze = () => {
@@ -150,7 +154,7 @@ export default function ProjectWorkspace() {
               <dl className="mt-4 space-y-2 text-sm">
                 <div className="flex justify-between"><dt className="text-ink-400">Started</dt><dd className="text-ink-800">{formatDate(project.startedAt)}</dd></div>
                 <div className="flex justify-between"><dt className="text-ink-400">Evidence</dt><dd className="text-ink-800">{myEvidence.length} items</dd></div>
-                <div className="flex justify-between"><dt className="text-ink-400">Skills rated</dt><dd className="text-ink-800">{mySignals.length}</dd></div>
+                <div className="flex justify-between"><dt className="text-ink-400">Skill signals</dt><dd className="text-ink-800">{mySignals.length}</dd></div>
               </dl>
             </div>
             <div className="rounded-2xl border border-ink-200 bg-surface p-5">
@@ -168,7 +172,7 @@ export default function ProjectWorkspace() {
         </div>
       )}
 
-      {tab === "Evidence & AI Rating" && (
+      {tab === "Evidence & AI Analysis" && (
         <div className="grid gap-6 lg:grid-cols-2">
           <div>
             <div className="rounded-2xl border border-ink-200 bg-surface p-5">
@@ -215,6 +219,18 @@ export default function ProjectWorkspace() {
                     />
                   )}
                 </div>
+                {field.kind === "link" && (
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-ink-500">Representative excerpt (optional)</label>
+                    <textarea
+                      value={form.excerpt}
+                      onChange={(e) => setForm((f) => ({ ...f, excerpt: e.target.value }))}
+                      rows={4}
+                      placeholder="Paste a representative excerpt — a code snippet, key section, or summary — so WSL can actually analyze it. Without this, the link is still saved, but shown as linked for mentor review, not automatically analyzed."
+                      className="w-full rounded-lg border border-ink-200 px-3 py-2 font-mono text-xs outline-none focus:border-teal-400"
+                    />
+                  </div>
+                )}
                 <button type="submit" disabled={submitting || !canSubmit} className="w-full rounded-lg bg-night px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-600 disabled:opacity-40">
                   {submitting ? "Saving…" : "Add Evidence"}
                 </button>
@@ -228,8 +244,13 @@ export default function ProjectWorkspace() {
                   <span className="rounded-md bg-ink-50 px-2 py-0.5 text-[11px] font-semibold text-ink-600">{e.type}</span>
                   <p className="mt-1.5 text-sm font-medium text-ink-900">{e.title}</p>
                   {e.link && <p className="mt-1 text-xs text-teal-600">{e.link}</p>}
-                  {e.content && (
-                    <pre className="mt-2 max-h-24 overflow-hidden rounded-lg bg-ink-50 px-2.5 py-2 font-mono text-[11px] text-ink-600">{e.content}</pre>
+                  {e.content ? (
+                    <>
+                      <pre className="mt-2 max-h-24 overflow-hidden rounded-lg bg-ink-50 px-2.5 py-2 font-mono text-[11px] text-ink-600">{e.content}</pre>
+                      <p className="mt-1 text-[11px] text-teal-600">Evidence analyzed.</p>
+                    </>
+                  ) : (
+                    <p className="mt-1.5 text-[11px] text-ink-400">Supporting evidence — linked for mentor review, not automatically analyzed.</p>
                   )}
                   <p className="mt-2 text-[11px] text-ink-400">Submitted {formatRelative(e.submittedAt)}</p>
                 </div>
@@ -239,20 +260,25 @@ export default function ProjectWorkspace() {
 
           <div>
             <div className="rounded-2xl border border-ink-200 bg-night p-5">
-              <h3 className="font-semibold text-white">WSL AI Rating</h3>
+              <h3 className="font-semibold text-white">AI Evidence Analysis</h3>
               <p className="mt-1 text-xs text-ink-300">
-                Rates each required skill based on your submitted evidence. It's automatic and informational only: it never
-                blocks or gates your submission.
+                Analyzes each required skill against your submitted evidence and shows an evidence confidence signal. It's
+                automatic and informational only — it does not represent proficiency, and it never blocks or gates your submission.
               </p>
               {myEvidence.length === 0 ? (
-                <p className="mt-4 text-sm text-ink-400">Submit evidence first, then request a rating.</p>
+                <p className="mt-4 text-sm text-ink-400">Submit evidence first, then request AI analysis.</p>
               ) : locked ? (
-                <p className="mt-4 text-sm text-teal-300">Rating complete — see the results below.</p>
+                <p className="mt-4 text-sm text-teal-300">Analysis complete — see the results below.</p>
+              ) : allSignalsVerified ? (
+                <p className="mt-4 text-sm text-teal-300">
+                  Every skill here has already been verified by your mentor — a mentor's verification is final, so re-analysis has
+                  nothing left to update.
+                </p>
               ) : (
                 <>
                   {mySignals.length > 0 && (
                     <p className="mt-4 text-sm text-teal-300">
-                      Rating complete — add more evidence and re-analyze anytime before your university confirms your submission.
+                      Analysis complete — add more evidence and re-analyze anytime before your university confirms this evidence.
                     </p>
                   )}
                   <button
@@ -260,7 +286,7 @@ export default function ProjectWorkspace() {
                     disabled={analyzing}
                     className="mt-3 w-full rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-ink-950 hover:bg-teal-400 disabled:opacity-60"
                   >
-                    {analyzing ? "Rating your evidence…" : mySignals.length > 0 ? "Re-analyze My Evidence with AI" : "Rate My Evidence with AI"}
+                    {analyzing ? "Analyzing your evidence…" : mySignals.length > 0 ? "Re-analyze My Evidence with AI" : "Analyze My Evidence with AI"}
                   </button>
                 </>
               )}
@@ -270,19 +296,30 @@ export default function ProjectWorkspace() {
               <div className="mt-4 space-y-3">
                 {mySignals.map((s) => (
                   <div key={s.id} className="rounded-xl border border-ink-200 bg-surface p-4">
-                    <span className="text-sm font-semibold text-ink-900">{s.skill}</span>
-                    <div className="mt-2"><ConfidenceMeter value={s.aiRating} label="AI rating" /></div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-ink-900">{s.skill}</span>
+                      <StatusBadge status={s.status} />
+                    </div>
+                    <p className="mt-0.5 text-[11px] text-ink-400">Suggested level: {s.suggestedLevel}</p>
+                    <div className="mt-2"><ConfidenceMeter value={s.evidenceConfidence} label="Evidence confidence" /></div>
                     {s.aiNote && <p className="mt-1.5 text-[11px] text-ink-400">{s.aiNote}</p>}
-                    {s.companyRating !== undefined ? (
-                      <div className="mt-2"><ConfidenceMeter value={s.companyRating} label="Company rating" /></div>
+                    {s.status === "Verified" ? (
+                      <p className="mt-2 text-xs font-semibold text-verified-600">
+                        ✓ Verified by {s.verifiedBy ? (getStaff(s.verifiedBy)?.name ?? "a university mentor") : "a university mentor"}
+                      </p>
+                    ) : s.status === "Rejected" ? (
+                      <p className="mt-2 text-xs text-danger-600">Not verified{s.reviewerNotes ? `: ${s.reviewerNotes}` : "."}</p>
+                    ) : s.status === "More Evidence Requested" ? (
+                      <p className="mt-2 text-xs text-amber-600">More evidence requested{s.reviewerNotes ? `: ${s.reviewerNotes}` : "."}</p>
                     ) : (
-                      <p className="mt-2 text-xs text-ink-400">Company rating not given yet.</p>
+                      <p className="mt-2 text-xs text-ink-400">Pending university verification.</p>
                     )}
                   </div>
                 ))}
                 <p className="text-xs text-ink-400">
-                  This AI rating is yours to see right away — it doesn't gate anything. Your university separately reviews your
-                  full submission before sharing it with the company, who may add their own rating afterward.
+                  This evidence confidence is yours to see right away — it doesn't gate anything. Evidence confidence indicates
+                  how strongly submitted work supports a skill signal; it does not represent proficiency. Only a university
+                  mentor's verification does.
                 </p>
               </div>
             )}

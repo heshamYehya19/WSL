@@ -159,11 +159,23 @@ CREATE TABLE IF NOT EXISTS skill_signals (
   project_id       TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   student_id       TEXT NOT NULL REFERENCES students(id),
   skill            TEXT NOT NULL,
-  ai_rating        INTEGER NOT NULL CHECK (ai_rating BETWEEN 0 AND 100),
-  -- A short, concrete statistic behind the rating, e.g. "Detected Python code (92% confidence)...".
+  -- How strongly WSL's analysis of submitted evidence supports this skill (0-100).
+  -- Not a measure of proficiency — see suggested_level/status for the human-facing read.
+  evidence_confidence INTEGER NOT NULL CHECK (evidence_confidence BETWEEN 0 AND 100),
+  -- A short, concrete statistic behind the confidence score, e.g. "Detected Python code (92% confidence)...".
   ai_note          TEXT NOT NULL DEFAULT '',
+  -- Deprecated pre-verification-rework columns: a company rating was never a university
+  -- verification, even under the old model. Kept only so historical seed rows still read
+  -- back; no new code writes or reads them for verification purposes.
   company_rating   INTEGER CHECK (company_rating BETWEEN 0 AND 100),
   company_rated_at TEXT,
+  status           TEXT NOT NULL DEFAULT 'Pending Verification'
+                     CHECK (status IN ('Pending Verification', 'Verified', 'More Evidence Requested', 'Rejected')),
+  suggested_level  TEXT NOT NULL DEFAULT 'Foundational'
+                     CHECK (suggested_level IN ('Foundational', 'Intermediate', 'Advanced', 'Demonstrated')),
+  verified_by      TEXT REFERENCES staff(id),
+  verified_at      TEXT,
+  reviewer_notes   TEXT,
   analyzed_at      TEXT NOT NULL,
   UNIQUE (project_id, skill)
 );
@@ -172,6 +184,32 @@ CREATE TABLE IF NOT EXISTS skill_signal_evidence (
   signal_id   TEXT NOT NULL REFERENCES skill_signals(id) ON DELETE CASCADE,
   evidence_id TEXT NOT NULL REFERENCES evidence(id) ON DELETE CASCADE,
   PRIMARY KEY (signal_id, evidence_id)
+);
+
+-- Extra contributors on a team project. The project's own student_id (and the
+-- UNIQUE(challenge_id, student_id) constraint on projects) stays the "owner" row —
+-- this table only adds attribution, never a second project row for the same work.
+-- Solo projects (the default) simply have zero rows here.
+CREATE TABLE IF NOT EXISTS project_members (
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  student_id TEXT NOT NULL REFERENCES students(id),
+  role_note  TEXT NOT NULL,
+  added_at   TEXT NOT NULL,
+  PRIMARY KEY (project_id, student_id)
+);
+
+-- One structured feedback snapshot per project, from the company — kept separate from
+-- skill_signals by construction, so company feedback can never alter a verification.
+CREATE TABLE IF NOT EXISTS company_feedback (
+  id                          TEXT PRIMARY KEY,
+  project_id                  TEXT NOT NULL UNIQUE REFERENCES projects(id) ON DELETE CASCADE,
+  contact_id                  TEXT NOT NULL REFERENCES company_contacts(id),
+  strong_technical_execution  INTEGER NOT NULL DEFAULT 0,
+  relevant_for_internship     INTEGER NOT NULL DEFAULT 0,
+  interested_in_speaking      INTEGER NOT NULL DEFAULT 0,
+  note                        TEXT NOT NULL DEFAULT '',
+  submitted_at                TEXT NOT NULL,
+  updated_at                  TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS opportunities (
@@ -183,6 +221,17 @@ CREATE TABLE IF NOT EXISTS opportunities (
   required_skills TEXT NOT NULL, -- JSON array of strings
   description     TEXT NOT NULL,
   posted_at       TEXT NOT NULL
+);
+
+-- Lightweight company engagement actions on a candidate — no email, no accept/reject flow.
+CREATE TABLE IF NOT EXISTS company_actions (
+  id             TEXT PRIMARY KEY,
+  company_id     TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  student_id     TEXT NOT NULL REFERENCES students(id),
+  kind           TEXT NOT NULL CHECK (kind IN ('saved', 'interested', 'invited')),
+  opportunity_id TEXT REFERENCES opportunities(id),
+  note           TEXT,
+  created_at     TEXT NOT NULL
 );
 
 -- Each notification belongs to exactly one account (student, university, or company).
@@ -201,13 +250,17 @@ CREATE INDEX IF NOT EXISTS idx_notifications_recipient ON notifications (recipie
 CREATE INDEX IF NOT EXISTS idx_projects_student ON projects (student_id);
 CREATE INDEX IF NOT EXISTS idx_evidence_project ON evidence (project_id);
 CREATE INDEX IF NOT EXISTS idx_signals_project ON skill_signals (project_id);
+CREATE INDEX IF NOT EXISTS idx_company_actions_company ON company_actions (company_id);
 `
 
 const TABLES_IN_DROP_ORDER = [
   "notifications",
+  "company_actions",
   "opportunities",
   "skill_signal_evidence",
   "skill_signals",
+  "project_members",
+  "company_feedback",
   "evidence",
   "feedback",
   "project_tasks",
@@ -241,7 +294,7 @@ export function getDb(): DatabaseSync {
   return db
 }
 
-const SCHEMA_VERSION = 5
+const SCHEMA_VERSION = 6
 
 /**
  * Brings databases created by older versions up to date without losing their data.
@@ -253,6 +306,17 @@ const SCHEMA_VERSION = 5
  * v5: evidence gained an optional `content` column, and skill_signals gained
  *     `ai_note` — the AI rating now runs a real ML model over actual submitted
  *     text instead of a hash of evidence type/count, and explains itself.
+ * v6: replaced the rating/confirm model with evidence verification. skill_signals'
+ *     `ai_rating` renamed to `evidence_confidence` (a number was never a statement of
+ *     skill — just how strongly evidence supports a signal) and gained `status`,
+ *     `suggested_level`, `verified_by`, `verified_at`, `reviewer_notes` so a university
+ *     mentor can decide each skill individually instead of one whole-project rubber
+ *     stamp. `company_rating`/`company_rated_at` are deprecated in place (never written
+ *     or read by new code — a company rating was never a verification). Challenge/
+ *     project statuses remapped: "Submissions Under Review" -> "Evidence Under Review",
+ *     "Confirmed to Company" -> "Skills Pending Verification", "Company Reviewed" ->
+ *     "Completed" (a one-time best-effort approximation — the old rows have no
+ *     per-skill resolution data to map from; `npm run db:reset` is the clean path).
  */
 function migrate(db: DatabaseSync) {
   const { user_version: version } = db.prepare("PRAGMA user_version").get() as { user_version: number }
@@ -284,6 +348,33 @@ function migrate(db: DatabaseSync) {
     transaction(db, () => {
       if (!evidenceColumns.includes("content")) db.exec("ALTER TABLE evidence ADD COLUMN content TEXT")
       if (!signalColumns.includes("ai_note")) db.exec("ALTER TABLE skill_signals ADD COLUMN ai_note TEXT NOT NULL DEFAULT ''")
+    })
+  }
+  if (version < 6) {
+    transaction(db, () => {
+      const cols = (db.prepare("PRAGMA table_info(skill_signals)").all() as { name: string }[]).map((c) => c.name)
+      if (cols.includes("ai_rating") && !cols.includes("evidence_confidence")) {
+        db.exec("ALTER TABLE skill_signals RENAME COLUMN ai_rating TO evidence_confidence")
+      }
+      const cols2 = (db.prepare("PRAGMA table_info(skill_signals)").all() as { name: string }[]).map((c) => c.name)
+      if (!cols2.includes("status")) {
+        db.exec(`ALTER TABLE skill_signals ADD COLUMN status TEXT NOT NULL DEFAULT 'Pending Verification'
+          CHECK (status IN ('Pending Verification', 'Verified', 'More Evidence Requested', 'Rejected'))`)
+      }
+      if (!cols2.includes("suggested_level")) {
+        db.exec(`ALTER TABLE skill_signals ADD COLUMN suggested_level TEXT NOT NULL DEFAULT 'Foundational'
+          CHECK (suggested_level IN ('Foundational', 'Intermediate', 'Advanced', 'Demonstrated'))`)
+      }
+      if (!cols2.includes("verified_by")) db.exec("ALTER TABLE skill_signals ADD COLUMN verified_by TEXT REFERENCES staff(id)")
+      if (!cols2.includes("verified_at")) db.exec("ALTER TABLE skill_signals ADD COLUMN verified_at TEXT")
+      if (!cols2.includes("reviewer_notes")) db.exec("ALTER TABLE skill_signals ADD COLUMN reviewer_notes TEXT")
+
+      // One-time best-effort status remap — see the v6 doc comment above.
+      for (const table of ["challenges", "projects", "challenge_history"]) {
+        db.exec(`UPDATE ${table} SET status = 'Evidence Under Review' WHERE status = 'Submissions Under Review'`)
+        db.exec(`UPDATE ${table} SET status = 'Skills Pending Verification' WHERE status = 'Confirmed to Company'`)
+        db.exec(`UPDATE ${table} SET status = 'Completed' WHERE status = 'Company Reviewed'`)
+      }
     })
   }
   if (columns.includes("assigned_university_id")) {

@@ -10,7 +10,7 @@ export function Footer() {
             <Wordmark />
             <p className="mt-3 text-sm leading-relaxed text-ink-500">
               WSL is the evidence infrastructure connecting universities, students, and organizations —
-              turning real-world learning into rated, demonstrated skill.
+              turning real-world learning into verified, demonstrated skill.
             </p>
           </div>
           <div className="grid grid-cols-2 gap-8 sm:grid-cols-3">
@@ -34,7 +34,7 @@ export function Footer() {
         </div>
         <div className="mt-8 flex flex-col gap-2 border-t border-ink-100 pt-6 text-xs text-ink-400 sm:flex-row sm:items-center sm:justify-between">
           <span>Jordan 2076 Hackathon — Amman track: Innovation in Education &amp; Learning Systems.</span>
-          <span>Universities and companies are real Jordanian institutions; student profiles, challenges, and ratings shown are illustrative.</span>
+          <span>Universities and companies are real Jordanian institutions; student profiles, challenges, and skill signals shown are illustrative.</span>
         </div>
       </div>
     </footer>

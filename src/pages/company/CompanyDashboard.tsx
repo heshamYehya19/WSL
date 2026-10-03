@@ -5,16 +5,16 @@ import { useStore } from "../../state/store"
 import { StatusBadge } from "../../components/ui/StatusBadge"
 import { CountUp } from "../../hooks/useCountUp"
 import { PIPELINE } from "../../lib/pipeline"
-import { bestRating, challengeUniversityIds } from "../../lib/selectors"
+import { challengeUniversityIds } from "../../lib/selectors"
 import { daysUntil, formatRelative } from "../../lib/format"
 import type { ChallengeStatus } from "../../types"
 
-// The company's own view of the shared pipeline: "Confirmed to Company" is what's ready for them.
-const STAGES = PIPELINE.map((s) => (s.status === "Confirmed to Company" ? { ...s, short: "Ready for you" } : s))
+// The company's own view of the shared pipeline: "Verified"/"Completed" are what's ready for them.
+const STAGES = PIPELINE.map((s) => (s.status === "Verified" || s.status === "Completed" ? { ...s, short: "Ready for you" } : s))
 const stageIndex = (s: ChallengeStatus) => STAGES.findIndex((x) => x.status === s)
 
-// Only work a university has confirmed is visible to the company — same rule as Talent Discovery.
-const CONFIRMED: ChallengeStatus[] = ["Confirmed to Company", "Company Reviewed"]
+// Only evidence a university has confirmed is visible to the company — same rule as Talent Discovery.
+const CONFIRMED: ChallengeStatus[] = ["Verified", "Completed", "Company Feedback Received"]
 
 function greeting() {
   const h = new Date().getHours()
@@ -59,10 +59,10 @@ export default function CompanyDashboard() {
   const confirmedProjectIds = new Set(myProjects.filter((p) => CONFIRMED.includes(p.status)).map((p) => p.id))
   const visibleSignals = skillSignals.filter((s) => confirmedProjectIds.has(s.projectId))
 
-  const awaiting = myProjects.filter((p) => p.status === "Confirmed to Company")
+  const awaiting = myProjects.filter((p) => p.status === "Verified" || p.status === "Completed")
   const studentsEngaged = new Set(myProjects.map((p) => p.studentId)).size
   const universitiesReached = new Set(myChallenges.flatMap((c) => c.assignments.map((a) => a.universityId))).size
-  const avgDelivered = visibleSignals.length ? Math.round(visibleSignals.reduce((sum, s) => sum + bestRating(s), 0) / visibleSignals.length) : 0
+  const avgDelivered = visibleSignals.length ? Math.round(visibleSignals.reduce((sum, s) => sum + s.evidenceConfidence, 0) / visibleSignals.length) : 0
 
   const stageCounts = STAGES.map((s) => myChallenges.filter((c) => c.status === s.status).length)
   const maxStage = Math.max(...stageCounts, 1)
@@ -75,13 +75,13 @@ export default function CompanyDashboard() {
     .slice(0, 6)
     .map(([skill, count]) => {
       const sigs = visibleSignals.filter((s) => s.skill === skill)
-      return { skill, count, delivered: sigs.length ? Math.round(sigs.reduce((sum, s) => sum + bestRating(s), 0) / sigs.length) : null }
+      return { skill, count, delivered: sigs.length ? Math.round(sigs.reduce((sum, s) => sum + s.evidenceConfidence, 0) / sigs.length) : null }
     })
   const maxDemand = Math.max(...skillRows.map((r) => r.count), 1)
 
   // Top talent: students whose confirmed work on your challenges scored best.
   const byStudent = new Map<string, number[]>()
-  for (const s of visibleSignals) byStudent.set(s.studentId, [...(byStudent.get(s.studentId) ?? []), bestRating(s)])
+  for (const s of visibleSignals) byStudent.set(s.studentId, [...(byStudent.get(s.studentId) ?? []), s.evidenceConfidence])
   const topTalent = [...byStudent.entries()]
     .map(([id, ratings]) => ({ student: getStudent(id), avg: Math.round(ratings.reduce((a, b) => a + b, 0) / ratings.length), skills: ratings.length }))
     .filter((t) => t.student)
@@ -123,7 +123,7 @@ export default function CompanyDashboard() {
                   <span className="relative inline-flex h-3 w-3 rounded-full bg-teal-400" />
                 </span>
                 <span className="text-sm text-white">
-                  <span className="font-bold">{awaiting.length}</span> submission{awaiting.length === 1 ? "" : "s"} ready for your rating
+                  <span className="font-bold">{awaiting.length}</span> submission{awaiting.length === 1 ? "" : "s"} ready for your review
                 </span>
                 <span className="ml-auto text-teal-300 transition-transform duration-200 group-hover:translate-x-1">→</span>
               </Link>
@@ -147,7 +147,7 @@ export default function CompanyDashboard() {
         <Kpi delay={0} label="Challenges submitted" value={myChallenges.length} icon={icon("M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2m-6 9 2 2 4-4")} />
         <Kpi delay={60} label="Students engaged" value={studentsEngaged} icon={icon("M16 19c0-2.2-1.8-4-4-4s-4 1.8-4 4M12 12a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm7 7c0-1.7-1-3.1-2.5-3.7M17 6a3 3 0 0 1 0 5.6M5 19c0-1.7 1-3.1 2.5-3.7M7 6a3 3 0 0 0 0 5.6")} />
         <Kpi delay={120} label="Universities reached" value={universitiesReached} icon={icon("M2 9.5 12 5l10 4.5-10 4.5-10-4.5ZM6 11.6v4.2c0 1.6 2.7 2.9 6 2.9s6-1.3 6-2.9v-4.2")} />
-        <Kpi delay={180} label="Avg. delivered score" value={avgDelivered} icon={icon("M4 19V9M10 19V5M16 19v-7M22 19v-3")} />
+        <Kpi delay={180} label="Avg. evidence confidence" value={avgDelivered} suffix="%" icon={icon("M4 19V9M10 19V5M16 19v-7M22 19v-3")} />
       </div>
 
       {/* PIPELINE */}
@@ -169,11 +169,11 @@ export default function CompanyDashboard() {
               <line x1="0" y1="0.5" x2="100" y2="0.5" className="flow-line stroke-teal-400" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
             </svg>
           </div>
-          <div className="relative grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+          <div className="relative grid grid-cols-3 gap-3 sm:grid-cols-5 lg:grid-cols-9">
             {STAGES.map((s, i) => {
               const count = stageCounts[i]
               const active = stage === s.status
-              const urgent = s.status === "Confirmed to Company" && count > 0
+              const urgent = (s.status === "Verified" || s.status === "Completed") && count > 0
               return (
                 <button
                   key={s.status}
@@ -253,7 +253,7 @@ export default function CompanyDashboard() {
                         />
                       ))}
                     </div>
-                    {c.status !== "Company Reviewed" && c.status !== "Draft" && (
+                    {c.status !== "Company Feedback Received" && c.status !== "Draft" && (
                       <span className={`shrink-0 text-[11px] font-semibold tabular-nums ${days < 0 ? "text-danger-600" : days <= 14 ? "text-amber-600" : "text-ink-400"}`}>
                         {days < 0 ? `${-days}d overdue` : `${days}d left`}
                       </span>
@@ -289,7 +289,7 @@ export default function CompanyDashboard() {
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-semibold text-ink-900">{student!.name}</span>
                         <span className="block truncate text-[11px] text-ink-400">
-                          {getUniversity(student!.universityId)?.shortName} · {skills} skill rating{skills === 1 ? "" : "s"}
+                          {getUniversity(student!.universityId)?.shortName} · {skills} skill signal{skills === 1 ? "" : "s"}
                         </span>
                       </span>
                       <span className="text-lg font-bold text-teal-600 tabular-nums">{avg}</span>

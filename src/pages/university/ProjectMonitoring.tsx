@@ -3,14 +3,14 @@ import { Link, useParams } from "react-router-dom"
 import { useDemoUser } from "../../state/demoUser"
 import { useStore } from "../../state/store"
 import { StatusBadge } from "../../components/ui/StatusBadge"
-import { ConfidenceMeter } from "../../components/ui/ConfidenceMeter"
+import { SignalReviewCard } from "../../components/university/SignalReviewCard"
 import { challengeFor, skillsForProject } from "../../lib/selectors"
 import { formatDate } from "../../lib/format"
 
 export default function ProjectMonitoring() {
   const { id } = useParams()
   const { university } = useDemoUser()
-  const { projects, challenges, evidence, skillSignals, addFeedback, confirmToCompany, getOrg, getStudent, getProgram, getStaff, isUniversityStudent } =
+  const { projects, challenges, evidence, skillSignals, addFeedback, confirmToCompany, reviewSignal, getOrg, getStudent, getProgram, getStaff, isUniversityStudent } =
     useStore()
   const [note, setNote] = useState("")
   const [confirmNote, setConfirmNote] = useState("")
@@ -32,9 +32,11 @@ export default function ProjectMonitoring() {
   const student = getStudent(project.studentId)
   const program = student ? getProgram(student.programId) : undefined
   const mentor = program ? getStaff(program.coordinatorId) : undefined
+  const projectEvidence = evidence.filter((e) => e.projectId === project.id)
   const projectSignals = skillsForProject(skillSignals, project.id)
-  const readyToConfirm = project.status === "Submissions Under Review"
-  const alreadyConfirmed = project.status === "Confirmed to Company" || project.status === "Company Reviewed"
+  const allResolved = projectSignals.length > 0 && projectSignals.every((s) => s.status === "Verified" || s.status === "Rejected")
+  const readyToConfirm = project.status === "Skills Pending Verification" || project.status === "Evidence Under Review"
+  const alreadyConfirmed = project.status === "Verified" || project.status === "Completed" || project.status === "Company Feedback Received"
 
   const submitFeedback = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -61,39 +63,69 @@ export default function ProjectMonitoring() {
         <StatusBadge status={project.status} />
       </div>
 
+      <div className="mb-6">
+        <div className="rounded-2xl border border-ink-200 bg-surface p-5">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-night text-xs font-bold text-teal-300">{student?.initials}</span>
+            <div>
+              <Link to={`/university/students/${project.studentId}`} className="text-sm font-semibold text-ink-900 hover:text-teal-600">{student?.name}</Link>
+              <p className="text-xs text-ink-400">{program?.name ?? student?.field} · {student?.year} · No. {student?.studentNumber}</p>
+            </div>
+          </div>
+          {project.members.length > 0 ? (
+            <p className="mt-3 text-xs text-ink-400">
+              Team project. {project.members.map((m) => `${getStudent(m.studentId)?.name ?? "Teammate"}: ${m.roleNote}`).join(" · ")}
+              {mentor ? ` Program mentor: ${mentor.name}.` : ""}
+            </p>
+          ) : (
+            <p className="mt-3 text-xs text-ink-400">Worked individually — not as part of a team.{mentor ? ` Program mentor: ${mentor.name}.` : ""}</p>
+          )}
+        </div>
+      </div>
+
+      <div className="mb-6">
+        <h3 className="mb-3 font-semibold text-ink-900">Skill Signals</h3>
+        <p className="mb-3 text-xs text-ink-500">
+          Evidence confidence indicates how strongly submitted work supports a skill signal — it does not represent proficiency. Review each one
+          individually: verify it, ask for more evidence, or reject it.
+        </p>
+        <div className="space-y-3">
+          {projectSignals.map((s) => (
+            <SignalReviewCard
+              key={s.id}
+              signal={s}
+              evidence={projectEvidence}
+              verifierName={s.verifiedBy ? getStaff(s.verifiedBy)?.name : undefined}
+              onReview={(decision, options) => reviewSignal(project.id, s.id, decision, options)}
+            />
+          ))}
+          {projectSignals.length === 0 && (
+            <p className="rounded-2xl border border-dashed border-ink-200 bg-surface p-6 text-center text-sm text-ink-400">
+              No skill signals yet — waiting on the student's evidence and AI evidence analysis.
+            </p>
+          )}
+        </div>
+      </div>
+
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           <div>
-            <h3 className="mb-3 font-semibold text-ink-900">Student</h3>
-            <div className="rounded-2xl border border-ink-200 bg-surface p-5">
-              <div className="flex items-center gap-2.5">
-                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-night text-xs font-bold text-teal-300">{student?.initials}</span>
-                <div>
-                  <Link to={`/university/students/${project.studentId}`} className="text-sm font-semibold text-ink-900 hover:text-teal-600">{student?.name}</Link>
-                  <p className="text-xs text-ink-400">{program?.name ?? student?.field} · {student?.year} · No. {student?.studentNumber}</p>
-                </div>
-              </div>
-              <p className="mt-3 text-xs text-ink-400">Worked individually — not as part of a team.{mentor ? ` Program mentor: ${mentor.name}.` : ""}</p>
-            </div>
-          </div>
-
-          <div>
-            <h3 className="mb-3 font-semibold text-ink-900">Evidence</h3>
+            <h3 className="mb-3 font-semibold text-ink-900">All Evidence</h3>
             <div className="space-y-2">
-              {evidence.filter((e) => e.projectId === project.id).map((e) => (
+              {projectEvidence.map((e) => (
                 <div key={e.id} className="rounded-xl border border-ink-200 bg-surface p-4">
                   <span className="rounded-md bg-ink-50 px-2 py-0.5 text-[11px] font-semibold text-ink-600">{e.type}</span>
                   <p className="mt-1.5 text-sm font-medium text-ink-900">{e.title}</p>
                   <p className="text-xs text-ink-500">{e.description}</p>
-                  <p className="mt-1 text-[11px] text-ink-400">{e.link}</p>
-                  {e.content && (
+                  {e.link && <p className="mt-1 text-[11px] text-ink-400">{e.link}</p>}
+                  {e.content ? (
                     <pre className="mt-2 max-h-24 overflow-hidden rounded-lg bg-ink-50 px-2.5 py-2 font-mono text-[11px] text-ink-600">{e.content}</pre>
+                  ) : (
+                    <p className="mt-1.5 text-[11px] text-ink-400">Supporting evidence — linked for mentor review, not automatically analyzed.</p>
                   )}
                 </div>
               ))}
-              {evidence.filter((e) => e.projectId === project.id).length === 0 && (
-                <p className="text-sm text-ink-400">No evidence submitted yet.</p>
-              )}
+              {projectEvidence.length === 0 && <p className="text-sm text-ink-400">No evidence submitted yet.</p>}
             </div>
           </div>
 
@@ -111,7 +143,9 @@ export default function ProjectMonitoring() {
               ))}
             </div>
             <form onSubmit={submitFeedback} className="mt-3 flex gap-2">
+              <label htmlFor="mentor-feedback" className="sr-only">Feedback note</label>
               <input
+                id="mentor-feedback"
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder={mentor ? `Leave feedback as ${mentor.name}...` : "Leave feedback for the student..."}
@@ -124,32 +158,28 @@ export default function ProjectMonitoring() {
 
         <div className="space-y-6">
           <div className="sticky top-24 space-y-6">
-            <div className="rounded-2xl border border-ink-200 bg-surface p-5">
-              <h3 className="mb-3 text-xs font-semibold tracking-wide text-teal-600 uppercase">WSL AI Ratings</h3>
-              <div className="space-y-3">
-                {projectSignals.map((s) => (
-                  <div key={s.id} className="rounded-xl border border-ink-100 p-3">
-                    <span className="text-sm font-semibold text-ink-900">{s.skill}</span>
-                    <div className="mt-1.5"><ConfidenceMeter value={s.aiRating} label="AI rating" /></div>
-                    {s.aiNote && <p className="mt-1 text-[11px] text-ink-400">{s.aiNote}</p>}
-                  </div>
-                ))}
-                {projectSignals.length === 0 && <p className="text-sm text-ink-400">No AI ratings yet — waiting on the student's evidence.</p>}
-              </div>
-              <p className="mt-3 text-xs text-ink-400">This rating is automatic and informational — it's just here to help you see the student's level.</p>
-            </div>
-
             {readyToConfirm && (
               <div className="rounded-2xl border border-teal-500/30 bg-teal-50 p-5">
                 <h3 className="mb-2 font-semibold text-ink-900">Confirm to Company</h3>
-                <p className="mb-3 text-xs text-ink-600">Once you've seen enough to judge this student's level, confirm the submission so {org?.name} can review it.</p>
+                <p className="mb-3 text-xs text-ink-600">
+                  {allResolved
+                    ? `Every required skill has a decision. Confirming approves this evidence for ${org?.name} to see — it does not change any verification.`
+                    : "Every required skill needs a Verify or Reject decision above before you can confirm this evidence to the company."}
+                </p>
+                <label htmlFor="confirm-note" className="sr-only">Optional note</label>
                 <input
+                  id="confirm-note"
                   value={confirmNote}
                   onChange={(e) => setConfirmNote(e.target.value)}
                   placeholder="Optional note..."
-                  className="mb-2 w-full rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-teal-400"
+                  disabled={!allResolved}
+                  className="mb-2 w-full rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-teal-400 disabled:opacity-50"
                 />
-                <button onClick={handleConfirm} disabled={saving} className="w-full rounded-lg bg-night px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-600 disabled:opacity-50">
+                <button
+                  onClick={handleConfirm}
+                  disabled={saving || !allResolved}
+                  className="w-full rounded-lg bg-night px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-600 disabled:opacity-50"
+                >
                   {saving ? "Confirming…" : "Confirm to Company"}
                 </button>
                 {mentor && <p className="mt-2 text-xs text-ink-500">Signed by {mentor.name}, {mentor.title}.</p>}
@@ -160,7 +190,7 @@ export default function ProjectMonitoring() {
               <div className="rounded-2xl border border-verified-500/30 bg-verified-100 p-5">
                 <p className="text-sm font-semibold text-verified-600">✓ Confirmed to {org?.name}</p>
                 <p className="mt-1 text-xs text-ink-600">
-                  {project.status === "Company Reviewed" ? "The company has since reviewed and rated this submission." : "Waiting on the company to review it."}
+                  {project.status === "Company Feedback Received" ? "The company has since left feedback on this submission." : "Waiting on the company to review it."}
                 </p>
               </div>
             )}

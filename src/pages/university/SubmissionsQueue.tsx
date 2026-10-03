@@ -12,8 +12,8 @@ import type { ChallengeStatus } from "../../types"
 
 type Tab = "awaiting" | "confirmed"
 const STATUSES: Record<Tab, ChallengeStatus[]> = {
-  awaiting: ["Submissions Under Review"],
-  confirmed: ["Confirmed to Company", "Company Reviewed"],
+  awaiting: ["Evidence Under Review", "Skills Pending Verification"],
+  confirmed: ["Verified", "Completed", "Company Feedback Received"],
 }
 
 function scoreTone(n: number) {
@@ -35,21 +35,18 @@ export default function SubmissionsQueue() {
     .sort((a, b) => (submittedAt(a.id) ?? "").localeCompare(submittedAt(b.id) ?? ""))
   const count = (t: Tab) => uniProjects.filter((p) => STATUSES[t].includes(p.status)).length
 
-  const companyRated = skillSignals.filter((s) => s.companyRating !== undefined && isUniversityStudent(s.studentId, university.id))
-  const agreement = companyRated.length
-    ? Math.round(companyRated.reduce((sum, s) => sum + (100 - Math.abs(s.companyRating! - s.aiRating)), 0) / companyRated.length)
-    : 0
+  const verifiedSignals = skillSignals.filter((s) => s.status === "Verified" && isUniversityStudent(s.studentId, university.id))
 
   return (
     <div>
       <PageHero
         eyebrow="Submissions"
         title="Review student submissions"
-        subtitle="WSL rates each submission automatically. Your job is to see your students' level and confirm it to the company — oldest submissions first."
+        subtitle="WSL surfaces an evidence signal for each submission. Your job is to verify each skill individually, then confirm it to the company — oldest submissions first."
         stats={[
-          { label: "awaiting your confirmation", value: count("awaiting"), accent: count("awaiting") > 0 },
+          { label: "awaiting your review", value: count("awaiting"), accent: count("awaiting") > 0 },
           { label: "confirmed to companies", value: count("confirmed") },
-          ...(companyRated.length ? [{ label: "AI–company agreement", value: agreement, suffix: "%" }] : []),
+          { label: "skills verified", value: verifiedSignals.length },
         ]}
       />
 
@@ -76,7 +73,7 @@ export default function SubmissionsQueue() {
             const challenge = challengeFor(challenges, p)
             const student = getStudent(p.studentId)
             const signals = skillsForProject(skillSignals, p.id)
-            const avg = signals.length ? Math.round(signals.reduce((sum, s) => sum + s.aiRating, 0) / signals.length) : 0
+            const avg = signals.length ? Math.round(signals.reduce((sum, s) => sum + s.evidenceConfidence, 0) / signals.length) : 0
             const evCount = evidence.filter((e) => e.projectId === p.id).length
             const sent = submittedAt(p.id)
             const oldest = tab === "awaiting" && i === 0 && list.length > 1
@@ -92,7 +89,7 @@ export default function SubmissionsQueue() {
                 {tab === "awaiting" && <div className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-amber-400 to-amber-500" />}
 
                 <div className="flex flex-col items-center justify-center sm:w-36 sm:border-r sm:border-ink-100 sm:pr-5">
-                  <Ring value={avg} max={100} label="AI rating" sub={`${signals.length} skill${signals.length === 1 ? "" : "s"}`} size="h-24 w-24" />
+                  <Ring value={avg} max={100} label="Evidence confidence" sub={`${signals.length} skill${signals.length === 1 ? "" : "s"}`} size="h-24 w-24" />
                 </div>
 
                 <div className="min-w-0">
@@ -118,40 +115,32 @@ export default function SubmissionsQueue() {
                     {signals.map((s, si) => (
                       <div key={s.id}>
                         <div className="mb-1 flex items-center justify-between text-[11px]">
-                          <span className="font-medium text-ink-700">{s.skill}</span>
+                          <span className="font-medium text-ink-700">
+                            {s.skill}
+                            {s.status === "Verified" && <span className="ml-1 text-verified-600" title="Verified">✓</span>}
+                          </span>
                           <span className="tabular-nums">
-                            <span className="font-bold text-ink-900">{s.aiRating}</span>
-                            {s.companyRating !== undefined && (
-                              <span
-                                className={`ml-1.5 font-bold ${s.companyRating > s.aiRating ? "text-verified-600" : s.companyRating < s.aiRating ? "text-amber-600" : "text-ink-500"}`}
-                                title={`Company rated ${s.companyRating}`}
-                              >
-                                {s.companyRating > s.aiRating ? "▲" : s.companyRating < s.aiRating ? "▼" : "="} {s.companyRating}
-                              </span>
-                            )}
+                            <span className="font-bold text-ink-900">{s.evidenceConfidence}</span>
                           </span>
                         </div>
                         <div className="relative h-1.5 overflow-hidden rounded-full bg-ink-100">
                           <div
-                            className={`h-full rounded-full bg-gradient-to-r ${scoreTone(s.aiRating)} transition-[width] duration-700 ease-out`}
-                            style={{ width: `${s.aiRating}%`, transitionDelay: `${si * 60}ms` }}
+                            className={`h-full rounded-full bg-gradient-to-r ${scoreTone(s.evidenceConfidence)} transition-[width] duration-700 ease-out`}
+                            style={{ width: `${s.evidenceConfidence}%`, transitionDelay: `${si * 60}ms` }}
                           />
-                          {s.companyRating !== undefined && (
-                            <span className="absolute top-1/2 h-3 w-0.5 -translate-y-1/2 rounded bg-verified-600" style={{ left: `${s.companyRating}%` }} title="Company rating" />
-                          )}
                         </div>
                       </div>
                     ))}
-                    {signals.length === 0 && <p className="text-xs text-ink-400">Not rated yet.</p>}
+                    {signals.length === 0 && <p className="text-xs text-ink-400">No skill signals yet.</p>}
                   </div>
 
                   <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-ink-100 pt-3 text-[11px] text-ink-400">
                     <span>
                       {evCount} evidence item{evCount === 1 ? "" : "s"}
                       {sent && ` · submitted ${formatRelative(sent)}`}
-                      {tab === "confirmed" && signals.some((s) => s.companyRating !== undefined) && (
+                      {tab === "confirmed" && signals.some((s) => s.status === "Verified") && (
                         <span className="ml-2 inline-flex items-center gap-1 text-verified-600">
-                          <span className="inline-block h-2.5 w-0.5 rounded bg-verified-600" /> company rating
+                          <span className="inline-block h-2.5 w-0.5 rounded bg-verified-600" /> university verified
                         </span>
                       )}
                     </span>

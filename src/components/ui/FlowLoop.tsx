@@ -1,17 +1,18 @@
 const STEPS = [
-  { label: "Submit", detail: "A company submits a real operational challenge" },
-  { label: "Screen", detail: "WSL automatically checks for private data — no one watches this happen" },
-  { label: "Assign", detail: "The university assigns it to students of the relevant college" },
-  { label: "Solve", detail: "A student works the challenge on their own" },
-  { label: "AI Rating", detail: "WSL rates the submission automatically — informational, never blocking" },
-  { label: "Review", detail: "The university reviews the work and confirms it to the company" },
-  { label: "Company Rating", detail: "The company reviews the confirmed submission and rates it too" },
-  { label: "Opportunity", detail: "Rated work becomes discoverable for real opportunities" },
+  { label: "Real Problem", detail: "A company submits a real operational challenge" },
+  { label: "Learning Project", detail: "A university assigns it to students of the relevant college" },
+  { label: "Student Work", detail: "A student works the challenge and submits real evidence" },
+  { label: "Evidence", detail: "Code, documents, and data — not just claims" },
+  { label: "AI Signals", detail: "WSL analyzes evidence for each required skill — informational, never blocking" },
+  { label: "Human Verification", detail: "A university mentor verifies, rejects, or requests more evidence on each signal" },
+  { label: "Verified Skills", detail: "Only a mentor's decision adds a skill to the student's living record" },
+  { label: "Talent Discovery", detail: "Companies search and discover verified evidence, not claimed skills" },
+  { label: "Opportunity", detail: "Verified work becomes discoverable for real opportunities" },
 ]
 
 export function FlowLoop({ compact = false }: { compact?: boolean }) {
   return (
-    <div className={`grid grid-cols-2 gap-3 sm:grid-cols-4 ${compact ? "lg:grid-cols-8" : "lg:grid-cols-4"}`}>
+    <div className={`grid grid-cols-3 gap-3 ${compact ? "lg:grid-cols-9" : "sm:grid-cols-3"}`}>
       {STEPS.map((step, i) => (
         <div
           key={step.label}
@@ -26,7 +27,7 @@ export function FlowLoop({ compact = false }: { compact?: boolean }) {
           {!compact && <p className="text-xs leading-relaxed text-ink-500">{step.detail}</p>}
           {i < STEPS.length - 1 && (
             <span className="pointer-events-none absolute top-1/2 -right-3 hidden -translate-y-1/2 text-teal-400 sm:block lg:block">
-              {(i + 1) % 4 !== 0 ? "→" : ""}
+              {(i + 1) % 3 !== 0 ? "→" : ""}
             </span>
           )}
         </div>

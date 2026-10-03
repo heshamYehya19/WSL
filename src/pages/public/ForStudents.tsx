@@ -18,11 +18,11 @@ const POINTS = [
   },
   {
     title: "AI feedback never blocks you",
-    body: "WSL rates your evidence automatically and shows it on your dashboard right away — it's informational, not a gate.",
+    body: "WSL analyzes your evidence automatically and shows the signal on your dashboard right away — it's informational, not a gate.",
   },
   {
     title: "A living record that grows with you",
-    body: "Every rated project adds to a permanent, evidence-backed skill profile employers can actually inspect.",
+    body: "Every verified project adds to a permanent, evidence-backed skill profile employers can actually inspect.",
   },
 ]
 
@@ -64,7 +64,7 @@ export default function ForStudents() {
             {showcase.student?.name} — {showcase.program?.name ?? showcase.student?.field}, {showcase.university?.name}
           </h3>
           <div className="mt-4 flex flex-wrap gap-2">
-            {showcase.signals.map((s) => <SkillChip key={s.id} skill={s.skill} rating={s.companyRating ?? s.aiRating} />)}
+            {showcase.signals.map((s) => <SkillChip key={s.id} skill={s.skill} rating={s.evidenceConfidence} />)}
           </div>
           <p className="mt-4 text-sm text-ink-300">
             This is not what a student claims they know. This is what their work has demonstrated.

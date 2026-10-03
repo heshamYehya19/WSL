@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ReactNode } from "react"
 import { fetchSnapshot, mutate } from "../lib/api"
 import { useSession } from "./session"
-import type { Availability, ChallengeVisibility, DataSensitivity, Difficulty, EvidenceType, Snapshot } from "../types"
+import type { Availability, ChallengeVisibility, CompanyActionKind, DataSensitivity, Difficulty, EvidenceType, SuggestedLevel, Snapshot } from "../types"
 
 export interface NewChallengeInput {
   title: string
@@ -37,8 +37,20 @@ interface StoreContextValue extends Snapshot {
   startProject: (challengeId: string) => Promise<string | undefined>
   addEvidence: (projectId: string, input: { type: EvidenceType; title: string; link: string; content: string }) => Promise<boolean>
   runAIReview: (projectId: string) => Promise<boolean>
+  reviewSignal: (
+    projectId: string,
+    signalId: string,
+    decision: "verify" | "request-more-evidence" | "reject",
+    options?: { suggestedLevel?: SuggestedLevel; reviewerNotes?: string },
+  ) => Promise<boolean>
   confirmToCompany: (projectId: string, note: string) => Promise<boolean>
-  submitCompanyReview: (projectId: string, ratings: Record<string, number>, note: string) => Promise<boolean>
+  submitCompanyFeedback: (
+    projectId: string,
+    feedback: { strongTechnicalExecution: boolean; relevantForInternship: boolean; interestedInSpeaking: boolean; note: string },
+  ) => Promise<boolean>
+  toggleSavedStudent: (studentId: string) => Promise<boolean>
+  toggleInterested: (studentId: string) => Promise<boolean>
+  inviteStudent: (studentId: string, opportunityId: string, note: string) => Promise<boolean>
   addFeedback: (projectId: string, note: string) => Promise<boolean>
   toggleTask: (projectId: string, taskId: string, done: boolean) => Promise<boolean>
   updateStudentProfile: (studentId: string, input: { bio: string; availability: Availability }) => Promise<boolean>
@@ -123,8 +135,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       startProject: (challengeId) => run<{ id: string }>("POST", `/challenges/${challengeId}/start`).then((r) => (r.ok ? r.result.id : undefined)),
       addEvidence: (projectId, input) => ok(run("POST", `/projects/${projectId}/evidence`, input)),
       runAIReview: (projectId) => ok(run("POST", `/projects/${projectId}/ai-review`)),
+      reviewSignal: (projectId, signalId, decision, options) =>
+        ok(run("POST", `/projects/${projectId}/signals/${signalId}/review`, { decision, ...options })),
       confirmToCompany: (projectId, note) => ok(run("POST", `/projects/${projectId}/confirm`, { note })),
-      submitCompanyReview: (projectId, ratings, note) => ok(run("POST", `/projects/${projectId}/company-review`, { ratings, note })),
+      submitCompanyFeedback: (projectId, feedback) => ok(run("POST", `/projects/${projectId}/company-feedback`, feedback)),
+      toggleSavedStudent: (studentId) => ok(run("POST", `/students/${studentId}/company-actions`, { kind: "saved" satisfies CompanyActionKind })),
+      toggleInterested: (studentId) => ok(run("POST", `/students/${studentId}/company-actions`, { kind: "interested" satisfies CompanyActionKind })),
+      inviteStudent: (studentId, opportunityId, note) =>
+        ok(run("POST", `/students/${studentId}/company-actions`, { kind: "invited" satisfies CompanyActionKind, opportunityId, note })),
       addFeedback: (projectId, note) => ok(run("POST", `/projects/${projectId}/feedback`, { note })),
       toggleTask: (projectId, taskId, done) => ok(run("PATCH", `/projects/${projectId}/tasks/${taskId}`, { done })),
       updateStudentProfile: (studentId, input) => ok(run("PATCH", `/students/${studentId}`, input)),

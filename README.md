@@ -40,8 +40,9 @@ in the UI. The seed contains:
 - **5 companies** (real): Estarta HQ, Echo Technology, IRIS Technology Jordan, SkyTech Enterprise
   Systems, Advanced Business Solutions — each with fictional contact people, challenges, and job
   opportunities.
-- Challenges at every pipeline stage, plus projects, evidence, AI/company ratings, feedback, and
-  per-account notifications that are consistent with each other.
+- Challenges at every pipeline stage, plus projects, evidence, AI evidence signals, university
+  verification decisions, company feedback, and per-account notifications that are all consistent
+  with each other.
 
 Seed timestamps are relative to when the database was seeded, so deadlines stay realistic.
 
@@ -55,6 +56,12 @@ snapshot so every page reflects the database immediately.
 
 The "AI evidence analysis" is a deterministic, clearly-labeled simulation — there is no external
 AI API call.
+
+**Demo auth, not production auth:** the signed-in account is a client-supplied `x-wsl-actor`
+header, trusted once its id is confirmed to exist — there's no password, session, or signed token.
+Ownership checks on every write are real and independent of this; what's missing for a real
+deployment is proof the request came from that account. Set `WSL_DEMO_MODE=false` to disable the
+one genuinely destructive action available in this mode, resetting the database.
 
 ## Stack
 

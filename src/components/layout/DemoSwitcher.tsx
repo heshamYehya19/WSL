@@ -174,7 +174,7 @@ export function DemoSwitcher() {
             <div className="grid grid-cols-2 gap-1 border-t border-ink-100 p-2">
               <button
                 onClick={async () => {
-                  if (confirm("Reset all data back to its starting state? Everything submitted, rated, or changed by any account will be lost.")) {
+                  if (confirm("Reset all demo data back to its starting state? Everything submitted, verified, or changed by any account will be lost.")) {
                     const ok = await resetDemo()
                     if (!ok) return
                     // Sign out and return to the landing page — otherwise whatever

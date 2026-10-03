@@ -30,6 +30,8 @@ export const EVIDENCE_LINKS: Record<string, string> = {
   "ev-tala-1": "github.com/tala-haddad/sme-sales-model",
   "ev-tala-2": "drive.google.com/file/d/1Nf5wQ9kLx2TmR7zV3bC8sJhE6fY4gA0dM/view",
   "ev-tala-3": "docs.google.com/presentation/d/1Gy7tR2wQp4LmX9zN5bC3sJhE8fK6vA0dT/view",
+  "ev-maint-1": "github.com/sara-alnajjar/asset-risk-model",
+  "ev-maint-2": "github.com/sara-alnajjar/asset-risk-model/blob/main/api/README.md",
 }
 
 export function seedDatabase(db: DatabaseSync): void {
@@ -298,9 +300,9 @@ export function seedDatabase(db: DatabaseSync): void {
         ["Sent to University", -120, SCREEN_NOTE],
         ["University Assigned", -114, "Assigned to B.Sc. Artificial Intelligence students at University of Jordan."],
         ["In Progress", -105, "Omar Al-Fayez started the project."],
-        ["Submissions Under Review", -40, "WSL rated Omar Al-Fayez's submitted evidence automatically."],
-        ["Confirmed to Company", -36, "Reviewed by Dr. Hazem Al-Qudah and confirmed to Estarta HQ."],
-        ["Company Reviewed", -30, "Estarta HQ reviewed the submission and gave its own rating."],
+        ["Evidence Under Review", -40, "WSL analyzed Omar Al-Fayez's submitted evidence automatically."],
+        ["Verified", -36, "Every required skill verified by Dr. Hazem Al-Qudah and confirmed to Estarta HQ."],
+        ["Company Feedback Received", -30, "Estarta HQ reviewed the evidence and left feedback."],
       ],
     },
     {
@@ -338,7 +340,8 @@ export function seedDatabase(db: DatabaseSync): void {
         ["Sent to University", -50, SCREEN_NOTE],
         ["University Assigned", -46, "Assigned to B.Sc. Cyber Security students at Jordan University of Science and Technology."],
         ["In Progress", -38, "Khaled Rawashdeh started the project."],
-        ["Submissions Under Review", -3, "WSL rated Khaled Rawashdeh's submitted evidence automatically."],
+        ["Evidence Under Review", -3, "WSL analyzed Khaled Rawashdeh's submitted evidence automatically."],
+        ["Skills Pending Verification", -2, "Dr. Rania Al-Shorman began reviewing Khaled Rawashdeh's skill signals."],
       ],
     },
     {
@@ -376,8 +379,8 @@ export function seedDatabase(db: DatabaseSync): void {
         ["Sent to University", -70, SCREEN_NOTE],
         ["University Assigned", -65, "Assigned to B.Sc. Software Engineering students at The Hashemite University."],
         ["In Progress", -60, "Leen Al-Zoubi started the project."],
-        ["Submissions Under Review", -9, "WSL rated Leen Al-Zoubi's submitted evidence automatically."],
-        ["Confirmed to Company", -6, "Reviewed by Dr. Mahmoud Al-Khasawneh and confirmed to Echo Technology."],
+        ["Evidence Under Review", -9, "WSL analyzed Leen Al-Zoubi's submitted evidence automatically."],
+        ["Verified", -6, "Every required skill verified by Dr. Mahmoud Al-Khasawneh and confirmed to Echo Technology."],
       ],
     },
     {
@@ -415,7 +418,7 @@ export function seedDatabase(db: DatabaseSync): void {
         ["Sent to University", -55, SCREEN_NOTE],
         ["University Assigned", -52, "Assigned to B.Sc. Cyber Security students at Amman Arab University."],
         ["In Progress", -48, "Yazan Al-Masri started the project."],
-        ["Submissions Under Review", -2, "WSL rated Yazan Al-Masri's submitted evidence automatically."],
+        ["Evidence Under Review", -2, "WSL analyzed Yazan Al-Masri's submitted evidence automatically."],
       ],
     },
     {
@@ -486,9 +489,9 @@ export function seedDatabase(db: DatabaseSync): void {
         ["Sent to University", -140, SCREEN_NOTE],
         ["University Assigned", -133, "Assigned to B.Sc. Software Engineering students at Jordan University of Science and Technology."],
         ["In Progress", -128, "Ahmad Obeidat started the project."],
-        ["Submissions Under Review", -60, "WSL rated Ahmad Obeidat's submitted evidence automatically."],
-        ["Confirmed to Company", -56, "Reviewed by Dr. Waleed Al-Batayneh and confirmed to SkyTech Enterprise Systems."],
-        ["Company Reviewed", -50, "SkyTech Enterprise Systems reviewed the submission and gave its own rating."],
+        ["Evidence Under Review", -60, "WSL analyzed Ahmad Obeidat's submitted evidence automatically."],
+        ["Verified", -56, "Every required skill verified by Dr. Waleed Al-Batayneh and confirmed to SkyTech Enterprise Systems."],
+        ["Company Feedback Received", -50, "SkyTech Enterprise Systems reviewed the evidence and left feedback."],
       ],
     },
     {
@@ -594,8 +597,8 @@ export function seedDatabase(db: DatabaseSync): void {
         ["Sent to University", -60, SCREEN_NOTE],
         ["University Assigned", -56, "Assigned to B.Sc. Business Information Technology students at University of Jordan."],
         ["In Progress", -50, "Tala Haddad started the project."],
-        ["Submissions Under Review", -8, "WSL rated Tala Haddad's submitted evidence automatically."],
-        ["Confirmed to Company", -4, "Reviewed by Dr. Manal Al-Ajlouni and confirmed to Advanced Business Solutions."],
+        ["Evidence Under Review", -8, "WSL analyzed Tala Haddad's submitted evidence automatically."],
+        ["Completed", -4, "Reviewed by Dr. Manal Al-Ajlouni and confirmed to Advanced Business Solutions — one skill signal wasn't verified from the evidence provided."],
       ],
     },
     {
@@ -655,6 +658,43 @@ export function seedDatabase(db: DatabaseSync): void {
       assignedProgram: null,
       history: [["Draft", -2]],
     },
+    {
+      id: "chal-skytech-maintenance",
+      company: "org-skytech",
+      contact: "ctc-skytech-2",
+      title: "Build a Predictive Maintenance Dashboard for Field Equipment",
+      problem:
+        "SkyTech's field-service clients still schedule equipment maintenance on a fixed calendar, so some assets fail between visits while others get serviced early for no reason. SkyTech wants a small internal tool that predicts which assets are at risk soon, with the prediction exposed through an API the ERP's purchasing module can call.",
+      objectives: [
+        "Explore historical sensor and maintenance-log data for failure patterns",
+        "Train a model that estimates failure risk per asset",
+        "Visualize risk per asset for field managers",
+        "Expose the predictions through a small REST API backed by the asset database",
+      ],
+      expected: "A working risk-prediction model, a visualization dashboard, and a documented REST API other SkyTech services can call.",
+      industry: "Enterprise Software (ERP)",
+      difficulty: "Advanced",
+      skills: ["Python", "Machine Learning", "Data Visualization", "REST API Design", "SQL"],
+      outcomes: [
+        "Work across a small team: modeling, visualization, and integration",
+        "Practice attributing individual contributions within one shared deliverable",
+      ],
+      dataset: "2 years of anonymized sensor readings and maintenance logs for 400 field assets",
+      sensitivity: "Low",
+      deadline: 20,
+      preferred: "uni-ju",
+      visibility: "Public",
+      requirements: ["Project report", "GitHub repository", "Presentation"],
+      assignedUni: "uni-ju",
+      assignedProgram: "prg-ju-cs",
+      history: [
+        ["Draft", -35],
+        ["Sent to University", -35, SCREEN_NOTE],
+        ["University Assigned", -30, "Assigned to B.Sc. Computer Science students at University of Jordan."],
+        ["In Progress", -20, "Sara Al-Najjar started the project."],
+        ["Evidence Under Review", -3, "WSL analyzed the team's submitted evidence automatically."],
+      ],
+    },
   ]
 
   for (const c of challenges) {
@@ -687,23 +727,37 @@ export function seedDatabase(db: DatabaseSync): void {
   }
 
   // ------------------------------------------------------------------- projects
-  interface SeedEvidence { id: string; type: string; title: string; description: string; day: number; content?: string }
-  // ai_rating/ai_note aren't authored here — they come from actually running WSL's
-  // real ML model (simulateAIReview) over this project's evidence below, same as a
-  // live student submission would. `company` (the human rating) is still authored,
-  // since that's an independent judgment call, not something the model produces.
-  interface SeedSignal { skill: string; company?: number }
+  // evidenceConfidence/aiNote/suggestedLevel aren't authored here — they come from
+  // actually running WSL's real ML model (simulateAIReview) over this project's
+  // evidence below, same as a live student submission would. The verification
+  // decision (status/verifiedBy/reviewerNotes) IS authored, since that's an
+  // independent human judgment call, not something the model produces.
+  interface SeedEvidence { id: string; student?: string; type: string; title: string; description: string; day: number; content?: string }
+  interface SeedSignal {
+    skill: string
+    status?: "Verified" | "More Evidence Requested" | "Rejected"
+    verifiedBy?: string
+    verifiedDay?: number
+    reviewerNotes?: string
+  }
   interface SeedProject {
     id: string
     challenge: string
     student: string
+    members?: { student: string; roleNote: string }[]
     status: string
     started: number
     tasksDone: number
     evidence: SeedEvidence[]
     signals: SeedSignal[]
     analyzed?: number
-    companyRated?: number
+    companyFeedback?: {
+      day: number
+      strongTechnicalExecution: boolean
+      relevantForInternship: boolean
+      interestedInSpeaking: boolean
+      note: string
+    }
     feedback: [kind: "staff" | "contact", authorId: string, day: number, note: string][]
   }
 
@@ -712,7 +766,7 @@ export function seedDatabase(db: DatabaseSync): void {
       id: "prj-estarta-intent-omar",
       challenge: "chal-estarta-intent",
       student: "stu-ju-omar",
-      status: "Company Reviewed",
+      status: "Company Feedback Received",
       started: -105,
       tasksDone: 4,
       evidence: [
@@ -745,23 +799,28 @@ model = AutoModelForSequenceClassification.from_pretrained(
         { id: "ev-omar-3", type: "Presentation", title: "Supervisor Briefing — Automating Call Reason Tagging", description: "Slide deck for contact-center supervisors explaining what the model can and can't do, with a proposed reporting workflow.", day: -41 },
       ],
       signals: [
-        { skill: "Python", company: 90 },
-        { skill: "Natural Language Processing", company: 92 },
-        { skill: "Machine Learning", company: 85 },
-        { skill: "Data Analysis", company: 88 },
+        { skill: "Python", status: "Verified", verifiedBy: "stf-ju-1", verifiedDay: -37, reviewerNotes: "Clean preprocessing and a real fine-tuned model, not just a baseline." },
+        { skill: "Natural Language Processing", status: "Verified", verifiedBy: "stf-ju-1", verifiedDay: -37 },
+        { skill: "Machine Learning", status: "Verified", verifiedBy: "stf-ju-1", verifiedDay: -37 },
+        { skill: "Data Analysis", status: "Verified", verifiedBy: "stf-ju-1", verifiedDay: -37 },
       ],
       analyzed: -40,
-      companyRated: -30,
+      companyFeedback: {
+        day: -30,
+        strongTechnicalExecution: true,
+        relevantForInternship: true,
+        interestedInSpeaking: true,
+        note: "The per-intent breakdown is exactly what our supervisors needed. We'd like to talk to Omar about our CX analytics internship.",
+      },
       feedback: [
         ["staff", "stf-ju-1", -36, "Careful handling of dialectal Arabic and an honest error analysis. Confirmed to Estarta HQ."],
-        ["contact", "ctc-estarta-1", -30, "The per-intent breakdown is exactly what our supervisors needed. We'd like to talk to Omar about our CX analytics internship."],
       ],
     },
     {
       id: "prj-estarta-access-khaled",
       challenge: "chal-estarta-access",
       student: "stu-just-khaled",
-      status: "Submissions Under Review",
+      status: "Skills Pending Verification",
       started: -38,
       tasksDone: 4,
       evidence: [
@@ -770,8 +829,14 @@ model = AutoModelForSequenceClassification.from_pretrained(
         { id: "ev-khaled-3", type: "Project Report", title: "Remote Agent Access — Risk Assessment & Hardening Plan", description: "Risk register with likelihood/impact ratings and a 3-phase hardening plan.", day: -4 },
       ],
       signals: [
-        { skill: "Network Security" },
-        { skill: "Risk Assessment" },
+        { skill: "Network Security", status: "Verified", verifiedBy: "stf-just-2", verifiedDay: -2 },
+        {
+          skill: "Risk Assessment",
+          status: "More Evidence Requested",
+          verifiedBy: "stf-just-2",
+          verifiedDay: -2,
+          reviewerNotes: "The report mentions likelihood/impact ratings but not the methodology behind them — can you show the matrix you used?",
+        },
         { skill: "Linux" },
         { skill: "Technical Writing" },
       ],
@@ -782,7 +847,7 @@ model = AutoModelForSequenceClassification.from_pretrained(
       id: "prj-echo-helpdesk-leen",
       challenge: "chal-echo-helpdesk",
       student: "stu-hu-leen",
-      status: "Confirmed to Company",
+      status: "Verified",
       started: -60,
       tasksDone: 4,
       evidence: [
@@ -819,10 +884,10 @@ function TicketList({ tickets, onSelect }) {
         { id: "ev-leen-3", type: "Video Walkthrough", title: "Portal Walkthrough Video", description: "6-minute walkthrough: raising a ticket, triage, resolution, and the SLA dashboard.", day: -10 },
       ],
       signals: [
-        { skill: "React" },
-        { skill: "Node.js" },
-        { skill: "SQL" },
-        { skill: "REST API Design" },
+        { skill: "React", status: "Verified", verifiedBy: "stf-hu-1", verifiedDay: -7 },
+        { skill: "Node.js", status: "Verified", verifiedBy: "stf-hu-1", verifiedDay: -7 },
+        { skill: "SQL", status: "Verified", verifiedBy: "stf-hu-1", verifiedDay: -7 },
+        { skill: "REST API Design", status: "Verified", verifiedBy: "stf-hu-1", verifiedDay: -7, reviewerNotes: "Documented OpenAPI spec with role permissions per route." },
       ],
       analyzed: -9,
       feedback: [
@@ -846,7 +911,7 @@ function TicketList({ tickets, onSelect }) {
       id: "prj-iris-anomaly-yazan",
       challenge: "chal-iris-anomaly",
       student: "stu-aau-yazan",
-      status: "Submissions Under Review",
+      status: "Evidence Under Review",
       started: -48,
       tasksDone: 4,
       evidence: [
@@ -894,7 +959,7 @@ print(f"Flagged {len(alerts)} anomalous flows out of {len(flows)}")` },
       id: "prj-skytech-inventory-ahmad",
       challenge: "chal-skytech-inventory",
       student: "stu-just-ahmad",
-      status: "Company Reviewed",
+      status: "Company Feedback Received",
       started: -128,
       tasksDone: 4,
       evidence: [
@@ -947,16 +1012,21 @@ class InventoryTransferConcurrencyTest {
 }` },
       ],
       signals: [
-        { skill: "Java", company: 91 },
-        { skill: "REST API Design", company: 94 },
-        { skill: "SQL", company: 82 },
-        { skill: "Software Testing", company: 88 },
+        { skill: "Java", status: "Verified", verifiedBy: "stf-just-1", verifiedDay: -57 },
+        { skill: "REST API Design", status: "Verified", verifiedBy: "stf-just-1", verifiedDay: -57 },
+        { skill: "SQL", status: "Verified", verifiedBy: "stf-just-1", verifiedDay: -57 },
+        { skill: "Software Testing", status: "Verified", verifiedBy: "stf-just-1", verifiedDay: -57, reviewerNotes: "Real concurrency tests with Testcontainers, not just unit tests — 87% coverage." },
       ],
       analyzed: -60,
-      companyRated: -50,
+      companyFeedback: {
+        day: -50,
+        strongTechnicalExecution: true,
+        relevantForInternship: false,
+        interestedInSpeaking: true,
+        note: "Strong API design — the transfer endpoints handled our concurrency edge cases. Ahmad would be a fit for our graduate engineer track.",
+      },
       feedback: [
         ["staff", "stf-just-1", -56, "Well-structured service with meaningful integration tests. Confirmed to SkyTech Enterprise Systems."],
-        ["contact", "ctc-skytech-1", -50, "Strong API design — the transfer endpoints handled our concurrency edge cases. Ahmad would be a fit for our graduate engineer track."],
       ],
     },
     {
@@ -976,7 +1046,7 @@ class InventoryTransferConcurrencyTest {
       id: "prj-abs-bi-tala",
       challenge: "chal-abs-bi",
       student: "stu-ju-tala",
-      status: "Confirmed to Company",
+      status: "Completed",
       started: -50,
       tasksDone: 4,
       evidence: [
@@ -1014,15 +1084,94 @@ WHERE s.qty > 0;` },
         { id: "ev-tala-3", type: "Presentation", title: "Dashboard Rollout Recommendation", description: "Short deck on insights from the sample clients and how ABS could roll the template out.", day: -9 },
       ],
       signals: [
-        { skill: "SQL" },
-        { skill: "Power BI" },
-        { skill: "Data Visualization" },
-        { skill: "Business Analysis" },
+        { skill: "SQL", status: "Verified", verifiedBy: "stf-ju-2", verifiedDay: -5 },
+        {
+          skill: "Power BI",
+          status: "Rejected",
+          verifiedBy: "stf-ju-2",
+          verifiedDay: -5,
+          reviewerNotes: "The dashboard link works, but there's no description of the data model or refresh process to verify from the evidence alone — please add a short write-up.",
+        },
+        { skill: "Data Visualization", status: "Verified", verifiedBy: "stf-ju-2", verifiedDay: -5 },
+        { skill: "Business Analysis", status: "Verified", verifiedBy: "stf-ju-2", verifiedDay: -5 },
       ],
       analyzed: -8,
       feedback: [
-        ["staff", "stf-ju-2", -4, "Thoughtful data model and a dashboard a store manager could actually use. Confirmed to Advanced Business Solutions."],
+        ["staff", "stf-ju-2", -4, "Thoughtful data model and a dashboard a store manager could actually use. Confirmed to Advanced Business Solutions — the Power BI signal needs more evidence to verify."],
       ],
+    },
+    {
+      id: "prj-skytech-maintenance-sara",
+      challenge: "chal-skytech-maintenance",
+      student: "stu-ju-sara",
+      // A team project: Sara owns it, Omar and Ahmad contribute specific, individually
+      // attributed parts — evidence below is submitted by whichever member actually did
+      // the work, not pooled under the owner.
+      members: [
+        { student: "stu-ju-omar", roleNote: "Python preprocessing and ML model training for the risk score" },
+        { student: "stu-just-ahmad", roleNote: "REST API integration and database design for the asset store" },
+      ],
+      status: "Evidence Under Review",
+      started: -20,
+      tasksDone: 2,
+      evidence: [
+        {
+          id: "ev-maint-1",
+          student: "stu-ju-omar",
+          type: "Code",
+          title: "risk_model.py",
+          description: "Feature engineering over sensor/maintenance logs and a gradient-boosted risk score per asset.",
+          day: -6,
+          content: `import pandas as pd
+from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.model_selection import train_test_split
+
+def build_features(logs: pd.DataFrame) -> pd.DataFrame:
+    logs["days_since_service"] = (logs["as_of"] - logs["last_service"]).dt.days
+    logs["vibration_trend"] = logs.groupby("asset_id")["vibration_rms"].diff().fillna(0)
+    return logs[["days_since_service", "vibration_trend", "runtime_hours", "temperature_max"]]
+
+logs = pd.read_csv("maintenance_logs.csv", parse_dates=["as_of", "last_service"])
+X = build_features(logs)
+y = logs["failed_within_30d"]
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=7)
+model = GradientBoostingClassifier(n_estimators=200, max_depth=3)
+model.fit(X_train, y_train)
+
+logs["risk_score"] = model.predict_proba(X)[:, 1]
+logs[["asset_id", "risk_score"]].to_csv("asset_risk_scores.csv", index=False)
+`,
+        },
+        {
+          id: "ev-maint-2",
+          student: "stu-just-ahmad",
+          type: "Documentation",
+          title: "Asset Risk API Reference",
+          description: "REST endpoints exposing per-asset risk scores and the underlying asset/maintenance database schema for the ERP purchasing module to call.",
+          day: -4,
+          content: `# Asset Risk API
+
+GET /api/assets/{assetId}/risk
+  -> { "assetId": string, "riskScore": number, "asOf": string }
+
+GET /api/assets/at-risk?threshold=0.7
+  -> list of assets above the given risk threshold, sorted by riskScore desc
+
+Backed by the asset and maintenance_log tables (see schema.sql) — the purchasing
+module polls /at-risk daily to flag parts to stock ahead of a likely failure.
+`,
+        },
+      ],
+      signals: [
+        { skill: "Python" },
+        { skill: "Machine Learning" },
+        { skill: "Data Visualization" },
+        { skill: "REST API Design" },
+        { skill: "SQL" },
+      ],
+      analyzed: -3,
+      feedback: [],
     },
   ]
 
@@ -1031,10 +1180,13 @@ WHERE s.qty > 0;` },
     objectivesOf(p.challenge).forEach((title, i) => {
       run("INSERT INTO project_tasks (id, project_id, position, title, done) VALUES (?, ?, ?, ?, ?)", `${p.id}-t${i + 1}`, p.id, i, title, i < p.tasksDone ? 1 : 0)
     })
+    for (const m of p.members ?? []) {
+      run("INSERT INTO project_members (project_id, student_id, role_note, added_at) VALUES (?, ?, ?, ?)", p.id, m.student, m.roleNote, d(p.started))
+    }
     for (const e of p.evidence) {
       run(
         "INSERT INTO evidence (id, project_id, student_id, type, title, description, link, content, submitted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        e.id, p.id, p.student, e.type, e.title, e.description, EVIDENCE_LINKS[e.id], e.content ?? null, d(e.day),
+        e.id, p.id, e.student ?? p.student, e.type, e.title, e.description, EVIDENCE_LINKS[e.id], e.content ?? null, d(e.day),
       )
     }
     if (p.signals.length > 0) {
@@ -1046,12 +1198,24 @@ WHERE s.qty > 0;` },
       p.signals.forEach((s, i) => {
         const r = results[i]
         const sigId = `sig-${p.id}-${i + 1}`
+        const status = s.status ?? "Pending Verification"
         run(
-          "INSERT INTO skill_signals (id, project_id, student_id, skill, ai_rating, ai_note, company_rating, company_rated_at, analyzed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-          sigId, p.id, p.student, s.skill, r.rating, r.note, s.company ?? null, s.company !== undefined && p.companyRated !== undefined ? d(p.companyRated) : null, d(p.analyzed!),
+          `INSERT INTO skill_signals (id, project_id, student_id, skill, evidence_confidence, ai_note, suggested_level, status, verified_by, verified_at, reviewer_notes, analyzed_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          sigId, p.id, p.student, s.skill, r.rating, r.note, r.suggestedLevel, status,
+          s.verifiedBy ?? null, s.verifiedBy && s.verifiedDay !== undefined ? d(s.verifiedDay) : null, s.reviewerNotes ?? null, d(p.analyzed!),
         )
         for (const ev of r.evidenceIds) run("INSERT INTO skill_signal_evidence (signal_id, evidence_id) VALUES (?, ?)", sigId, ev)
       })
+    }
+    if (p.companyFeedback) {
+      const cf = p.companyFeedback
+      const contactId = challenges.find((c) => c.id === p.challenge)!.contact
+      run(
+        `INSERT INTO company_feedback (id, project_id, contact_id, strong_technical_execution, relevant_for_internship, interested_in_speaking, note, submitted_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `cf-${p.id}`, p.id, contactId, cf.strongTechnicalExecution ? 1 : 0, cf.relevantForInternship ? 1 : 0, cf.interestedInSpeaking ? 1 : 0, cf.note, d(cf.day), d(cf.day),
+      )
     }
     p.feedback.forEach(([kind, author, day, note], i) => {
       run("INSERT INTO feedback (id, project_id, author_kind, author_id, note, at) VALUES (?, ?, ?, ?, ?, ?)", `fb-${p.id}-${i + 1}`, p.id, kind, author, note, d(day))
@@ -1080,6 +1244,21 @@ WHERE s.qty > 0;` },
     )
   }
 
+  // ---------------------------------------------------------- company actions
+  // Lightweight engagement a company can take on a candidate — no email, no
+  // accept/reject flow, just a recorded action (see POST /students/:id/company-actions).
+  const companyActions: [id: string, company: string, student: string, kind: string, opportunity: string | null, note: string | null, day: number][] = [
+    ["cact-echo-leen", "org-echo", "stu-hu-leen", "saved", null, null, -5],
+    ["cact-skytech-ahmad", "org-skytech", "stu-just-ahmad", "interested", null, null, -49],
+    ["cact-estarta-omar", "org-estarta", "stu-ju-omar", "invited", "opp-estarta-cx", "Following up on our note — we'd love to talk through the CX Data Analyst Intern role with you.", -28],
+  ]
+  for (const [id, company, student, kind, opportunity, note, day] of companyActions) {
+    run(
+      "INSERT INTO company_actions (id, company_id, student_id, kind, opportunity_id, note, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      id, company, student, kind, opportunity, note, d(day),
+    )
+  }
+
   // -------------------------------------------------------------- notifications
   // Mirrors what the live system would have sent for the events seeded above.
   const notifications: [role: string, recipient: string, title: string, body: string, link: string | null, day: number, read: number][] = [
@@ -1089,14 +1268,14 @@ WHERE s.qty > 0;` },
     ["company", "org-skytech", "Challenge assigned", "Applied Science Private University assigned “Implement Role-Based Access Control for an ERP” to B.Sc. Software Engineering students.", "/company/challenges/chal-skytech-rbac", -7, 0],
     ["company", "org-skytech", "Student started your challenge", "Mais Khalil (ASU) started “Forecast Spare-Parts Demand for ERP Clients”.", "/company/challenges/chal-skytech-forecast", -21, 1],
     ["company", "org-abs", "Submission ready for your review", "University of Jordan confirmed Tala Haddad's submission for “Build a Sales Performance BI Dashboard for SMEs”.", "/company/submissions/prj-abs-bi-tala", -4, 0],
-    ["university", "uni-aau", "Submission awaiting confirmation", "WSL rated Yazan Al-Masri's evidence for “Detect Anomalies in Network Traffic Logs”.", "/university/projects/prj-iris-anomaly-yazan", -2, 0],
-    ["university", "uni-just", "Submission awaiting confirmation", "WSL rated Khaled Rawashdeh's evidence for “Audit Remote Agent Access Security”.", "/university/projects/prj-estarta-access-khaled", -3, 0],
+    ["university", "uni-aau", "Evidence signals ready for review", "WSL found evidence signals in Yazan Al-Masri's submission for “Detect Anomalies in Network Traffic Logs”.", "/university/projects/prj-iris-anomaly-yazan", -2, 0],
+    ["university", "uni-just", "Evidence signals ready for review", "WSL found evidence signals in Khaled Rawashdeh's submission for “Audit Remote Agent Access Security”.", "/university/projects/prj-estarta-access-khaled", -3, 0],
     ["university", "uni-hu", "New challenge received", "IRIS Technology Jordan sent “Phishing Awareness Simulation & Reporting Dashboard”.", "/university/challenges/chal-iris-phishing", -3, 0],
-    ["university", "uni-ju", "Company rated your student's work", "Estarta HQ rated Omar Al-Fayez's submission for “Classify Customer Call Intents from Transcripts”.", "/university/projects/prj-estarta-intent-omar", -30, 1],
-    ["student", "stu-ju-omar", "Estarta HQ rated your work", "Your submission for “Classify Customer Call Intents from Transcripts” received company ratings and feedback.", "/student/projects/prj-estarta-intent-omar", -30, 1],
+    ["university", "uni-ju", "Company sent feedback on your student's work", "Estarta HQ sent feedback on Omar Al-Fayez's submission for “Classify Customer Call Intents from Transcripts”.", "/university/projects/prj-estarta-intent-omar", -30, 1],
+    ["student", "stu-ju-omar", "Estarta HQ sent feedback", "Your submission for “Classify Customer Call Intents from Transcripts” received company feedback.", "/student/projects/prj-estarta-intent-omar", -30, 1],
     ["student", "stu-hu-leen", "Submission confirmed to Echo Technology", "Dr. Mahmoud Al-Khasawneh confirmed your helpdesk portal submission to the company.", "/student/projects/prj-echo-helpdesk-leen", -6, 0],
     ["student", "stu-ju-tala", "Submission confirmed to Advanced Business Solutions", "Dr. Manal Al-Ajlouni confirmed your BI dashboard submission to the company.", "/student/projects/prj-abs-bi-tala", -4, 0],
-    ["student", "stu-just-ahmad", "SkyTech Enterprise Systems rated your work", "Your inventory microservice submission received company ratings and feedback.", "/student/projects/prj-skytech-inventory-ahmad", -50, 1],
+    ["student", "stu-just-ahmad", "SkyTech Enterprise Systems sent feedback", "Your inventory microservice submission received company feedback.", "/student/projects/prj-skytech-inventory-ahmad", -50, 1],
     ["student", "stu-asu-bashar", "New challenge available", "“Implement Role-Based Access Control for an ERP” from SkyTech Enterprise Systems was assigned to your program.", "/student/challenges/chal-skytech-rbac", -7, 0],
   ]
   // A challenge with no university preference reaches every university.

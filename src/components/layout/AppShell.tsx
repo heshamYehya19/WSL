@@ -1,9 +1,10 @@
-import { useState } from "react"
+import { Suspense, useState } from "react"
 import { Link, NavLink, Navigate, Outlet, useLocation } from "react-router-dom"
 import type { ReactNode } from "react"
 import { Wordmark } from "../ui/Wordmark"
 import { DemoSwitcher } from "./DemoSwitcher"
 import { ThemeToggle } from "../ui/ThemeToggle"
+import { RouteFallback } from "../ui/RouteFallback"
 import { useDemoUser } from "../../state/demoUser"
 import { useStore } from "../../state/store"
 import { formatRelative } from "../../lib/format"
@@ -199,7 +200,9 @@ export function AppShell({ role }: { role: Exclude<Role, "guest"> }) {
         </header>
         <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
           <div key={pathname} className="animate-page-enter">
-            <Outlet />
+            <Suspense fallback={<RouteFallback />}>
+              <Outlet />
+            </Suspense>
           </div>
         </main>
       </div>

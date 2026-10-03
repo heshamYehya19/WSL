@@ -67,7 +67,7 @@ export default function ForCompanies() {
           <Reveal delay={100} className="rounded-2xl border border-ink-200 bg-surface p-5 transition-all duration-300 hover:-translate-y-1 hover:border-teal-300 hover:shadow-lg hover:shadow-ink-950/5">
             <h3 className="font-semibold text-ink-900">Evidence, not an opaque score</h3>
             <p className="mt-1.5 text-sm leading-relaxed text-ink-500">
-              Talent Discovery never ranks candidates with a mystery score. You see WSL's automatic rating, the exact evidence behind it, and can add your own rating too.
+              Talent Discovery never ranks candidates with a mystery score. You see WSL's AI evidence analysis, the exact evidence behind it, and can leave your own feedback.
             </p>
           </Reveal>
         </div>

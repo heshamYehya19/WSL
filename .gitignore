@@ -28,6 +28,9 @@ dist-ssr
 # actually ship with the app live in server/ml/*.json, not here.
 scripts/ml/cache/
 
-# SQLite temporary files (the database itself, data/wsl.db, is committed)
+# Live SQLite runtime data — schema, migrations, and seed/reset scripts are
+# tracked; the actual database is created and re-seeded automatically on first
+# run (see server/db.ts, npm run db:reset), so there's nothing to commit here.
+data/wsl.db
 *.db-wal
 *.db-shm

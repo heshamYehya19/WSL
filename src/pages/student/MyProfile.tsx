@@ -3,7 +3,7 @@ import { useDemoUser } from "../../state/demoUser"
 import { useStore } from "../../state/store"
 import { SkillRecordBody } from "../../components/profile/SkillRecordBody"
 import { CountUp } from "../../hooks/useCountUp"
-import { bestRating, studentProjects, studentSignals } from "../../lib/selectors"
+import { studentProjects, studentSignals } from "../../lib/selectors"
 import type { Availability } from "../../types"
 
 const AVAILABILITIES: { value: Availability; hint: string }[] = [
@@ -25,13 +25,13 @@ export default function MyProfile() {
 
   const mySignals = studentSignals(skillSignals, student.id)
   const uniqueSkills = new Map<string, number>()
-  for (const s of mySignals) uniqueSkills.set(s.skill, Math.max(uniqueSkills.get(s.skill) ?? 0, bestRating(s)))
+  for (const s of mySignals) uniqueSkills.set(s.skill, Math.max(uniqueSkills.get(s.skill) ?? 0, s.evidenceConfidence))
   const avgScore = uniqueSkills.size ? Math.round([...uniqueSkills.values()].reduce((a, b) => a + b, 0) / uniqueSkills.size) : 0
-  const verifiedCount = new Set(mySignals.filter((s) => s.companyRating !== undefined).map((s) => s.skill)).size
+  const verifiedCount = new Set(mySignals.filter((s) => s.status === "Verified").map((s) => s.skill)).size
   const stats = [
     { label: "Projects", value: studentProjects(projects, student.id).length },
-    { label: "Skills rated", value: uniqueSkills.size },
-    { label: "Company verified", value: verifiedCount },
+    { label: "Skill signals", value: uniqueSkills.size },
+    { label: "University verified", value: verifiedCount },
     { label: "Evidence items", value: evidence.filter((e) => e.studentId === student.id).length },
   ]
   const isOpen = student.availability !== "Not Available"
@@ -65,7 +65,7 @@ export default function MyProfile() {
         <div className="relative p-6 sm:p-8">
           <div className="flex flex-wrap items-start gap-5">
             {/* Avatar with a ring that fills to the student's average score */}
-            <div className="group relative h-20 w-20 shrink-0" title={`Average skill score: ${avgScore}`}>
+            <div className="group relative h-20 w-20 shrink-0" title={`Average evidence confidence: ${avgScore}`}>
               <div
                 className="absolute inset-0 rounded-full transition-transform duration-500 group-hover:rotate-180"
                 style={{ background: `conic-gradient(var(--color-teal-400) ${avgScore * 3.6}deg, rgba(255,255,255,0.08) 0deg)` }}
@@ -181,7 +181,7 @@ export default function MyProfile() {
             maxLength={600}
             className="w-full rounded-xl border border-ink-200 bg-surface px-3 py-2 text-sm outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20"
           />
-          <p className="mt-1 text-xs text-ink-400">Companies see this on your candidate profile. Your skill ratings can't be edited — they come from your evidence.</p>
+          <p className="mt-1 text-xs text-ink-400">Companies see this on your candidate profile. Your skill signals can't be edited — they come from your evidence.</p>
           <div className="mt-4 flex gap-3">
             <button onClick={save} disabled={saving} className="rounded-full bg-night px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-teal-600 disabled:opacity-50">
               {saving ? "Saving…" : "Save changes"}

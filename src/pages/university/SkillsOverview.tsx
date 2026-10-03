@@ -4,7 +4,7 @@ import { useDemoUser } from "../../state/demoUser"
 import { useStore } from "../../state/store"
 import { EmptyState } from "../../components/ui/EmptyState"
 import { PageHero, Pills, SearchInput } from "../../components/ui/ListKit"
-import { bestRating, studentSignals } from "../../lib/selectors"
+import { studentSignals } from "../../lib/selectors"
 import { formatRelative } from "../../lib/format"
 
 type View = "cards" | "heatmap"
@@ -23,14 +23,14 @@ export default function SkillsOverview() {
   const roster = studentsOfUniversity(university.id).map((s) => {
     const signals = studentSignals(skillSignals, s.id)
     const best = new Map<string, number>()
-    for (const sig of signals) best.set(sig.skill, Math.max(best.get(sig.skill) ?? 0, bestRating(sig)))
+    for (const sig of signals) best.set(sig.skill, Math.max(best.get(sig.skill) ?? 0, sig.evidenceConfidence))
     const scores = [...best.values()]
     const lastActive = signals.reduce<string | null>((l, sig) => (!l || sig.analyzedAt > l ? sig.analyzedAt : l), null)
     return {
       s,
       best,
       avg: scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0,
-      verified: new Set(signals.filter((sig) => sig.companyRating !== undefined).map((sig) => sig.skill)).size,
+      verified: new Set(signals.filter((sig) => sig.status === "Verified").map((sig) => sig.skill)).size,
       projectCount: projects.filter((p) => p.studentId === s.id).length,
       lastActive,
     }
@@ -59,8 +59,8 @@ export default function SkillsOverview() {
         stats={[
           { label: "enrolled", value: roster.length },
           { label: "active on WSL", value: active.length, accent: true },
-          { label: "cohort avg. score", value: cohortAvg },
-          { label: "company-verified skills", value: roster.reduce((a, r) => a + r.verified, 0) },
+          { label: "cohort avg. confidence", value: cohortAvg },
+          { label: "university-verified skills", value: roster.reduce((a, r) => a + r.verified, 0) },
         ]}
       />
 
@@ -105,7 +105,7 @@ export default function SkillsOverview() {
       ) : view === "heatmap" ? (
         <div className="animate-fade-in-up overflow-hidden rounded-2xl border border-ink-200 bg-surface">
           {columns.length === 0 ? (
-            <p className="p-8 text-center text-sm text-ink-400">No rated skills yet in this group.</p>
+            <p className="p-8 text-center text-sm text-ink-400">No skill signals yet in this group.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full border-separate border-spacing-1 p-3 text-xs">
@@ -165,7 +165,7 @@ export default function SkillsOverview() {
             </div>
           )}
           <div className="flex flex-wrap items-center gap-3 border-t border-ink-100 px-4 py-2.5 text-[11px] text-ink-400">
-            <span>Score</span>
+            <span>Evidence confidence</span>
             <span className="h-2.5 w-32 rounded-full" style={{ background: "linear-gradient(to right, color-mix(in srgb, var(--color-teal-500) 15%, transparent), var(--color-teal-500))" }} />
             <span>0 → 100</span>
             <span className="ml-3 inline-block h-3 w-5 rounded border border-dashed border-ink-300" /> not practised yet
@@ -184,7 +184,7 @@ export default function SkillsOverview() {
                 className="animate-fade-in-up group flex flex-col rounded-2xl border border-ink-200 bg-surface p-5 transition-all duration-300 hover:-translate-y-1 hover:border-teal-400 hover:shadow-xl hover:shadow-teal-500/10"
               >
                 <div className="flex items-center gap-3">
-                  <span className="relative h-12 w-12 shrink-0" title={avg ? `Average score ${avg}` : "No ratings yet"}>
+                  <span className="relative h-12 w-12 shrink-0" title={avg ? `Average evidence confidence ${avg}` : "No skill signals yet"}>
                     <span
                       className="absolute inset-0 rounded-full transition-transform duration-500 group-hover:rotate-90"
                       style={{ background: `conic-gradient(var(--color-teal-400) ${avg * 3.6}deg, var(--color-ink-100) 0deg)` }}
@@ -222,7 +222,7 @@ export default function SkillsOverview() {
                     </div>
                   ))}
                   {top.length === 0 && (
-                    <p className="rounded-xl border border-dashed border-ink-200 py-4 text-center text-xs text-ink-400">No rated skills yet — nudge them toward a challenge</p>
+                    <p className="rounded-xl border border-dashed border-ink-200 py-4 text-center text-xs text-ink-400">No skill signals yet — nudge them toward a challenge</p>
                   )}
                 </div>
 
@@ -238,7 +238,7 @@ export default function SkillsOverview() {
                     </span>
                   ))}
                 </div>
-                {lastActive && <p className="mt-2 text-center text-[10px] text-ink-400">Last rated {formatRelative(lastActive)}</p>}
+                {lastActive && <p className="mt-2 text-center text-[10px] text-ink-400">Last analyzed {formatRelative(lastActive)}</p>}
               </Link>
             )
           })}

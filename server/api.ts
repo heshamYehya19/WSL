@@ -4,11 +4,14 @@ import type { DatabaseSync } from "node:sqlite"
 import { getDb, resetDatabase, transaction } from "./db.ts"
 import { checkRelevance, simulateAIReview } from "./ai.ts"
 import type { ChallengeContext } from "./ai.ts"
+import { rank } from "../src/lib/pipeline.ts"
 import type {
   AppNotification,
   Challenge,
   ChallengeStatus,
+  CompanyAction,
   CompanyContact,
+  CompanyFeedback,
   Evidence,
   EvidenceType,
   FeedbackEntry,
@@ -16,7 +19,9 @@ import type {
   Organization,
   Program,
   Project,
+  ProjectMember,
   SkillSignal,
+  SkillSignalStatus,
   Snapshot,
   Staff,
   Student,
@@ -24,17 +29,6 @@ import type {
 } from "../src/types.ts"
 
 // ---------------------------------------------------------------- shared rules
-
-const PIPELINE_ORDER: ChallengeStatus[] = [
-  "Draft",
-  "Sent to University",
-  "University Assigned",
-  "In Progress",
-  "Submissions Under Review",
-  "Confirmed to Company",
-  "Company Reviewed",
-]
-const rank = (s: string) => PIPELINE_ORDER.indexOf(s as ChallengeStatus)
 
 const SCREEN_NOTE = "WSL automatically screened this challenge for private or confidential data — none found."
 // The full EvidenceType union (src/types.ts) still covers older evidence types
@@ -45,6 +39,21 @@ const DIFFICULTIES = ["Foundational", "Intermediate", "Advanced"]
 const SENSITIVITIES = ["None (Public Dataset)", "Low", "Moderate", "High (NDA Required)"]
 const VISIBILITIES = ["Public", "University Only", "Restricted"]
 const AVAILABILITIES = ["Open to Opportunities", "Not Available", "Open to Internships"]
+const SUGGESTED_LEVELS = ["Foundational", "Intermediate", "Advanced", "Demonstrated"]
+const REVIEW_DECISIONS = ["verify", "request-more-evidence", "reject"] as const
+const COMPANY_ACTION_KINDS = ["saved", "interested", "invited"]
+
+/**
+ * DEMO AUTH, not production auth: `x-wsl-actor: role:id` (see resolveActor below) is
+ * trusted as-is once the id is confirmed to exist in the database — there is no
+ * password, session, or signed token anywhere in this app. A real deployment would
+ * need server-issued session cookies/JWTs and CSRF protection on mutating routes
+ * instead of a client-supplied header. This flag only gates the one genuinely
+ * destructive action (reset); it does not make resolveActor() itself secure.
+ */
+function isDemoMode(): boolean {
+  return process.env.WSL_DEMO_MODE !== "false"
+}
 
 class ApiError extends Error {
   status: number
@@ -77,7 +86,46 @@ function exec(db: DatabaseSync, sql: string, ...params: (string | number | null)
 
 // ------------------------------------------------------------------- snapshot
 
+const COMPANY_VISIBLE_STATUSES = ["Verified", "Completed", "Company Feedback Received"]
+
+/**
+ * Which projects' evidence/signals/feedback an actor may read. A student sees their
+ * own (owner or team member); a university sees every project any of its own
+ * students is on; a company sees any project — any company's challenge — once a
+ * mentor has confirmed it for sharing (that's the talent-discovery boundary, not an
+ * own-challenge boundary). Guests see none. Project/challenge metadata itself (title,
+ * status, required skills) is NOT filtered by this — only the evidence/signal content.
+ */
+function visibleProjectIds(db: DatabaseSync, actor: Actor): Set<string> {
+  if (actor.role === "guest") return new Set()
+  if (actor.role === "student") {
+    return new Set(
+      all(
+        db,
+        "SELECT pr.id FROM projects pr LEFT JOIN project_members pm ON pm.project_id = pr.id WHERE pr.student_id = ? OR pm.student_id = ?",
+        actor.id,
+        actor.id,
+      ).map((r) => String(r.id)),
+    )
+  }
+  if (actor.role === "university") {
+    return new Set(
+      all(db, "SELECT pr.id FROM projects pr JOIN students s ON s.id = pr.student_id WHERE s.university_id = ?", actor.id).map((r) => String(r.id)),
+    )
+  }
+  return new Set(
+    all(db, `SELECT id FROM projects WHERE status IN (${COMPANY_VISIBLE_STATUSES.map(() => "?").join(",")})`, ...COMPANY_VISIBLE_STATUSES).map((r) =>
+      String(r.id),
+    ),
+  )
+}
+
+function isProjectMember(db: DatabaseSync, projectId: string, studentId: string): boolean {
+  return !!one(db, "SELECT 1 FROM project_members WHERE project_id = ? AND student_id = ?", projectId, studentId)
+}
+
 function buildSnapshot(db: DatabaseSync, actor: Actor): Snapshot {
+  const visible = visibleProjectIds(db, actor)
   const programs: Program[] = all(db, "SELECT * FROM programs ORDER BY name").map((r) => ({
     id: String(r.id),
     universityId: String(r.university_id),
@@ -208,58 +256,85 @@ function buildSnapshot(db: DatabaseSync, actor: Actor): Snapshot {
      LEFT JOIN companies co ON co.id = cc.company_id
      ORDER BY f.at`,
   )
+  const memberRows = all(db, "SELECT * FROM project_members")
+  const companyFeedbackRows = all(db, "SELECT * FROM company_feedback")
   const projects: Project[] = all(
     db,
     `SELECT pr.*, c.title AS challenge_title, c.company_id
      FROM projects pr JOIN challenges c ON c.id = pr.challenge_id
      ORDER BY pr.started_at DESC`,
-  ).map((r) => ({
-    id: String(r.id),
-    challengeId: String(r.challenge_id),
-    title: String(r.challenge_title),
-    organizationId: String(r.company_id),
-    studentId: String(r.student_id),
-    status: r.status as ChallengeStatus,
-    startedAt: String(r.started_at),
-    tasks: taskRows.filter((t) => t.project_id === r.id).map((t) => ({ id: String(t.id), title: String(t.title), done: Number(t.done) === 1 })),
-    feedback: feedbackRows
-      .filter((f) => f.project_id === r.id)
-      .map(
-        (f): FeedbackEntry => ({
-          id: String(f.id),
-          author: String(f.author_name ?? "Unknown reviewer"),
-          role: String(f.author_role ?? ""),
-          authorKind: f.author_kind as FeedbackEntry["authorKind"],
-          note: String(f.note),
-          at: String(f.at),
-        }),
-      ),
-  }))
+  ).map((r) => {
+    const cf = companyFeedbackRows.find((f) => f.project_id === r.id)
+    return {
+      id: String(r.id),
+      challengeId: String(r.challenge_id),
+      title: String(r.challenge_title),
+      organizationId: String(r.company_id),
+      studentId: String(r.student_id),
+      members: memberRows
+        .filter((m) => m.project_id === r.id)
+        .map((m): ProjectMember => ({ studentId: String(m.student_id), roleNote: String(m.role_note) })),
+      status: r.status as ChallengeStatus,
+      startedAt: String(r.started_at),
+      tasks: taskRows.filter((t) => t.project_id === r.id).map((t) => ({ id: String(t.id), title: String(t.title), done: Number(t.done) === 1 })),
+      feedback: feedbackRows
+        .filter((f) => f.project_id === r.id && visible.has(String(r.id)))
+        .map(
+          (f): FeedbackEntry => ({
+            id: String(f.id),
+            author: String(f.author_name ?? "Unknown reviewer"),
+            role: String(f.author_role ?? ""),
+            authorKind: f.author_kind as FeedbackEntry["authorKind"],
+            note: String(f.note),
+            at: String(f.at),
+          }),
+        ),
+      ...(cf
+        ? {
+            companyFeedback: {
+              strongTechnicalExecution: Number(cf.strong_technical_execution) === 1,
+              relevantForInternship: Number(cf.relevant_for_internship) === 1,
+              interestedInSpeaking: Number(cf.interested_in_speaking) === 1,
+              note: String(cf.note),
+              submittedAt: String(cf.submitted_at),
+            } satisfies CompanyFeedback,
+          }
+        : {}),
+    }
+  })
 
-  const evidence: Evidence[] = all(db, "SELECT * FROM evidence ORDER BY submitted_at DESC").map((r) => ({
-    id: String(r.id),
-    projectId: String(r.project_id),
-    studentId: String(r.student_id),
-    type: r.type as EvidenceType,
-    title: String(r.title),
-    description: String(r.description),
-    link: String(r.link),
-    ...(r.content ? { content: String(r.content) } : {}),
-    submittedAt: String(r.submitted_at),
-  }))
+  const evidence: Evidence[] = all(db, "SELECT * FROM evidence ORDER BY submitted_at DESC")
+    .filter((r) => visible.has(String(r.project_id)))
+    .map((r) => ({
+      id: String(r.id),
+      projectId: String(r.project_id),
+      studentId: String(r.student_id),
+      type: r.type as EvidenceType,
+      title: String(r.title),
+      description: String(r.description),
+      link: String(r.link),
+      ...(r.content ? { content: String(r.content) } : {}),
+      submittedAt: String(r.submitted_at),
+    }))
 
   const signalEvidence = all(db, "SELECT * FROM skill_signal_evidence")
-  const skillSignals: SkillSignal[] = all(db, "SELECT * FROM skill_signals ORDER BY analyzed_at DESC").map((r) => ({
-    id: String(r.id),
-    projectId: String(r.project_id),
-    studentId: String(r.student_id),
-    skill: String(r.skill),
-    aiRating: Number(r.ai_rating),
-    aiNote: String(r.ai_note ?? ""),
-    ...(r.company_rating !== null ? { companyRating: Number(r.company_rating), companyRatedAt: String(r.company_rated_at) } : {}),
-    evidenceIds: signalEvidence.filter((se) => se.signal_id === r.id).map((se) => String(se.evidence_id)),
-    analyzedAt: String(r.analyzed_at),
-  }))
+  const skillSignals: SkillSignal[] = all(db, "SELECT * FROM skill_signals ORDER BY analyzed_at DESC")
+    .filter((r) => visible.has(String(r.project_id)))
+    .map((r) => ({
+      id: String(r.id),
+      projectId: String(r.project_id),
+      studentId: String(r.student_id),
+      skill: String(r.skill),
+      evidenceConfidence: Number(r.evidence_confidence),
+      suggestedLevel: r.suggested_level as SkillSignal["suggestedLevel"],
+      aiNote: String(r.ai_note ?? ""),
+      status: r.status as SkillSignalStatus,
+      ...(r.verified_by ? { verifiedBy: String(r.verified_by), verifiedAt: String(r.verified_at) } : {}),
+      ...(r.reviewer_notes ? { reviewerNotes: String(r.reviewer_notes) } : {}),
+      ...(r.company_rating !== null ? { companyRating: Number(r.company_rating), companyRatedAt: String(r.company_rated_at) } : {}),
+      evidenceIds: signalEvidence.filter((se) => se.signal_id === r.id).map((se) => String(se.evidence_id)),
+      analyzedAt: String(r.analyzed_at),
+    }))
 
   const opportunities: Opportunity[] = all(db, "SELECT * FROM opportunities ORDER BY posted_at DESC").map((r) => ({
     id: String(r.id),
@@ -271,6 +346,19 @@ function buildSnapshot(db: DatabaseSync, actor: Actor): Snapshot {
     description: String(r.description),
     postedAt: String(r.posted_at),
   }))
+
+  const companyActions: CompanyAction[] =
+    actor.role === "company"
+      ? all(db, "SELECT * FROM company_actions WHERE company_id = ? ORDER BY created_at DESC", actor.id).map((r) => ({
+          id: String(r.id),
+          organizationId: String(r.company_id),
+          studentId: String(r.student_id),
+          kind: r.kind as CompanyAction["kind"],
+          ...(r.opportunity_id ? { opportunityId: String(r.opportunity_id) } : {}),
+          ...(r.note ? { note: String(r.note) } : {}),
+          createdAt: String(r.created_at),
+        }))
+      : []
 
   const notifications: AppNotification[] =
     actor.role === "guest"
@@ -289,11 +377,18 @@ function buildSnapshot(db: DatabaseSync, actor: Actor): Snapshot {
           createdAt: String(r.created_at),
         }))
 
-  return { universities, staff, organizations, contacts, students, challenges, projects, evidence, skillSignals, opportunities, notifications }
+  return { universities, staff, organizations, contacts, students, challenges, projects, evidence, skillSignals, opportunities, companyActions, notifications }
 }
 
 // --------------------------------------------------------------------- helpers
 
+/**
+ * DEMO AUTH ONLY — see the isDemoMode() comment above. This trusts whatever role:id
+ * the client sends, with the one check that the id exists. Every write handler still
+ * does its own ownership check against the resolved id (that part is real and stays
+ * regardless of demo/production); what's missing for production is proof that the
+ * request actually came from that account — a signed cookie/token, not a bare header.
+ */
 function resolveActor(db: DatabaseSync, header: string | undefined): Actor {
   if (!header) return { role: "guest" }
   const [role, id] = header.split(":")
@@ -326,6 +421,14 @@ function pushHistory(db: DatabaseSync, challengeId: string, status: ChallengeSta
 function advanceIfFurther(db: DatabaseSync, challengeId: string, status: ChallengeStatus, note?: string) {
   const c = one(db, "SELECT status FROM challenges WHERE id = ?", challengeId)
   if (c && rank(status) > rank(String(c.status))) pushHistory(db, challengeId, status, note)
+}
+
+/** True once a mentor has made a final call (Verified or Rejected) on every required
+ * skill — the precondition for confirming evidence to the company. A skill still
+ * "Pending Verification" or "More Evidence Requested" means review isn't done. */
+function allSignalsResolved(db: DatabaseSync, projectId: string): boolean {
+  const rows = all(db, "SELECT status FROM skill_signals WHERE project_id = ?", projectId)
+  return rows.length > 0 && rows.every((r) => r.status === "Verified" || r.status === "Rejected")
 }
 
 function text(v: unknown, field: string, { required = false, max = 4000 } = {}): string {
@@ -543,16 +646,17 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
     handler: (db, actor, [id], body) => {
       const student = requireRole(actor, "student")
       const p = projectContext(db, id)
-      if (p.studentId !== student.id) throw new ApiError(403, "You can only add evidence to your own projects.")
-      if (rank(p.status) >= rank("Confirmed to Company")) throw new ApiError(409, "This submission was already confirmed to the company.")
+      if (p.studentId !== student.id && !isProjectMember(db, id, student.id)) throw new ApiError(403, "You can only add evidence to your own projects.")
+      if (rank(p.status) >= rank("Verified")) throw new ApiError(409, "This evidence was already confirmed to the company.")
       const evType = oneOf(body.type, SUBMITTABLE_EVIDENCE_TYPES, "evidence type", "")
       if (!evType) throw new ApiError(400, "Evidence type is required.")
       const title = text(body.title, "Title", { required: true, max: 200 })
-      // "Code" evidence is pasted directly — everything else is a link to
-      // where the actual work lives (repo, document, or dataset).
+      // "Code" evidence is pasted directly and always analyzed. Everything else is a
+      // link to where the work lives, with an optional excerpt a mentor can paste in
+      // to also have it analyzed — otherwise it's just linked for mentor review.
       const isCode = evType === "Code"
       const link = isCode ? "" : text(body.link, "Link", { required: true, max: 500 })
-      const content = isCode ? text(body.content, "Code", { required: true, max: 20000 }) : null
+      const content = isCode ? text(body.content, "Code", { required: true, max: 20000 }) : text(body.content, "Content", { max: 20000 }) || null
 
       const checkText = [title, content].filter(Boolean).join(". ")
       const relevance = checkRelevance(challengeContextFor(db, p.challengeId), checkText)
@@ -576,8 +680,8 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
     handler: (db, actor, [id]) => {
       const student = requireRole(actor, "student")
       const p = projectContext(db, id)
-      if (p.studentId !== student.id) throw new ApiError(403, "You can only request a rating for your own projects.")
-      if (rank(p.status) >= rank("Confirmed to Company")) throw new ApiError(409, "This submission was already confirmed to the company.")
+      if (p.studentId !== student.id && !isProjectMember(db, id, student.id)) throw new ApiError(403, "You can only request analysis for your own projects.")
+      if (rank(p.status) >= rank("Verified")) throw new ApiError(409, "This evidence was already confirmed to the company.")
       const ev = all(db, "SELECT * FROM evidence WHERE project_id = ? ORDER BY submitted_at", id).map((r) => ({
         id: String(r.id),
         projectId: id,
@@ -595,26 +699,82 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
       const challenge = challengeContextFor(db, p.challengeId)
       // Re-analyzing (e.g. after the student adds more evidence) recomputes every
       // required skill against ALL current evidence and overwrites prior results,
-      // rather than only ever rating a skill once — otherwise evidence submitted
-      // after the first rating could never be analyzed at all.
+      // rather than only ever analyzing a skill once — otherwise evidence submitted
+      // after the first analysis could never be picked up at all.
       const results = simulateAIReview(skills, ev, challenge)
       const now = nowIso()
       for (const r of results) {
-        const existing = one(db, "SELECT id FROM skill_signals WHERE project_id = ? AND skill = ?", id, r.skill)
+        const existing = one(db, "SELECT id, status FROM skill_signals WHERE project_id = ? AND skill = ?", id, r.skill)
+        // A mentor's decision is durable — new evidence never silently re-scores a
+        // skill the mentor already verified out from under them.
+        if (existing && existing.status === "Verified") continue
         const sigId = existing ? String(existing.id) : newId("sig")
         if (existing) {
           exec(db, "DELETE FROM skill_signal_evidence WHERE signal_id = ?", sigId)
-          exec(db, "UPDATE skill_signals SET ai_rating = ?, ai_note = ?, analyzed_at = ? WHERE id = ?", r.rating, r.note, now, sigId)
+          exec(
+            db,
+            "UPDATE skill_signals SET evidence_confidence = ?, ai_note = ?, suggested_level = ?, status = 'Pending Verification', analyzed_at = ? WHERE id = ?",
+            r.rating, r.note, r.suggestedLevel, now, sigId,
+          )
         } else {
-          exec(db, "INSERT INTO skill_signals (id, project_id, student_id, skill, ai_rating, ai_note, analyzed_at) VALUES (?, ?, ?, ?, ?, ?, ?)", sigId, id, student.id, r.skill, r.rating, r.note, now)
+          exec(
+            db,
+            "INSERT INTO skill_signals (id, project_id, student_id, skill, evidence_confidence, ai_note, suggested_level, status, analyzed_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'Pending Verification', ?)",
+            sigId, id, student.id, r.skill, r.rating, r.note, r.suggestedLevel, now,
+          )
         }
         for (const evId of r.evidenceIds) exec(db, "INSERT INTO skill_signal_evidence (signal_id, evidence_id) VALUES (?, ?)", sigId, evId)
       }
       if (p.status === "In Progress") {
-        exec(db, "UPDATE projects SET status = 'Submissions Under Review' WHERE id = ?", id)
-        notify(db, "university", p.universityId, "Submission awaiting confirmation", `WSL rated ${p.studentName}'s evidence for “${p.challengeTitle}”.`, `/university/projects/${id}`)
+        exec(db, "UPDATE projects SET status = 'Evidence Under Review' WHERE id = ?", id)
+        notify(db, "university", p.universityId, "Evidence ready for review", `WSL analyzed ${p.studentName}'s evidence for “${p.challengeTitle}”.`, `/university/projects/${id}`)
       }
-      advanceIfFurther(db, p.challengeId, "Submissions Under Review", `WSL rated ${p.studentName}'s submitted evidence automatically.`)
+      advanceIfFurther(db, p.challengeId, "Evidence Under Review", `WSL analyzed ${p.studentName}'s submitted evidence automatically.`)
+    },
+  },
+  {
+    method: "POST",
+    pattern: /^\/projects\/([^/]+)\/signals\/([^/]+)\/review$/,
+    handler: (db, actor, [id, signalId], body) => {
+      const uni = requireRole(actor, "university")
+      const p = projectContext(db, id)
+      if (p.universityId !== uni.id) throw new ApiError(403, "You can only review your own students' work.")
+      const signal = one(db, "SELECT id, skill, status FROM skill_signals WHERE id = ? AND project_id = ?", signalId, id)
+      if (!signal) throw new ApiError(404, "Skill signal not found.")
+      const decision = oneOf(body.decision, [...REVIEW_DECISIONS], "decision", "")
+      if (!decision) throw new ApiError(400, "Decision is required.")
+      const reviewerNotes = text(body.reviewerNotes, "Reviewer notes", { max: 1000, required: decision !== "verify" })
+      const mentor = coordinatorFor(db, p.programId)
+      const now = nowIso()
+
+      if (decision === "verify") {
+        const suggestedLevel = oneOf(body.suggestedLevel, SUGGESTED_LEVELS, "suggested level", "")
+        exec(
+          db,
+          `UPDATE skill_signals SET status = 'Verified', verified_by = ?, verified_at = ?, reviewer_notes = ?
+           ${suggestedLevel ? ", suggested_level = ?" : ""} WHERE id = ?`,
+          ...(suggestedLevel ? [mentor.id, now, reviewerNotes || null, suggestedLevel, signalId] : [mentor.id, now, reviewerNotes || null, signalId]),
+        )
+      } else {
+        const status: SkillSignalStatus = decision === "reject" ? "Rejected" : "More Evidence Requested"
+        exec(db, "UPDATE skill_signals SET status = ?, verified_by = ?, verified_at = ?, reviewer_notes = ? WHERE id = ?", status, mentor.id, now, reviewerNotes, signalId)
+      }
+
+      notify(
+        db,
+        "student",
+        p.studentId,
+        decision === "verify" ? `"${signal.skill}" verified` : decision === "reject" ? `"${signal.skill}" not verified` : `More evidence requested for "${signal.skill}"`,
+        `${mentor.name} reviewed your ${signal.skill} evidence for “${p.challengeTitle}”.`,
+        `/student/projects/${id}`,
+      )
+      // First mentor touch moves the project from "evidence is sitting there" to
+      // "actively being worked through" — it does not itself finish the review;
+      // only an explicit /confirm (once every skill has a final decision) does that.
+      if (p.status === "Evidence Under Review") {
+        exec(db, "UPDATE projects SET status = 'Skills Pending Verification' WHERE id = ?", id)
+        advanceIfFurther(db, p.challengeId, "Skills Pending Verification", `${mentor.name} began reviewing ${p.studentName}'s skill signals.`)
+      }
     },
   },
   {
@@ -624,39 +784,95 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
       const uni = requireRole(actor, "university")
       const p = projectContext(db, id)
       if (p.universityId !== uni.id) throw new ApiError(403, "You can only confirm your own students' work.")
-      if (p.status !== "Submissions Under Review") throw new ApiError(409, "This submission isn't awaiting confirmation.")
+      if (rank(p.status) >= rank("Verified")) throw new ApiError(409, "This evidence was already confirmed to the company.")
+      if (!allSignalsResolved(db, id)) {
+        throw new ApiError(409, "Every required skill needs a Verify or Reject decision before you can confirm this evidence to the company.")
+      }
+      const allVerified = all(db, "SELECT status FROM skill_signals WHERE project_id = ?", id).every((r) => r.status === "Verified")
+      const finalStatus: ChallengeStatus = allVerified ? "Verified" : "Completed"
       const mentor = coordinatorFor(db, p.programId)
       const note = text(body.note, "Note", { max: 1000 }) || `Reviewed and confirmed to ${p.companyName}.`
       exec(db, "INSERT INTO feedback (id, project_id, author_kind, author_id, note, at) VALUES (?, ?, 'staff', ?, ?, ?)", newId("fb"), id, mentor.id, note, nowIso())
-      exec(db, "UPDATE projects SET status = 'Confirmed to Company' WHERE id = ?", id)
-      advanceIfFurther(db, p.challengeId, "Confirmed to Company", `Reviewed by ${mentor.name} and confirmed to ${p.companyName}.`)
-      notify(db, "company", p.companyId, "Submission ready for your review", `${p.universityName} confirmed ${p.studentName}'s submission for “${p.challengeTitle}”.`, `/company/submissions/${id}`)
-      notify(db, "student", p.studentId, `Submission confirmed to ${p.companyName}`, `${mentor.name} confirmed your submission for “${p.challengeTitle}”.`, `/student/projects/${id}`)
+      exec(db, "UPDATE projects SET status = ? WHERE id = ?", finalStatus, id)
+      advanceIfFurther(db, p.challengeId, finalStatus, `Reviewed by ${mentor.name} and confirmed to ${p.companyName}.`)
+      notify(db, "company", p.companyId, "Evidence ready for your review", `${p.universityName} shared verified evidence for ${p.studentName}'s work on “${p.challengeTitle}”.`, `/company/submissions/${id}`)
+      notify(db, "student", p.studentId, `Evidence confirmed to ${p.companyName}`, `${mentor.name} confirmed your evidence for “${p.challengeTitle}”.`, `/student/projects/${id}`)
     },
   },
   {
     method: "POST",
-    pattern: /^\/projects\/([^/]+)\/company-review$/,
+    pattern: /^\/projects\/([^/]+)\/company-feedback$/,
     handler: (db, actor, [id], body) => {
       const company = requireRole(actor, "company")
       const p = projectContext(db, id)
-      if (p.companyId !== company.id) throw new ApiError(403, "You can only review submissions to your own challenges.")
-      if (p.status !== "Confirmed to Company") throw new ApiError(409, "This submission isn't awaiting your review.")
-      const ratings = (body.ratings ?? {}) as Record<string, unknown>
-      const signals = all(db, "SELECT id FROM skill_signals WHERE project_id = ?", id).map((r) => String(r.id))
-      if (signals.length === 0) throw new ApiError(409, "There are no rated skills to review.")
+      if (p.companyId !== company.id) throw new ApiError(403, "You can only give feedback on submissions to your own challenges.")
+      if (rank(p.status) < rank("Verified")) throw new ApiError(409, "This evidence isn't ready for your review yet.")
       const now = nowIso()
-      for (const sigId of signals) {
-        const v = Number(ratings[sigId])
-        if (!Number.isInteger(v) || v < 0 || v > 100) throw new ApiError(400, "Give every skill a rating between 0 and 100.")
-        exec(db, "UPDATE skill_signals SET company_rating = ?, company_rated_at = ? WHERE id = ?", v, now, sigId)
+      const existing = one(db, "SELECT id FROM company_feedback WHERE project_id = ?", id)
+      const feedbackId = existing ? String(existing.id) : newId("cf")
+      const strongExecution = body.strongTechnicalExecution === true ? 1 : 0
+      const relevantForInternship = body.relevantForInternship === true ? 1 : 0
+      const interestedInSpeaking = body.interestedInSpeaking === true ? 1 : 0
+      const note = text(body.note, "Feedback note", { max: 2000 })
+      if (existing) {
+        exec(
+          db,
+          "UPDATE company_feedback SET strong_technical_execution = ?, relevant_for_internship = ?, interested_in_speaking = ?, note = ?, updated_at = ? WHERE id = ?",
+          strongExecution, relevantForInternship, interestedInSpeaking, note, now, feedbackId,
+        )
+      } else {
+        exec(
+          db,
+          `INSERT INTO company_feedback (id, project_id, contact_id, strong_technical_execution, relevant_for_internship, interested_in_speaking, note, submitted_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          feedbackId, id, p.contactId, strongExecution, relevantForInternship, interestedInSpeaking, note, now, now,
+        )
       }
-      const note = text(body.note, "Feedback", { max: 2000 })
-      if (note) exec(db, "INSERT INTO feedback (id, project_id, author_kind, author_id, note, at) VALUES (?, ?, 'contact', ?, ?, ?)", newId("fb"), id, p.contactId, note, now)
-      exec(db, "UPDATE projects SET status = 'Company Reviewed' WHERE id = ?", id)
-      advanceIfFurther(db, p.challengeId, "Company Reviewed", `${p.companyName} reviewed the submission and gave its own rating.`)
-      notify(db, "student", p.studentId, `${p.companyName} rated your work`, `Your submission for “${p.challengeTitle}” received company ratings${note ? " and feedback" : ""}.`, `/student/projects/${id}`)
-      notify(db, "university", p.universityId, "Company rated your student's work", `${p.companyName} rated ${p.studentName}'s submission for “${p.challengeTitle}”.`, `/university/projects/${id}`)
+      // Structured feedback is a company's reaction to evidence it already saw — it
+      // never touches skill_signals, so it can never change what's verified.
+      exec(db, "UPDATE projects SET status = 'Company Feedback Received' WHERE id = ?", id)
+      advanceIfFurther(db, p.challengeId, "Company Feedback Received", `${p.companyName} left feedback on the submission.`)
+      notify(db, "student", p.studentId, `${p.companyName} left feedback`, `Your evidence for “${p.challengeTitle}” received feedback${note ? " and a note" : ""}.`, `/student/projects/${id}`)
+      notify(db, "university", p.universityId, "Company left feedback", `${p.companyName} left feedback on ${p.studentName}'s submission for “${p.challengeTitle}”.`, `/university/projects/${id}`)
+    },
+  },
+  {
+    method: "POST",
+    pattern: /^\/students\/([^/]+)\/company-actions$/,
+    handler: (db, actor, [studentId], body) => {
+      const company = requireRole(actor, "company")
+      if (!one(db, "SELECT id FROM students WHERE id = ?", studentId)) throw new ApiError(404, "Student not found.")
+      const kind = oneOf(body.kind, COMPANY_ACTION_KINDS, "kind", "")
+      if (!kind) throw new ApiError(400, "Kind is required.")
+      const now = nowIso()
+
+      if (kind === "invited") {
+        const opportunityId = text(body.opportunityId, "Opportunity", { required: true })
+        if (!one(db, "SELECT id FROM opportunities WHERE id = ? AND company_id = ?", opportunityId, company.id)) {
+          throw new ApiError(400, "Choose one of your own opportunities.")
+        }
+        if (one(db, "SELECT 1 FROM company_actions WHERE company_id = ? AND student_id = ? AND kind = 'invited' AND opportunity_id = ?", company.id, studentId, opportunityId)) {
+          throw new ApiError(409, "You already invited this student to that opportunity.")
+        }
+        const note = text(body.note, "Note", { max: 1000 })
+        exec(
+          db,
+          "INSERT INTO company_actions (id, company_id, student_id, kind, opportunity_id, note, created_at) VALUES (?, ?, ?, 'invited', ?, ?, ?)",
+          newId("cact"), company.id, studentId, opportunityId, note || null, now,
+        )
+        const opp = one(db, "SELECT title FROM opportunities WHERE id = ?", opportunityId)!
+        notify(db, "student", studentId, "You've been invited to an opportunity", `A company invited you to apply for “${String(opp.title)}”.`, "/student/opportunities")
+        return { removed: false }
+      }
+
+      // "saved"/"interested" are simple toggles: calling again undoes the action.
+      const existing = one(db, "SELECT id FROM company_actions WHERE company_id = ? AND student_id = ? AND kind = ?", company.id, studentId, kind)
+      if (existing) {
+        exec(db, "DELETE FROM company_actions WHERE id = ?", String(existing.id))
+        return { removed: true }
+      }
+      exec(db, "INSERT INTO company_actions (id, company_id, student_id, kind, note, created_at) VALUES (?, ?, ?, ?, ?, ?)", newId("cact"), company.id, studentId, kind, text(body.note, "Note", { max: 1000 }) || null, now)
+      return { removed: false }
     },
   },
   {
@@ -674,7 +890,7 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
         authorId = mentor.id
         from = mentor.name
       } else if (actor.role === "company" && actor.id === p.companyId) {
-        if (rank(p.status) < rank("Confirmed to Company")) throw new ApiError(409, "You can leave feedback once the university confirms this submission.")
+        if (rank(p.status) < rank("Verified")) throw new ApiError(409, "You can leave feedback once the university confirms this evidence.")
         kind = "contact"
         authorId = p.contactId
         from = p.companyName
@@ -691,8 +907,8 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
     handler: (db, actor, [id, taskId], body) => {
       const student = requireRole(actor, "student")
       const p = projectContext(db, id)
-      if (p.studentId !== student.id) throw new ApiError(403, "You can only update your own project tasks.")
-      if (rank(p.status) >= rank("Confirmed to Company")) throw new ApiError(409, "This project was already confirmed to the company.")
+      if (p.studentId !== student.id && !isProjectMember(db, id, student.id)) throw new ApiError(403, "You can only update your own project tasks.")
+      if (rank(p.status) >= rank("Verified")) throw new ApiError(409, "This project was already confirmed to the company.")
       if (!one(db, "SELECT id FROM project_tasks WHERE id = ? AND project_id = ?", taskId, id)) throw new ApiError(404, "Task not found.")
       exec(db, "UPDATE project_tasks SET done = ? WHERE id = ?", body.done === true ? 1 : 0, taskId)
     },
@@ -758,6 +974,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
     }
 
     if (req.method === "POST" && path === "/reset") {
+      if (!isDemoMode()) throw new ApiError(403, "Reset is only available in demo mode.")
       resetDatabase()
       send(res, 200, { result: null, snapshot: buildSnapshot(db, resolveActor(db, header)) })
       return true

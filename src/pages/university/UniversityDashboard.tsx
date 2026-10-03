@@ -21,19 +21,19 @@ export default function UniversityDashboard() {
   const roster = studentsOfUniversity(university.id)
   const uniChallenges = challenges.filter((c) => assignmentFor(c, university.id))
   const activeChallenges = uniChallenges.filter((c) =>
-    ["University Assigned", "In Progress", "Submissions Under Review"].includes(statusAtUniversity(c, university.id, projects, students)),
+    ["University Assigned", "In Progress", "Evidence Under Review", "Skills Pending Verification"].includes(statusAtUniversity(c, university.id, projects, students)),
   )
   const uniProjects = projects.filter((p) => isUniversityStudent(p.studentId, university.id))
   const uniEvidence = evidence.filter((e) => isUniversityStudent(e.studentId, university.id))
   const uniSignals = skillSignals.filter((s) => isUniversityStudent(s.studentId, university.id))
-  const companyRatedCount = uniSignals.filter((s) => s.companyRating !== undefined).length
+  const verifiedCount = uniSignals.filter((s) => s.status === "Verified").length
   const participating = new Set(uniProjects.map((p) => p.studentId)).size
 
   // Waiting on this university: routed to it, not yet assigned by it, and still open.
   const needsReview = challenges.filter(
     (c) => isRoutedTo(c, university.id) && !assignmentFor(c, university.id) && daysUntil(c.deadline) > 0,
   )
-  const projectsAwaitingConfirmation = uniProjects.filter((p) => p.status === "Submissions Under Review")
+  const projectsAwaitingConfirmation = uniProjects.filter((p) => p.status === "Evidence Under Review" || p.status === "Skills Pending Verification")
   const pending = needsReview.length + projectsAwaitingConfirmation.length
 
   const skillCounts = new Map<string, number>()
@@ -103,7 +103,7 @@ export default function UniversityDashboard() {
         <StatTile label="Active Challenges" value={activeChallenges.length} />
         <StatTile label="Student Projects" value={uniProjects.length} />
         <StatTile label="Evidence Submitted" value={uniEvidence.length} />
-        <StatTile label="Skills Rated" value={uniSignals.length} hint={`${companyRatedCount} company-rated`} />
+        <StatTile label="Skill Signals" value={uniSignals.length} hint={`${verifiedCount} verified`} />
         <StatTile label="Students Participating" value={participating} hint={`of ${roster.length} enrolled`} />
       </div>
 
@@ -114,10 +114,10 @@ export default function UniversityDashboard() {
           <div className="grid grid-cols-2 gap-4">
             <Ring value={participating} max={roster.length} label="Participation" sub={`${participating} of ${roster.length} students`} />
             <Ring
-              value={companyRatedCount}
+              value={verifiedCount}
               max={uniSignals.length}
-              label="Company verified"
-              sub={`${companyRatedCount} of ${uniSignals.length} ratings`}
+              label="University verified"
+              sub={`${verifiedCount} of ${uniSignals.length} signals`}
               strokeClassName="stroke-verified-500"
             />
           </div>

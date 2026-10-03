@@ -8,9 +8,7 @@ import { EmptyState } from "../../components/ui/EmptyState"
 import { BarList } from "../../components/ui/BarList"
 import { SkillLevels } from "../../components/ui/SkillLevels"
 import { formatRelative } from "../../lib/format"
-import { bestRating, challengeFor, skillsForProject, studentProjects, studentSignals } from "../../lib/selectors"
-
-const MATCH_THRESHOLD = 75
+import { challengeFor, skillsForProject, studentProjects, studentSignals } from "../../lib/selectors"
 
 function greeting() {
   const h = new Date().getHours()
@@ -25,40 +23,40 @@ export default function StudentDashboard() {
   const myProjects = studentProjects(projects, student.id)
   const mySignals = studentSignals(skillSignals, student.id)
   const myEvidence = evidence.filter((e) => e.studentId === student.id)
-  const ratedNames = new Set(mySignals.filter((s) => bestRating(s) >= MATCH_THRESHOLD).map((s) => s.skill))
-  const matchedOpportunities = opportunities.filter((o) => o.requiredSkills.some((s) => ratedNames.has(s)))
-  const avgAiRating = mySignals.length ? Math.round(mySignals.reduce((sum, s) => sum + s.aiRating, 0) / mySignals.length) : 0
-  const companyRatedCount = mySignals.filter((s) => s.companyRating !== undefined).length
+  const verifiedNames = new Set(mySignals.filter((s) => s.status === "Verified").map((s) => s.skill))
+  const matchedOpportunities = opportunities.filter((o) => o.requiredSkills.some((s) => verifiedNames.has(s)))
+  const avgConfidence = mySignals.length ? Math.round(mySignals.reduce((sum, s) => sum + s.evidenceConfidence, 0) / mySignals.length) : 0
+  const verifiedCount = mySignals.filter((s) => s.status === "Verified").length
 
-  const latestAiFeedback = [...mySignals].sort((a, b) => new Date(b.analyzedAt).getTime() - new Date(a.analyzedAt).getTime()).slice(0, 5)
+  const latestSignals = [...mySignals].sort((a, b) => new Date(b.analyzedAt).getTime() - new Date(a.analyzedAt).getTime()).slice(0, 5)
 
   const topSkillsBySkill = new Map<string, (typeof mySignals)[number]>()
   for (const s of mySignals) {
     const existing = topSkillsBySkill.get(s.skill)
-    if (!existing || bestRating(s) > bestRating(existing)) topSkillsBySkill.set(s.skill, s)
+    if (!existing || s.evidenceConfidence > existing.evidenceConfidence) topSkillsBySkill.set(s.skill, s)
   }
   const skillRatingItems = Array.from(topSkillsBySkill.values())
-    .sort((a, b) => bestRating(b) - bestRating(a))
+    .sort((a, b) => b.evidenceConfidence - a.evidenceConfidence)
     .slice(0, 7)
     .map((s) => ({
       key: s.id,
       label: s.skill,
-      value: bestRating(s),
-      displayValue: `${bestRating(s)}%`,
+      value: s.evidenceConfidence,
+      displayValue: `${s.evidenceConfidence}%`,
       meta:
-        s.companyRating !== undefined ? (
-          <span className="rounded-full bg-verified-100 px-1.5 py-0.5 text-[10px] font-semibold text-verified-600">Company Rated</span>
+        s.status === "Verified" ? (
+          <span className="rounded-full bg-verified-100 px-1.5 py-0.5 text-[10px] font-semibold text-verified-600">University Verified</span>
         ) : undefined,
     }))
 
-  const skillLevelItems = Array.from(topSkillsBySkill.values()).map((s) => ({ key: s.id, skill: s.skill, rating: bestRating(s) }))
+  const skillLevelItems = Array.from(topSkillsBySkill.values()).map((s) => ({ key: s.id, skill: s.skill, rating: s.evidenceConfidence, suggestedLevel: s.suggestedLevel }))
 
   const currentProject = myProjects.find((p) => p.status === "In Progress")
 
   const activity = [
     ...myProjects.map((p) => ({ at: p.startedAt, text: `Started project "${p.title}"` })),
-    ...mySignals.map((s) => ({ at: s.analyzedAt, text: `WSL rated your "${s.skill}" evidence: ${s.aiRating}%` })),
-    ...mySignals.filter((s) => s.companyRating !== undefined).map((s) => ({ at: s.companyRatedAt!, text: `Company rated your "${s.skill}" work: ${s.companyRating}%` })),
+    ...mySignals.map((s) => ({ at: s.analyzedAt, text: `WSL found an evidence signal for your "${s.skill}" work: ${s.evidenceConfidence}% confidence` })),
+    ...mySignals.filter((s) => s.status === "Verified" && s.verifiedAt).map((s) => ({ at: s.verifiedAt!, text: `Your "${s.skill}" skill signal was verified` })),
   ]
     .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
     .slice(0, 6)
@@ -112,16 +110,16 @@ export default function StudentDashboard() {
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         <StatTile label="Active Projects" value={myProjects.filter((p) => p.status === "In Progress").length} />
-        <StatTile label="Skills Rated" value={mySignals.length} />
-        <StatTile label="Avg. AI Rating" value={mySignals.length ? `${avgAiRating}%` : "—"} />
-        <StatTile label="Company Ratings" value={companyRatedCount} />
+        <StatTile label="Skill Signals" value={mySignals.length} />
+        <StatTile label="Avg. Evidence Confidence" value={mySignals.length ? `${avgConfidence}%` : "—"} />
+        <StatTile label="Verified Skills" value={verifiedCount} />
         <StatTile label="Evidence Submitted" value={myEvidence.length} />
         <StatTile label="Opportunities Matched" value={matchedOpportunities.length} />
       </div>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
         <div className="rounded-2xl border border-ink-200 bg-surface p-5">
-          <h2 className="mb-4 font-semibold text-ink-900">Skill Ratings</h2>
+          <h2 className="mb-4 font-semibold text-ink-900">Skill Signals</h2>
           <BarList items={skillRatingItems} max={100} emptyMessage="No skill signals yet — submit evidence to start building your profile." />
         </div>
         <div className="rounded-2xl border border-ink-200 bg-surface p-5">
@@ -168,7 +166,7 @@ export default function StudentDashboard() {
                     </div>
                     <div className="mt-3 flex flex-wrap gap-1.5">
                       {projectSignals.map((s) => (
-                        <SkillChip key={s.id} skill={s.skill} rating={s.companyRating ?? s.aiRating} size="sm" />
+                        <SkillChip key={s.id} skill={s.skill} rating={s.evidenceConfidence} size="sm" />
                       ))}
                     </div>
                     <p className="mt-3 text-xs text-ink-400">{myEv.length} evidence item{myEv.length === 1 ? "" : "s"} submitted</p>
@@ -179,19 +177,19 @@ export default function StudentDashboard() {
           )}
 
           <div className="mt-8 mb-3 flex items-center justify-between">
-            <h2 className="font-semibold text-ink-900">Latest AI Feedback</h2>
+            <h2 className="font-semibold text-ink-900">Latest AI Evidence Signals</h2>
           </div>
-          {latestAiFeedback.length === 0 ? (
-            <EmptyState title="No AI feedback yet" description="Submit evidence on a project to get WSL's automatic rating — it appears here right away." />
+          {latestSignals.length === 0 ? (
+            <EmptyState title="No AI evidence signals yet" description="Submit evidence on a project to get WSL's AI evidence analysis — it appears here right away." />
           ) : (
             <div className="grid gap-3 sm:grid-cols-2">
-              {latestAiFeedback.map((s) => (
+              {latestSignals.map((s) => (
                 <div key={s.id} className="rounded-2xl border border-ink-200 bg-surface p-4">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-semibold text-ink-900">{s.skill}</span>
-                    <span className="text-sm font-bold text-teal-600">{s.aiRating}%</span>
+                    <span className="text-sm font-bold text-teal-600">{s.evidenceConfidence}%</span>
                   </div>
-                  <p className="mt-1 text-xs text-ink-400">Rated {formatRelative(s.analyzedAt)}</p>
+                  <p className="mt-1 text-xs text-ink-400">Analyzed {formatRelative(s.analyzedAt)}</p>
                 </div>
               ))}
             </div>
