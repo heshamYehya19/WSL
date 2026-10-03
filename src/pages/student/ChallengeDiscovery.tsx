@@ -4,7 +4,7 @@ import { useDemoUser } from "../../state/demoUser"
 import { useStore } from "../../state/store"
 import { EmptyState } from "../../components/ui/EmptyState"
 import { DeadlinePill, DifficultyBars, PageHero, Pills, SearchInput } from "../../components/ui/ListKit"
-import { assignmentFor, canStudentSee, studentSignals } from "../../lib/selectors"
+import { assignmentFor, canStudentSee, studentProjects, studentSignals } from "../../lib/selectors"
 import { daysUntil } from "../../lib/format"
 
 type Sort = "match" | "deadline"
@@ -18,13 +18,20 @@ export default function ChallengeDiscovery() {
   const [level, setLevel] = useState<Level>("All")
   const [sort, setSort] = useState<Sort>("match")
 
-  const mine = useMemo(() => (student ? challenges.filter((c) => canStudentSee(c, student)) : []), [challenges, student])
+  // A challenge the student has already started lives on as a project under My Projects, so it leaves this list.
+  const startedIds = useMemo(
+    () => new Set(student ? studentProjects(projects, student.id).map((p) => p.challengeId) : []),
+    [projects, student],
+  )
+  const mine = useMemo(
+    () => (student ? challenges.filter((c) => canStudentSee(c, student) && !startedIds.has(c.id)) : []),
+    [challenges, student, startedIds],
+  )
   if (!student) return null
 
   // Skills this student has already proven anywhere, with their best score.
   const proven = new Map<string, number>()
   for (const s of studentSignals(skillSignals, student.id)) proven.set(s.skill, Math.max(proven.get(s.skill) ?? 0, s.evidenceConfidence))
-  const startedIds = new Set(projects.filter((p) => p.studentId === student.id).map((p) => p.challengeId))
 
   const matchOf = (skills: string[]) => (skills.length ? Math.round((skills.filter((s) => proven.has(s)).length / skills.length) * 100) : 0)
 
@@ -87,14 +94,29 @@ export default function ChallengeDiscovery() {
         </div>
       </div>
 
-      {visible.length === 0 ? (
+      {mine.length === 0 ? (
+        <EmptyState
+          title={startedIds.size ? "You've started every challenge assigned to you" : "No challenges assigned yet"}
+          description={
+            startedIds.size
+              ? "Keep working on them in My Projects — new challenges will appear here when your university assigns them."
+              : "Challenges will appear here once your university assigns them."
+          }
+          action={
+            startedIds.size ? (
+              <Link to="/student/projects" className="rounded-full bg-night px-4 py-2 text-sm font-semibold text-white hover:bg-teal-600">
+                Go to My Projects
+              </Link>
+            ) : undefined
+          }
+        />
+      ) : visible.length === 0 ? (
         <EmptyState title="No challenges match" description="Try a different search or clear a filter." />
       ) : (
         <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
           {visible.map((c, i) => {
             const org = getOrg(c.organizationId)
             const match = matchOf(c.requiredSkills)
-            const started = startedIds.has(c.id)
             const program = assignmentFor(c, student.universityId)?.program
             return (
               <Link
@@ -113,7 +135,6 @@ export default function ChallengeDiscovery() {
                     {topMatchId === c.id && (
                       <span className="rounded-full bg-gradient-to-r from-teal-500 to-teal-400 px-2 py-0.5 text-[10px] font-bold text-ink-950 shadow-sm">★ Best match</span>
                     )}
-                    {started && <span className="rounded-full bg-verified-100 px-2 py-0.5 text-[10px] font-bold text-verified-600">✓ Started</span>}
                     <DeadlinePill days={daysUntil(c.deadline)} />
                   </div>
                 </div>
