@@ -1,5 +1,10 @@
 import { Link } from "react-router-dom"
 import { Wordmark } from "../ui/Wordmark"
+import { LiveUrlQr } from "../ui/LiveUrlQr"
+import { parseLiveUrl } from "../../lib/liveUrl"
+
+// Set VITE_PUBLIC_URL when building the deployed app to show a QR code for it here.
+const LIVE_URL = parseLiveUrl(import.meta.env.VITE_PUBLIC_URL)
 
 export function Footer() {
   return (
@@ -12,6 +17,11 @@ export function Footer() {
               WSL is the evidence infrastructure connecting universities, students, and organizations —
               turning real-world learning into verified, demonstrated skill.
             </p>
+            {LIVE_URL && (
+              <div className="mt-4">
+                <LiveUrlQr url={LIVE_URL} />
+              </div>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-8 sm:grid-cols-3">
             <div>

@@ -12,6 +12,8 @@ by companies looking for demonstrated capability, not claimed skills.
 
 > The project isn't the product. The evidence infrastructure is.
 
+**Live demo:** _not deployed yet — add the URL here once it's live (see [Deploying on Replit](#deploying-on-replit))._
+
 ## Running locally
 
 Requires **Node.js 22.18+** (uses the built-in `node:sqlite` module — no database server to install).
@@ -30,6 +32,42 @@ Before a demo, open `/api/health` to check which model is configured and whether
 The SQLite database lives at `data/wsl.db` (git-ignored). It is created and seeded automatically
 on first run; set `WSL_DB_PATH` to use a different file. Use **Demo Access** (or `/login`) to
 pick an account — no passwords are required in this MVP.
+
+## Deploying on Replit
+
+The repository includes a [`.replit`](.replit) file, so it can be imported and deployed as is.
+
+1. **Import** the GitHub repository into Replit (*Create Repl → Import from GitHub*).
+2. **Node.js 22.18 or newer.** WSL runs its TypeScript server directly and uses the built-in
+   `node:sqlite`, both of which need 22.18+. `.replit` asks for the `nodejs-22` module; run
+   `node --version` in the Shell, and if it's older than 22.18, switch `.replit` to a newer Node module.
+3. **API key as a Secret.** Add `GROQ_API_KEY` in Replit's *Secrets* tool; it reaches the server as
+   an environment variable. Never put a key in a file in the repository — `.env` is git-ignored and
+   is only for local development.
+4. **A persistent disk for the database.** All data lives in one SQLite file (`WSL_DB_PATH`, default
+   `data/wsl.db`). Deploy as a **Reserved VM** — a single always-on instance (already set in `.replit`)
+   — not Autoscale, where each instance would get its own copy of the database. Point `WSL_DB_PATH` at
+   storage that survives restarts and redeploys. If the file is ever lost, WSL recreates and re-seeds
+   the demo database on the next start, so the demo keeps working, but anything created since is gone;
+   don't redeploy during judging.
+5. **Demo mode.** `WSL_DEMO_MODE` is on unless set to `false`. In demo mode anyone can reset the
+   database from the account menu — useful between judges. Turning it off only disables the reset; it
+   doesn't add authentication (see the limitations below).
+6. **Build and start.** Build with `npm ci && npm run build`, start with `npm start`, which serves the
+   built app and the API on `$PORT` (default 3000, mapped to port 80 in `.replit`).
+7. **Before judging:** open `/api/health` and check `keyWorks` is `true`; run `npm run db:grade-seed`
+   with your key and commit `server/ml/seed-grades.json` so the tour shows model-graded results
+   without spending quota; then reset the demo.
+8. **Once it's live:** put the URL at the top of this README, and add a `VITE_PUBLIC_URL` Secret with
+   the same URL before building — the site footer then shows a QR code that opens the live demo.
+
+| Environment variable | Purpose |
+|---|---|
+| `GROQ_API_KEY` | The grading model's key (Secret). See the AI section for the other model settings. |
+| `WSL_DB_PATH` | Path of the SQLite file; put it on persistent storage. Default `data/wsl.db`. |
+| `WSL_DEMO_MODE` | `false` disables the database reset. On by default. |
+| `PORT` | Port the server listens on. Default `3000`. |
+| `VITE_PUBLIC_URL` | The live URL, at build time; shows a QR code for it in the footer. |
 
 ## Data
 
