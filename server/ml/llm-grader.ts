@@ -61,6 +61,30 @@ export function configuredProvider(): Provider | null {
   return groq ?? gemini
 }
 
+const HEALTH_TIMEOUT_MS = 8_000
+
+/**
+ * A cheap, real check that the configured key actually works — lists the provider's
+ * models (no grading tokens spent) with a short timeout. For GET /api/health, so the
+ * team can confirm the key is live before judging without spending a grading call.
+ */
+export async function checkProviderHealth(provider: Provider): Promise<{ ok: boolean; message?: string }> {
+  try {
+    const res =
+      provider.id === "groq"
+        ? await llmDeps.fetch("https://api.groq.com/openai/v1/models", {
+            headers: { Authorization: `Bearer ${provider.apiKey}` },
+            signal: AbortSignal.timeout(HEALTH_TIMEOUT_MS),
+          })
+        : await llmDeps.fetch(`${GEMINI_API}/models?key=${encodeURIComponent(provider.apiKey)}`, { signal: AbortSignal.timeout(HEALTH_TIMEOUT_MS) })
+    if (res.ok) return { ok: true }
+    const body = (await res.json().catch(() => null)) as { error?: { message?: string } } | null
+    return { ok: false, message: `HTTP ${res.status}${body?.error?.message ? `: ${body.error.message.slice(0, 200)}` : ""}` }
+  } catch (err) {
+    return { ok: false, message: err instanceof Error ? err.message : String(err) }
+  }
+}
+
 const SYSTEM_INSTRUCTION = `You are WSL's evidence grader. WSL turns students' real project work into a verified skill record that companies trust, so a wrong high score is far worse than a cautious low one.
 
 For each required skill, decide how strongly the student's OWN CONTENT proves it, on 0-100:

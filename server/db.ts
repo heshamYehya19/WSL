@@ -63,6 +63,10 @@ const SKILL_SIGNALS_COLUMNS = `
   -- claim any tier at all. See gateByCriteria in server/ml/analyze.ts.
   suggested_level  TEXT NOT NULL DEFAULT 'Foundational'
                      CHECK (suggested_level IN ('Insufficient', 'Foundational', 'Intermediate', 'Advanced', 'Demonstrated')),
+  -- Whether this signal's current numbers came from a live model call or the offline
+  -- scorer. Protects a model-graded result from ever being silently overwritten by a
+  -- weaker offline estimate when a later re-analysis can't reach the model.
+  graded_source    TEXT NOT NULL DEFAULT 'offline' CHECK (graded_source IN ('model', 'offline')),
   verified_by      TEXT REFERENCES staff(id),
   verified_at      TEXT,
   reviewer_notes   TEXT,
@@ -337,7 +341,7 @@ export function getDb(): DatabaseSync {
   return db
 }
 
-const SCHEMA_VERSION = 11
+const SCHEMA_VERSION = 12
 
 /**
  * Brings databases created by older versions up to date without losing their data.
@@ -378,6 +382,10 @@ const SCHEMA_VERSION = 11
  *     new challenge is canonicalized going forward at the point it's created.
  * v11: projects gained `graded_evidence_hash`/`graded_model`/`graded_at`, so re-analyzing
  *     unchanged evidence can skip the model call and return the existing result instantly.
+ * v12: skill_signals gained `graded_source` ('model' or 'offline'), so a model outage
+ *     during re-analysis can never silently downgrade an already model-graded signal to
+ *     a weaker offline estimate — only a skill with no prior model-graded result falls
+ *     back to the offline scorer, clearly labeled.
  */
 function migrate(db: DatabaseSync) {
   const { user_version: version } = db.prepare("PRAGMA user_version").get() as { user_version: number }
@@ -531,6 +539,14 @@ function migrate(db: DatabaseSync) {
       if (!projectColumns.includes("graded_evidence_hash")) db.exec("ALTER TABLE projects ADD COLUMN graded_evidence_hash TEXT")
       if (!projectColumns.includes("graded_model")) db.exec("ALTER TABLE projects ADD COLUMN graded_model TEXT")
       if (!projectColumns.includes("graded_at")) db.exec("ALTER TABLE projects ADD COLUMN graded_at TEXT")
+    })
+  }
+  if (version < 12) {
+    const signalColumns = (db.prepare("PRAGMA table_info(skill_signals)").all() as { name: string }[]).map((c) => c.name)
+    transaction(db, () => {
+      if (!signalColumns.includes("graded_source")) {
+        db.exec("ALTER TABLE skill_signals ADD COLUMN graded_source TEXT NOT NULL DEFAULT 'offline' CHECK (graded_source IN ('model', 'offline'))")
+      }
     })
   }
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`)

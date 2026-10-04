@@ -3,6 +3,7 @@ import type { IncomingMessage, ServerResponse } from "node:http"
 import type { DatabaseSync } from "node:sqlite"
 import { getDb, resetDatabase, transaction } from "./db.ts"
 import { analyzeEvidence, canonicalSkillName, checkRelevance, currentGradingModel, hashEvidenceSet } from "./ai.ts"
+import { checkProviderHealth, configuredProvider } from "./ml/llm-grader.ts"
 import type { ChallengeContext, EvidenceQuote, SimulatedRating, SkillCriterion } from "./ai.ts"
 import { parseGithubLink, readGithubRepo } from "./github.ts"
 import type { RepoSnapshot } from "./github.ts"
@@ -361,6 +362,7 @@ function buildSnapshot(db: DatabaseSync, actor: Actor): Snapshot {
       aiNote: String(r.ai_note ?? ""),
       aiQuotes: parseQuotes(r.ai_quotes),
       criteria: parseCriteria(r.ai_criteria),
+      gradedSource: r.graded_source as SkillSignal["gradedSource"],
       status: r.status as SkillSignalStatus,
       ...(r.verified_by ? { verifiedBy: String(r.verified_by), verifiedAt: String(r.verified_at) } : {}),
       ...(r.reviewer_notes ? { reviewerNotes: String(r.reviewer_notes) } : {}),
@@ -894,43 +896,63 @@ const routes: { method: string; pattern: RegExp; prepare?: (actor: Actor, body: 
       // required skill against ALL current evidence and overwrites prior results,
       // rather than only ever analyzing a skill once — otherwise evidence submitted
       // after the first analysis could never be picked up at all.
-      const results = await analyzeEvidence(skills, ev, challengeContextFor(db, p.challengeId))
-      return { unchanged: false as const, model, hash, results }
+      const run = await analyzeEvidence(skills, ev, challengeContextFor(db, p.challengeId))
+      return { unchanged: false as const, model, hash, ...run }
     },
-    handler: (db, actor, [id], _body, prepared: { unchanged: true; model: string; hash: string; gradedAt: string } | { unchanged: false; model: string; hash: string; results: SimulatedRating[] }) => {
+    handler: (
+      db,
+      actor,
+      [id],
+      _body,
+      prepared: { unchanged: true; model: string; hash: string; gradedAt: string } | { unchanged: false; model: string; hash: string; results: SimulatedRating[]; failed: boolean },
+    ) => {
       const { p, student } = requireEvidenceAccess(db, actor, id, "request analysis for")
       if (prepared.unchanged) return { unchanged: true, model: prepared.model, gradedAt: prepared.gradedAt }
 
       const now = nowIso()
       for (const r of prepared.results) {
-        const existing = one(db, "SELECT id, status FROM skill_signals WHERE project_id = ? AND skill = ?", id, r.skill)
+        const existing = one(db, "SELECT id, status, graded_source FROM skill_signals WHERE project_id = ? AND skill = ?", id, r.skill)
         // A mentor's decision is durable — new evidence never silently re-scores a
         // skill the mentor already verified out from under them.
         if (existing && existing.status === "Verified") continue
+        // The model failing this run must never downgrade a skill it already graded
+        // before — keep that result untouched rather than overwrite it with a weaker
+        // offline estimate. A skill with no prior model-graded result still gets the
+        // offline estimate, clearly labeled by graded_source for the UI.
+        if (existing && existing.graded_source === "model" && r.source === "offline" && prepared.failed) continue
         const sigId = existing ? String(existing.id) : newId("sig")
         if (existing) {
           exec(db, "DELETE FROM skill_signal_evidence WHERE signal_id = ?", sigId)
           exec(
             db,
-            "UPDATE skill_signals SET evidence_confidence = ?, ai_note = ?, ai_quotes = ?, ai_criteria = ?, suggested_level = ?, status = 'Pending Verification', analyzed_at = ? WHERE id = ?",
-            r.rating, r.note, JSON.stringify(r.quotes), JSON.stringify(r.criteria), r.suggestedLevel, now, sigId,
+            "UPDATE skill_signals SET evidence_confidence = ?, ai_note = ?, ai_quotes = ?, ai_criteria = ?, suggested_level = ?, graded_source = ?, status = 'Pending Verification', analyzed_at = ? WHERE id = ?",
+            r.rating, r.note, JSON.stringify(r.quotes), JSON.stringify(r.criteria), r.suggestedLevel, r.source, now, sigId,
           )
         } else {
           exec(
             db,
-            "INSERT INTO skill_signals (id, project_id, student_id, skill, evidence_confidence, ai_note, ai_quotes, ai_criteria, suggested_level, status, analyzed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending Verification', ?)",
-            sigId, id, student.id, r.skill, r.rating, r.note, JSON.stringify(r.quotes), JSON.stringify(r.criteria), r.suggestedLevel, now,
+            "INSERT INTO skill_signals (id, project_id, student_id, skill, evidence_confidence, ai_note, ai_quotes, ai_criteria, suggested_level, graded_source, status, analyzed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending Verification', ?)",
+            sigId, id, student.id, r.skill, r.rating, r.note, JSON.stringify(r.quotes), JSON.stringify(r.criteria), r.suggestedLevel, r.source, now,
           )
         }
         for (const evId of r.evidenceIds) exec(db, "INSERT INTO skill_signal_evidence (signal_id, evidence_id) VALUES (?, ?)", sigId, evId)
       }
-      exec(db, "UPDATE projects SET graded_evidence_hash = ?, graded_model = ?, graded_at = ? WHERE id = ?", prepared.hash, prepared.model, now, id)
+      // A failed model call is not a stable, cacheable outcome — leave the project's
+      // cache fields alone so the next re-analysis attempt can reach the model again
+      // instead of being short-circuited as "unchanged."
+      if (!prepared.failed) {
+        exec(db, "UPDATE projects SET graded_evidence_hash = ?, graded_model = ?, graded_at = ? WHERE id = ?", prepared.hash, prepared.model, now, id)
+      }
       if (p.status === "In Progress") {
         exec(db, "UPDATE projects SET status = 'Evidence Under Review' WHERE id = ?", id)
         notify(db, "university", p.universityId, "Evidence ready for review", `WSL analyzed ${p.studentName}'s evidence for “${p.challengeTitle}”.`, `/university/projects/${id}`)
       }
       advanceIfFurther(db, p.challengeId, "Evidence Under Review", `WSL analyzed ${p.studentName}'s submitted evidence automatically.`)
-      return { unchanged: false, model: prepared.model, gradedAt: now }
+      if (prepared.failed) {
+        const row = one(db, "SELECT graded_model, graded_at FROM projects WHERE id = ?", id)!
+        return { unchanged: false, failed: true, model: row.graded_model ?? null, gradedAt: row.graded_at ?? null }
+      }
+      return { unchanged: false, failed: false, model: prepared.model, gradedAt: now }
     },
   },
   {
@@ -1170,6 +1192,13 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
   const url = new URL(req.url ?? "/", "http://localhost")
   if (!url.pathname.startsWith("/api/")) return false
   const path = url.pathname.slice(4)
+
+  if (req.method === "GET" && path === "/health") {
+    const provider = configuredProvider()
+    const health = provider ? await checkProviderHealth(provider) : { ok: false, message: "No GROQ_API_KEY or GEMINI_API_KEY configured — using the offline scorer." }
+    send(res, 200, { provider: provider?.id ?? null, model: provider?.model ?? "offline", keyWorks: health.ok, message: health.message })
+    return true
+  }
 
   try {
     const db = getDb()

@@ -217,6 +217,10 @@ export interface SkillSignal {
   aiQuotes: EvidenceQuote[]
   /** Named rubric criteria this signal was checked against, met ones first. */
   criteria: SkillCriterion[]
+  /** "model" when a live grader produced this result; "offline" when the deterministic
+   * fallback did — e.g. no key configured, or a model outage that couldn't be retried
+   * because this skill had no prior model-graded result to protect. */
+  gradedSource: "model" | "offline"
   status: SkillSignalStatus
   /** Set once a mentor verifies/rejects/requests more evidence — resolves to a staff id. */
   verifiedBy?: string

@@ -46,24 +46,33 @@ export function hashEvidenceSet(skills: string[], evidence: EvidenceLike[], mode
   return createHash("sha256").update(JSON.stringify(canonical)).digest("hex")
 }
 
-export async function analyzeEvidence(skills: string[], evidence: EvidenceLike[], challenge: ChallengeContext): Promise<SimulatedRating[]> {
-  if (evidence.length === 0) return []
+export interface AnalysisRun {
+  results: SimulatedRating[]
+  /** True only when a provider was configured and the call itself failed (timeout, 429,
+   * bad response). False for a clean model success or a deliberate no-provider-configured
+   * run — both are stable outcomes safe to cache; a failure is not, so a retry can reach
+   * the model again instead of being short-circuited by the evidence-hash cache. */
+  failed: boolean
+}
+
+export async function analyzeEvidence(skills: string[], evidence: EvidenceLike[], challenge: ChallengeContext): Promise<AnalysisRun> {
+  if (evidence.length === 0) return { results: [], failed: false }
   const offline = () => simulateAIReview(skills, evidence, challenge)
 
   const provider = configuredProvider()
-  if (!provider) return offline()
+  if (!provider) return { results: offline(), failed: false }
 
   const readable = evidence.filter((e) => analyzableContent(e).length > 0)
-  if (readable.length === 0) return offline()
+  if (readable.length === 0) return { results: offline(), failed: false }
 
   try {
     const graded = await gradeWithModel(provider, skills, readable, challenge)
-    if (graded.length === skills.length) return graded
+    if (graded.length === skills.length) return { results: graded, failed: false }
     // Fill any skill the model skipped with the offline score rather than leaving a gap.
     const fallback = offline()
-    return skills.map((skill, i) => graded.find((g) => g.skill === skill) ?? fallback[i])
+    return { results: skills.map((skill, i) => graded.find((g) => g.skill === skill) ?? fallback[i]), failed: false }
   } catch (err) {
     console.warn(`[wsl-ai] ${provider.label} grading failed, using the offline check:`, err instanceof Error ? err.message : err)
-    return offline()
+    return { results: offline(), failed: true }
   }
 }

@@ -8,11 +8,20 @@ import { createServer } from "node:http"
 // static ones. Each test FILE gets its own fresh module registry under vitest's
 // default per-file isolation, so each file gets its own temp database and its
 // own in-memory getDb() singleton — no cross-file contamination.
-process.env.WSL_DB_PATH = join(mkdtempSync(join(tmpdir(), "wsl-test-")), "wsl.db")
+const testDir = mkdtempSync(join(tmpdir(), "wsl-test-"))
+process.env.WSL_DB_PATH = join(testDir, "wsl.db")
 process.env.WSL_DEMO_MODE ??= "true"
+// Seed from the offline scorer, not the committed pre-graded file, so test
+// expectations never shift when someone regenerates server/ml/seed-grades.json.
+process.env.WSL_SEED_GRADES_PATH = join(testDir, "no-seed-grades.json")
 
 export const { resetDatabase } = await import("../db.ts")
 export const { handleApi } = await import("../api.ts")
+
+// llm-grader.ts loads a developer's real .env on import. Tests must never reach a
+// live model (slow, flaky, and it spends the real daily quota), so drop any keys it
+// loaded — a test that needs a provider sets a fake key and mocks llmDeps.fetch.
+for (const k of ["GROQ_API_KEY", "GROQ_MODEL", "GEMINI_API_KEY", "GEMINI_MODEL", "WSL_AI_PROVIDER"]) delete process.env[k]
 
 export interface TestResponse {
   status: number

@@ -1,5 +1,9 @@
+import { readFileSync } from "node:fs"
+import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
 import type { DatabaseSync } from "node:sqlite"
-import { simulateAIReview } from "./ai.ts"
+import { hashEvidenceSet, simulateAIReview } from "./ai.ts"
+import type { SimulatedRating } from "./ai.ts"
 
 // Initial content for the WSL database. Universities and companies are real
 // Jordanian institutions; every person, challenge, submission, and rating is
@@ -7,6 +11,30 @@ import { simulateAIReview } from "./ai.ts"
 // deadlines and "x days ago" labels always read naturally.
 
 const SCREEN_NOTE = "WSL automatically screened this challenge for private or confidential data — none found."
+
+// Pre-graded by the live model (npm run db:grade-seed, server/ml/seed-grades.json),
+// so the seeded demo never needs a model call — and never depends on quota — at
+// `npm run db:reset` time. A project only uses its cached entry when the hash still
+// matches its current evidence/skills; otherwise it falls back to the same offline
+// scorer a fresh clone with no key has always used, so this is purely additive.
+interface SeedGradeEntry { model: string; hash: string; results: SimulatedRating[] }
+let seedGrades: Record<string, SeedGradeEntry> | null | undefined
+function loadSeedGrades(): Record<string, SeedGradeEntry> {
+  if (seedGrades === undefined) {
+    try {
+      const path = process.env.WSL_SEED_GRADES_PATH ?? join(dirname(fileURLToPath(import.meta.url)), "ml", "seed-grades.json")
+      seedGrades = JSON.parse(readFileSync(path, "utf8")) as Record<string, SeedGradeEntry>
+    } catch {
+      seedGrades = null
+    }
+  }
+  return seedGrades ?? {}
+}
+
+/** Forgets the loaded seed-grades file so the next seed re-reads it (tests only). */
+export function resetSeedGradesCache(): void {
+  seedGrades = undefined
+}
 
 /** Where each seeded piece of evidence lives. Also used to upgrade databases seeded with older links. */
 export const EVIDENCE_LINKS: Record<string, string> = {
@@ -1371,23 +1399,35 @@ module polls /at-risk daily to flag parts to stock ahead of a likely failure.
       )
     }
     if (p.signals.length > 0) {
-      const results = simulateAIReview(
-        p.signals.map((s) => s.skill),
-        p.evidence.map((e) => ({ id: e.id, type: e.type, title: e.title, description: e.description, content: e.content })),
-        challengeContextOf(p.challenge),
-      )
+      const skills = p.signals.map((s) => s.skill)
+      const evidenceLike = p.evidence.map((e) => ({ id: e.id, type: e.type, title: e.title, description: e.description, content: e.content }))
+      const cached = loadSeedGrades()[p.id]
+      const cacheValid =
+        !!cached &&
+        skills.every((sk) => cached.results.some((r) => r.skill === sk)) &&
+        cached.hash === hashEvidenceSet(skills, evidenceLike, cached.model)
+      const gradedModel = cacheValid ? cached!.model : "offline"
+      const results = cacheValid ? cached!.results : simulateAIReview(skills, evidenceLike, challengeContextOf(p.challenge))
       p.signals.forEach((s, i) => {
-        const r = results[i]
+        // By name, not position: a pre-graded file may list skills in a different order.
+        const r = results.find((x) => x.skill === s.skill) ?? results[i]
         const sigId = `sig-${p.id}-${i + 1}`
         const status = s.status ?? "Pending Verification"
         run(
-          `INSERT INTO skill_signals (id, project_id, student_id, skill, evidence_confidence, ai_note, ai_quotes, ai_criteria, suggested_level, status, verified_by, verified_at, reviewer_notes, analyzed_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          sigId, p.id, p.student, s.skill, r.rating, r.note, JSON.stringify(r.quotes), JSON.stringify(r.criteria), r.suggestedLevel, status,
+          `INSERT INTO skill_signals (id, project_id, student_id, skill, evidence_confidence, ai_note, ai_quotes, ai_criteria, suggested_level, graded_source, status, verified_by, verified_at, reviewer_notes, analyzed_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          sigId, p.id, p.student, s.skill, r.rating, r.note, JSON.stringify(r.quotes), JSON.stringify(r.criteria), r.suggestedLevel, r.source, status,
           s.verifiedBy ?? null, s.verifiedBy && s.verifiedDay !== undefined ? d(s.verifiedDay) : null, s.reviewerNotes ?? null, d(p.analyzed!),
         )
         for (const ev of r.evidenceIds) run("INSERT INTO skill_signal_evidence (signal_id, evidence_id) VALUES (?, ?)", sigId, ev)
       })
+      run(
+        "UPDATE projects SET graded_evidence_hash = ?, graded_model = ?, graded_at = ? WHERE id = ?",
+        hashEvidenceSet(skills, evidenceLike, gradedModel),
+        gradedModel,
+        d(p.analyzed!),
+        p.id,
+      )
     }
     if (p.companyFeedback) {
       const cf = p.companyFeedback

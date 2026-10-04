@@ -310,6 +310,21 @@ export default function ProjectWorkspace() {
                       Evidence Strength: <span className="font-semibold">{evidenceStrengthFor(s.evidenceConfidence)}</span>
                     </p>
                     <div className="mt-1"><ConfidenceMeter value={s.evidenceConfidence} label="Evidence confidence" /></div>
+                    {s.gradedSource === "offline" && (
+                      <div className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-amber-50 px-2.5 py-1.5">
+                        <p className="text-[11px] font-medium text-amber-700">Estimated offline, not graded by the AI model</p>
+                        {!locked && !allSignalsVerified && (
+                          <button
+                            type="button"
+                            onClick={handleAnalyze}
+                            disabled={analyzing}
+                            className="shrink-0 text-[11px] font-semibold text-amber-800 underline hover:text-amber-900 disabled:opacity-50"
+                          >
+                            Retry
+                          </button>
+                        )}
+                      </div>
+                    )}
                     {s.criteria.length > 0 && (
                       <div className="mt-3">
                         <CriteriaChecklist criteria={s.criteria} />
