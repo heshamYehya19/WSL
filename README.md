@@ -20,8 +20,12 @@ Requires **Node.js 22.18+** (uses the built-in `node:sqlite` module — no datab
 npm install
 npm run dev          # app + API on the Vite dev server
 npm run db:reset     # wipe the database and restore the demo data
+npm test             # API test suite (never calls a live model or GitHub)
+npm run lint
 npm run build && npm start   # production: serves dist/ + API on http://localhost:3000
 ```
+
+Before a demo, open `/api/health` to check which model is configured and whether its key works.
 
 The SQLite database lives at `data/wsl.db` (git-ignored). It is created and seeded automatically
 on first run; set `WSL_DB_PATH` to use a different file. Use **Demo Access** (or `/login`) to
@@ -68,9 +72,21 @@ challenge requires:
 - **Only real content counts.** An evidence title or description is the student's own claim and
   never raises a score. Public GitHub links are read automatically (the README and the top few
   source files, `server/github.ts`); other links are left for the mentor.
-- **Offline fallback.** Without a key, or on a failed call, a stricter local scorer
-  (`server/ml/analyze.ts`) looks for concrete, skill-specific signs and quotes the lines it found. It
-  never suggests "Demonstrated". The seeded demo data is scored with it.
+- **Repeatable results.** Each analysis is keyed by a hash of the exact evidence content, the
+  required skills and the model. Re-analyzing unchanged evidence returns the stored result instantly
+  ("No new evidence since the last analysis.") instead of calling the model again, and the evidence
+  page shows which model produced the result and when. Calls use temperature 0.
+- **Quota and outages.** If the model fails (a 429 from the free tier's daily limit, a timeout), a
+  skill it graded before keeps that result — it is never overwritten with offline numbers. A failed
+  run isn't cached, so *Retry* reaches the model again.
+- **Offline fallback.** Only a skill with no model result yet (no key configured, or the model was
+  unavailable on its first analysis) is scored by a stricter local scorer (`server/ml/analyze.ts`),
+  which looks for concrete, skill-specific signs and quotes the lines it found. It never suggests
+  "Demonstrated", and it's labeled "Estimated offline, not graded by the AI model".
+- **Pre-graded demo data.** `npm run db:grade-seed` grades the seeded projects with the live model
+  once and stores the result in `server/ml/seed-grades.json`. Seeding uses a stored result while its
+  evidence still matches, so the tour shows model-graded results without any live call. Projects
+  without a stored result are seeded with the offline scorer.
 
 Student evidence is not run through the personal-data screen below — that screen exists to catch a
 company accidentally posting sensitive data in a public challenge brief, not to gate a student's own
@@ -118,8 +134,62 @@ either goes back to edit or confirms it's OK to share. A confirmed challenge car
 universities and students, and its history records what was shared. A file WSL can't read (a
 scanned PDF, for example) is flagged the same way, because WSL can't vouch for what's in it.
 
+## Architecture
+
+![WSL architecture](public/architecture.svg)
+
+See [docs/architecture.md](docs/architecture.md) for each component and the main flows. The diagram
+is also available as [public/architecture.png](public/architecture.png) for slides; regenerate both
+with `npm run docs:architecture` after editing it.
+
 ## Stack
 
 - React + TypeScript + Vite, React Router, Tailwind CSS v4
 - Node.js API (`server/`) mounted into Vite in development, standalone in production
 - SQLite via `node:sqlite` — schema in `server/db.ts`, demo data in `server/seed.ts`
+
+## Testing and known limitations
+
+`npm test` runs the API suite (`server/test/`) against a real HTTP server and a throwaway SQLite
+database. It never reaches a live model or GitHub: provider keys from `.env` are cleared and every
+model or GitHub response a test needs is mocked. It covers, among others:
+
+- ownership and visibility (who can read and change what), per-skill verification and the project
+  status it rolls up to, and company feedback never changing a verification;
+- repeat analysis of unchanged evidence returning the identical cached result without a model call;
+- a model failure (429) leaving a previous model-graded result untouched, a retry reaching the model
+  again, and the offline fallback being labeled;
+- quotes and rubric criteria the model invents being dropped, and brief-copying evidence being
+  rejected or scored low;
+- invalid GitHub links, unreadable repositories, a challenge with no skills or learning outcomes, and
+  Arabic evidence (normalized, accepted when relevant, rejected when copied or unrelated);
+- `/api/health`, the pre-graded seed cache, and upgrading an older database.
+
+Things to try in the demo: press *Re-analyze* twice on the same project; submit a GitLab link as a
+GitHub repository; submit a challenge with no skills; paste the challenge brief back as evidence;
+submit evidence written in Arabic.
+
+**Known limitations — said plainly:**
+
+- **Demo auth.** The signed-in account is a client-supplied `X-WSL-Actor` header with no password,
+  session or signed token. Ownership checks are real, but anyone can claim any account. Not
+  production authentication.
+- **AI results are signals, not certificates.** A model can misjudge work, and an evidence-confidence
+  score measures how strongly the submitted work supports a skill, not the student's proficiency.
+  Only a university mentor's verification puts a skill on a student's record.
+- **Free-tier model quota.** Groq's free tier allows a fixed number of tokens per day (200,000 for
+  `openai/gpt-oss-120b` — on the order of 60–100 analyses). When it runs out, existing model results are kept, but new
+  projects only get offline estimates until the quota resets. New evidence is graded again by the
+  model, so borderline skills can still move between analyses even at temperature 0.
+- **The offline fallback is weaker.** It matches skill-specific patterns in the text; it can't judge
+  whether the code is correct or the analysis is sound, and it caps below "Demonstrated".
+- **Relevance check language coverage.** Word overlap works for English and Arabic. Evidence written
+  in a different script than the brief (Arabic work on an English brief) isn't judged at intake and is
+  left to the AI grader, and a translated copy of the brief isn't caught as copying.
+- **Other checks are heuristic.** The personal-data screen is pattern-based and can miss or
+  over-flag data; it screens company challenges, not student evidence. The GitHub reader only reads
+  public repositories, and only the README plus a few source files.
+- **Single-file database.** SQLite in one process, unencrypted on disk — fine for a demo, not for
+  scale or sensitive data.
+- **Seeded data is illustrative.** The universities and companies are real names, but every person,
+  challenge, submission, verification and piece of feedback is fictional and doesn't represent them.

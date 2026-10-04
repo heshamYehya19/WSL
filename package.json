@@ -9,6 +9,7 @@
     "start": "node server/index.ts",
     "db:reset": "node server/reset.ts",
     "db:grade-seed": "node scripts/grade-seed.ts",
+    "docs:architecture": "node scripts/render-architecture.ts",
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "vitest run"
