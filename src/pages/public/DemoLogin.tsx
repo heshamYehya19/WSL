@@ -3,6 +3,58 @@ import { useNavigate } from "react-router-dom"
 import { PageHeader } from "../../components/ui/PageHeader"
 import { useDemoUser } from "../../state/demoUser"
 import { useStore } from "../../state/store"
+import { useTour } from "../../state/tour"
+
+const FEATURED_STUDENT = "stu-aau-yazan"
+
+/** The account a first-time visitor should open: a full skill record, plus the guided tour of his story. */
+function StartHere({ onSignIn }: { onSignIn: () => void }) {
+  const { start } = useTour()
+  const { getStudent, getUniversity } = useStore()
+  const student = getStudent(FEATURED_STUDENT)
+  if (!student) return null
+  const uni = getUniversity(student.universityId)
+  return (
+    <div className="animate-fade-in-up relative mb-8 overflow-hidden rounded-3xl bg-night p-6 text-white sm:p-8">
+      <div className="bg-grid pointer-events-none absolute inset-0 opacity-50" />
+      <div className="pointer-events-none absolute -top-16 -right-16 h-48 w-48 rounded-full bg-teal-500/25 blur-3xl" />
+      <div className="relative flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+        <div className="flex min-w-0 items-start gap-4">
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-teal-400 to-teal-600 text-base font-bold text-ink-950">
+            {student.initials}
+          </span>
+          <div className="min-w-0">
+            <div className="text-xs font-semibold tracking-wide text-teal-300 uppercase">Start here</div>
+            <h2 className="mt-1 text-xl font-semibold">{student.name}</h2>
+            <p className="text-sm text-white/70">
+              {student.field} · {student.year} · {uni?.name}
+            </p>
+            <p className="mt-3 max-w-xl text-sm leading-relaxed text-white/80">
+              Follow one student through the whole loop: IRIS posts a challenge, his university assigns it, he submits real code, WSL's AI quotes the
+              lines that prove each skill, a mentor verifies them, and IRIS finds him by evidence instead of a CV. About three minutes.
+            </p>
+          </div>
+        </div>
+        <div className="flex shrink-0 flex-col gap-2 sm:flex-row md:flex-col">
+          <button
+            type="button"
+            onClick={start}
+            className="rounded-xl bg-teal-400 px-5 py-3 text-sm font-semibold text-ink-950 shadow-lg shadow-teal-500/20 transition-colors hover:bg-teal-300"
+          >
+            Take the tour →
+          </button>
+          <button
+            type="button"
+            onClick={onSignIn}
+            className="rounded-xl border border-white/25 px-5 py-3 text-sm font-semibold text-white transition-colors hover:border-teal-300"
+          >
+            Open {student.name.split(" ")[0]}'s skill record
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function RoleIcon({ d }: { d: string }) {
   return (
@@ -70,6 +122,8 @@ export default function DemoLogin() {
         title="Continue as..."
         subtitle="Choose your account. Each student, university, and company has its own data on WSL, and everything you do is saved to that account. You can switch accounts anytime from the top bar."
       />
+
+      <StartHere onSignIn={() => go("student", FEATURED_STUDENT, "/student/profile")} />
 
       <div className="grid gap-6 lg:grid-cols-3">
         <RoleCard

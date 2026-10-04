@@ -11,7 +11,7 @@ describe("/reset", () => {
     const res = await server.call("POST", "/reset", "university:uni-ju", {})
     expect(res.status).toBe(200)
     const snap = res.json.snapshot as { projects: unknown[] }
-    expect(snap.projects.length).toBe(10)
+    expect(snap.projects.length).toBe(11)
   })
 
   it("is rejected outside demo mode", async () => {

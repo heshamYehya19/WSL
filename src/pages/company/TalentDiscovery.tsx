@@ -27,8 +27,9 @@ export default function TalentDiscovery() {
   const queryTerms = query.toLowerCase().split(/[,+]/).map((t) => t.trim()).filter(Boolean)
 
   // Discoverable = the university has confirmed at least one project of theirs to a company.
+  // Only skills a mentor verified are shown; an AI signal alone, or one a mentor rejected, never is.
   const confirmedProjectIds = new Set(projects.filter((p) => CONFIRMED_STATUSES.includes(p.status)).map((p) => p.id))
-  const discoverable = skillSignals.filter((s) => confirmedProjectIds.has(s.projectId))
+  const discoverable = skillSignals.filter((s) => confirmedProjectIds.has(s.projectId) && s.status === "Verified")
 
   // Most-proven skills across the network, offered as one-click search suggestions.
   const skillFreq = new Map<string, number>()

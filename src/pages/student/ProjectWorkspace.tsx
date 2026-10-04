@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Link, useParams } from "react-router-dom"
+import { Link, useParams, useSearchParams } from "react-router-dom"
 import { useDemoUser } from "../../state/demoUser"
 import { useStore } from "../../state/store"
 import { StatusBadge } from "../../components/ui/StatusBadge"
@@ -7,6 +7,8 @@ import { ConfidenceMeter } from "../../components/ui/ConfidenceMeter"
 import { EmptyState } from "../../components/ui/EmptyState"
 import { challengeFor, projectEvidence, skillsForProject } from "../../lib/selectors"
 import { formatDate, formatRelative } from "../../lib/format"
+import { EvidenceQuotes } from "../../components/ui/EvidenceQuotes"
+import { evidenceAnalysisLabel } from "../../lib/aiNote"
 
 type SubmittableType = "GitHub Repository" | "Code" | "Documentation" | "Dataset / Model"
 
@@ -28,7 +30,9 @@ export default function ProjectWorkspace() {
   const { id } = useParams()
   const { student } = useDemoUser()
   const { projects, challenges, evidence, skillSignals, addEvidence, runAIReview, toggleTask, getOrg, getStaff } = useStore()
-  const [tab, setTab] = useState<(typeof TABS)[number]>("Overview")
+  const [searchParams] = useSearchParams()
+  // ?tab=evidence opens straight on the evidence (the guided tour links there).
+  const [tab, setTab] = useState<(typeof TABS)[number]>(searchParams.get("tab") === "evidence" ? "Evidence & AI Analysis" : "Overview")
   const [analyzing, setAnalyzing] = useState(false)
   const [form, setForm] = useState({ type: "GitHub Repository" as SubmittableType, title: "", link: "", content: "", excerpt: "" })
   const [submitting, setSubmitting] = useState(false)
@@ -173,7 +177,7 @@ export default function ProjectWorkspace() {
       )}
 
       {tab === "Evidence & AI Analysis" && (
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <div>
             <div className="rounded-2xl border border-ink-200 bg-surface p-5">
               <h3 className="mb-3 font-semibold text-ink-900">Submit Evidence</h3>
@@ -226,7 +230,7 @@ export default function ProjectWorkspace() {
                       value={form.excerpt}
                       onChange={(e) => setForm((f) => ({ ...f, excerpt: e.target.value }))}
                       rows={4}
-                      placeholder="Paste a representative excerpt — a code snippet, key section, or summary — so WSL can actually analyze it. Without this, the link is still saved, but shown as linked for mentor review, not automatically analyzed."
+                      placeholder="Paste a representative excerpt — a code snippet, key section, or summary — so WSL can actually analyze it. Public GitHub links are read automatically (README and main source files); other links are saved for mentor review."
                       className="w-full rounded-lg border border-ink-200 px-3 py-2 font-mono text-xs outline-none focus:border-teal-400"
                     />
                   </div>
@@ -243,15 +247,9 @@ export default function ProjectWorkspace() {
                 <div key={e.id} className="rounded-xl border border-ink-200 bg-surface p-4">
                   <span className="rounded-md bg-ink-50 px-2 py-0.5 text-[11px] font-semibold text-ink-600">{e.type}</span>
                   <p className="mt-1.5 text-sm font-medium text-ink-900">{e.title}</p>
-                  {e.link && <p className="mt-1 text-xs text-teal-600">{e.link}</p>}
-                  {e.content ? (
-                    <>
-                      <pre className="mt-2 max-h-24 overflow-hidden rounded-lg bg-ink-50 px-2.5 py-2 font-mono text-[11px] text-ink-600">{e.content}</pre>
-                      <p className="mt-1 text-[11px] text-teal-600">Evidence analyzed.</p>
-                    </>
-                  ) : (
-                    <p className="mt-1.5 text-[11px] text-ink-400">Supporting evidence — linked for mentor review, not automatically analyzed.</p>
-                  )}
+                  {e.link && <p className="mt-1 text-xs break-all text-teal-600">{e.link}</p>}
+                  {e.content && <pre className="mt-2 max-h-24 overflow-hidden rounded-lg whitespace-pre-wrap [overflow-wrap:anywhere] bg-ink-50 px-2.5 py-2 font-mono text-[11px] text-ink-600">{e.content}</pre>}
+                  <p className={`mt-1.5 text-[11px] ${e.content || e.analyzedFiles ? "text-teal-600" : "text-ink-400"}`}>{evidenceAnalysisLabel(e)}</p>
                   <p className="mt-2 text-[11px] text-ink-400">Submitted {formatRelative(e.submittedAt)}</p>
                 </div>
               ))}
@@ -302,6 +300,11 @@ export default function ProjectWorkspace() {
                     </div>
                     <p className="mt-0.5 text-[11px] text-ink-400">Suggested level: {s.suggestedLevel}</p>
                     <div className="mt-2"><ConfidenceMeter value={s.evidenceConfidence} label="Evidence confidence" /></div>
+                    {s.aiQuotes.length > 0 && (
+                      <div className="mt-2">
+                        <EvidenceQuotes quotes={s.aiQuotes} />
+                      </div>
+                    )}
                     {s.aiNote && <p className="mt-1.5 text-[11px] text-ink-400">{s.aiNote}</p>}
                     {s.status === "Verified" ? (
                       <p className="mt-2 text-xs font-semibold text-verified-600">
