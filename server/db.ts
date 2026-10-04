@@ -175,6 +175,12 @@ CREATE TABLE IF NOT EXISTS projects (
   student_id   TEXT NOT NULL REFERENCES students(id),
   status       TEXT NOT NULL,
   started_at   TEXT NOT NULL,
+  -- Identifies the exact (evidence content + required skills + model) a grading run
+  -- was based on (server/ai.ts's hashEvidenceSet). Re-analyzing with an unchanged
+  -- hash skips the model call entirely and returns the existing skill_signals as-is.
+  graded_evidence_hash TEXT,
+  graded_model         TEXT,
+  graded_at            TEXT,
   UNIQUE (challenge_id, student_id)
 );
 
@@ -331,7 +337,7 @@ export function getDb(): DatabaseSync {
   return db
 }
 
-const SCHEMA_VERSION = 10
+const SCHEMA_VERSION = 11
 
 /**
  * Brings databases created by older versions up to date without losing their data.
@@ -370,6 +376,8 @@ const SCHEMA_VERSION = 10
  *     a student's record, and Talent Discovery search. One-time best-effort cleanup of
  *     challenges.required_skills and skill_signals.skill for existing rows below; every
  *     new challenge is canonicalized going forward at the point it's created.
+ * v11: projects gained `graded_evidence_hash`/`graded_model`/`graded_at`, so re-analyzing
+ *     unchanged evidence can skip the model call and return the existing result instantly.
  */
 function migrate(db: DatabaseSync) {
   const { user_version: version } = db.prepare("PRAGMA user_version").get() as { user_version: number }
@@ -515,6 +523,14 @@ function migrate(db: DatabaseSync) {
         claimed.set(row.project_id, set)
         updateSignal.run(canonical, row.id)
       }
+    })
+  }
+  if (version < 11) {
+    const projectColumns = (db.prepare("PRAGMA table_info(projects)").all() as { name: string }[]).map((c) => c.name)
+    transaction(db, () => {
+      if (!projectColumns.includes("graded_evidence_hash")) db.exec("ALTER TABLE projects ADD COLUMN graded_evidence_hash TEXT")
+      if (!projectColumns.includes("graded_model")) db.exec("ALTER TABLE projects ADD COLUMN graded_model TEXT")
+      if (!projectColumns.includes("graded_at")) db.exec("ALTER TABLE projects ADD COLUMN graded_at TEXT")
     })
   }
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`)

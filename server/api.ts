@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto"
 import type { IncomingMessage, ServerResponse } from "node:http"
 import type { DatabaseSync } from "node:sqlite"
 import { getDb, resetDatabase, transaction } from "./db.ts"
-import { analyzeEvidence, canonicalSkillName, checkRelevance } from "./ai.ts"
+import { analyzeEvidence, canonicalSkillName, checkRelevance, currentGradingModel, hashEvidenceSet } from "./ai.ts"
 import type { ChallengeContext, EvidenceQuote, SimulatedRating, SkillCriterion } from "./ai.ts"
 import { parseGithubLink, readGithubRepo } from "./github.ts"
 import type { RepoSnapshot } from "./github.ts"
@@ -305,6 +305,7 @@ function buildSnapshot(db: DatabaseSync, actor: Actor): Snapshot {
         .map((m): ProjectMember => ({ studentId: String(m.student_id), roleNote: String(m.role_note) })),
       status: r.status as ChallengeStatus,
       startedAt: String(r.started_at),
+      ...(r.graded_model ? { gradedModel: String(r.graded_model), gradedAt: String(r.graded_at) } : {}),
       tasks: taskRows.filter((t) => t.project_id === r.id).map((t) => ({ id: String(t.id), title: String(t.title), done: Number(t.done) === 1 })),
       feedback: feedbackRows
         .filter((f) => f.project_id === r.id && visible.has(String(r.id)))
@@ -867,7 +868,10 @@ const routes: { method: string; pattern: RegExp; prepare?: (actor: Actor, body: 
   {
     method: "POST",
     pattern: /^\/projects\/([^/]+)\/ai-review$/,
-    // Grading calls Gemini, so it runs before the database transaction; the handler only saves the results.
+    // Grading calls a model, so it runs before the database transaction; the handler only
+    // saves the results. If the evidence set is unchanged since the last analysis (same
+    // content, same required skills, same model), the model is never called at all — the
+    // handler just confirms that and returns, leaving the existing skill_signals as-is.
     prepare: async (actor, _body, [id]) => {
       const db = getDb()
       const { p } = requireEvidenceAccess(db, actor, id, "request analysis for")
@@ -880,16 +884,25 @@ const routes: { method: string; pattern: RegExp; prepare?: (actor: Actor, body: 
       }))
       if (ev.length === 0) throw new ApiError(409, "Submit at least one piece of evidence first.")
       const skills = parseList(one(db, "SELECT required_skills FROM challenges WHERE id = ?", p.challengeId)!.required_skills)
+      const model = currentGradingModel()
+      const hash = hashEvidenceSet(skills, ev, model)
+      const projectRow = one(db, "SELECT graded_evidence_hash, graded_model, graded_at FROM projects WHERE id = ?", id)!
+      if (projectRow.graded_evidence_hash === hash && projectRow.graded_model === model) {
+        return { unchanged: true as const, model, hash, gradedAt: String(projectRow.graded_at) }
+      }
       // Re-analyzing (e.g. after the student adds more evidence) recomputes every
       // required skill against ALL current evidence and overwrites prior results,
       // rather than only ever analyzing a skill once — otherwise evidence submitted
       // after the first analysis could never be picked up at all.
-      return analyzeEvidence(skills, ev, challengeContextFor(db, p.challengeId))
+      const results = await analyzeEvidence(skills, ev, challengeContextFor(db, p.challengeId))
+      return { unchanged: false as const, model, hash, results }
     },
-    handler: (db, actor, [id], _body, results: SimulatedRating[]) => {
+    handler: (db, actor, [id], _body, prepared: { unchanged: true; model: string; hash: string; gradedAt: string } | { unchanged: false; model: string; hash: string; results: SimulatedRating[] }) => {
       const { p, student } = requireEvidenceAccess(db, actor, id, "request analysis for")
+      if (prepared.unchanged) return { unchanged: true, model: prepared.model, gradedAt: prepared.gradedAt }
+
       const now = nowIso()
-      for (const r of results) {
+      for (const r of prepared.results) {
         const existing = one(db, "SELECT id, status FROM skill_signals WHERE project_id = ? AND skill = ?", id, r.skill)
         // A mentor's decision is durable — new evidence never silently re-scores a
         // skill the mentor already verified out from under them.
@@ -911,11 +924,13 @@ const routes: { method: string; pattern: RegExp; prepare?: (actor: Actor, body: 
         }
         for (const evId of r.evidenceIds) exec(db, "INSERT INTO skill_signal_evidence (signal_id, evidence_id) VALUES (?, ?)", sigId, evId)
       }
+      exec(db, "UPDATE projects SET graded_evidence_hash = ?, graded_model = ?, graded_at = ? WHERE id = ?", prepared.hash, prepared.model, now, id)
       if (p.status === "In Progress") {
         exec(db, "UPDATE projects SET status = 'Evidence Under Review' WHERE id = ?", id)
         notify(db, "university", p.universityId, "Evidence ready for review", `WSL analyzed ${p.studentName}'s evidence for “${p.challengeTitle}”.`, `/university/projects/${id}`)
       }
       advanceIfFurther(db, p.challengeId, "Evidence Under Review", `WSL analyzed ${p.studentName}'s submitted evidence automatically.`)
+      return { unchanged: false, model: prepared.model, gradedAt: now }
     },
   },
   {

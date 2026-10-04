@@ -16,12 +16,35 @@
 // the product; the offline scorer's own note is already a complete, honest explanation
 // on its own.
 
+import { createHash } from "node:crypto"
 import { analyzableContent, simulateAIReview } from "./ml/analyze.ts"
 import type { ChallengeContext, EvidenceLike, SimulatedRating } from "./ml/analyze.ts"
 import { configuredProvider, gradeWithModel } from "./ml/llm-grader.ts"
 
 export { canonicalSkillName, checkRelevance, simulateAIReview, suggestedLevelFor } from "./ml/analyze.ts"
 export type { ChallengeContext, EvidenceQuote, RelevanceCheck, SkillCriterion, SimulatedRating, SuggestedLevel } from "./ml/analyze.ts"
+
+/** The model this server would grade with right now, or "offline" with no key configured. */
+export function currentGradingModel(): string {
+  return configuredProvider()?.model ?? "offline"
+}
+
+/**
+ * Identifies exactly what a grading run was based on: the model, the required
+ * skills, and every piece of evidence content (never titles/descriptions, which
+ * aren't graded). Two calls with the same evidence set produce the same hash,
+ * which is what lets re-analysis skip the model entirely when nothing changed.
+ */
+export function hashEvidenceSet(skills: string[], evidence: EvidenceLike[], model: string): string {
+  const canonical = {
+    model,
+    skills: [...skills].sort(),
+    evidence: evidence
+      .map((e) => ({ id: e.id, content: analyzableContent(e) }))
+      .sort((a, b) => a.id.localeCompare(b.id)),
+  }
+  return createHash("sha256").update(JSON.stringify(canonical)).digest("hex")
+}
 
 export async function analyzeEvidence(skills: string[], evidence: EvidenceLike[], challenge: ChallengeContext): Promise<SimulatedRating[]> {
   if (evidence.length === 0) return []

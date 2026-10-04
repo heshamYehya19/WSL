@@ -74,6 +74,10 @@ export interface SimulatedRating {
   evidenceIds: string[]
   /** Named rubric criteria this submission was checked against, met ones first. */
   criteria: SkillCriterion[]
+  /** Whether this came from a live model call or the deterministic offline scorer. */
+  source: "model" | "offline"
+  /** The exact model id used ("openai/gpt-oss-120b", "gemini-flash-latest"), or "offline". */
+  model: string
 }
 
 export interface ChallengeContext {
@@ -545,6 +549,8 @@ function scoreSkillLocally(skill: string, items: { id: string; lines: string[] }
     quotes,
     evidenceIds: evidenceIds.length > 0 ? evidenceIds : [items[0].id],
     criteria,
+    source: "offline",
+    model: "offline",
   }
 }
 
@@ -577,6 +583,8 @@ export function simulateAIReview(requiredSkills: string[], submittedEvidence: Ev
         quotes: [],
         evidenceIds: [submittedEvidence[0].id],
         criteria: [],
+        source: "offline",
+        model: "offline",
       }
     }
     return scoreSkillLocally(skill, items)

@@ -142,7 +142,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       assignChallenge: (id, programId) => ok(run("POST", `/challenges/${id}/assign`, { programId })),
       startProject: (challengeId) => run<{ id: string }>("POST", `/challenges/${challengeId}/start`).then((r) => (r.ok ? r.result.id : undefined)),
       addEvidence: (projectId, input) => ok(run("POST", `/projects/${projectId}/evidence`, input)),
-      runAIReview: (projectId) => ok(run("POST", `/projects/${projectId}/ai-review`)),
+      runAIReview: (projectId) =>
+        run<{ unchanged: boolean }>("POST", `/projects/${projectId}/ai-review`).then((r) => {
+          if (r.ok && r.result.unchanged) setToast("No new evidence since the last analysis.")
+          return r.ok
+        }),
       reviewSignal: (projectId, signalId, decision, options) =>
         ok(run("POST", `/projects/${projectId}/signals/${signalId}/review`, { decision, ...options })),
       confirmToCompany: (projectId, note) => ok(run("POST", `/projects/${projectId}/confirm`, { note })),

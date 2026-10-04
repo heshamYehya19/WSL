@@ -273,6 +273,9 @@ export interface Project {
   members: ProjectMember[]
   status: ChallengeStatus
   startedAt: string
+  /** The exact model ("openai/gpt-oss-120b") or "offline" that produced the current skill signals, and when. Unset before the first analysis. */
+  gradedModel?: string
+  gradedAt?: string
   tasks: ProjectTask[]
   feedback: FeedbackEntry[]
   companyFeedback?: CompanyFeedback

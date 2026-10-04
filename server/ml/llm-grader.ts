@@ -301,10 +301,12 @@ export async function gradeWithModel(
       skill,
       rating,
       suggestedLevel: offered.length > 0 ? gateByCriteria(suggestedLevelFor(rating), metCount) : suggestedLevelFor(rating),
-      note: [`Graded by ${provider.label} against this challenge.`, reason, ...caveats].filter(Boolean).join(" "),
+      note: [`Graded by ${provider.model} against this challenge.`, reason, ...caveats].filter(Boolean).join(" "),
       quotes,
       evidenceIds: ids.length > 0 ? ids : [items[0].id],
       criteria,
+      source: "model",
+      model: provider.model,
     })
   }
   return ratings

@@ -183,11 +183,42 @@ describe("evidence grading through the API", () => {
     const ml = signals.find((s) => s.skill === "Machine Learning")!
     expect(ml.evidenceConfidence).toBe(88)
     expect(ml.aiQuotes.map((q) => q.text)).toEqual(["model = IsolationForest(n_estimators=300, contamination=0.02, random_state=42)"])
-    expect(ml.aiNote).toMatch(/Gemini/)
+    expect(ml.aiNote).toMatch(/Graded by gemini-flash-latest/)
     // Its only "proof" was the brief itself, so the score is capped.
     const sec = signals.find((s) => s.skill === "Network Security")!
     expect(sec.aiQuotes).toHaveLength(0)
     expect(sec.evidenceConfidence).toBeLessThanOrEqual(20)
+  })
+
+  it("re-analyzing unchanged evidence returns the identical cached result without calling the model again", async () => {
+    process.env.GEMINI_API_KEY = "test-key"
+    const calls: { url: string; init: RequestInit }[] = []
+    geminiReply(
+      {
+        restatesBrief: false,
+        skills: SKILLS.map((skill) => ({
+          skill,
+          score: 72,
+          reason: "Working anomaly detection pipeline.",
+          quotes: [{ evidenceId: "ev-yazan-1", text: "model = IsolationForest(n_estimators=300, contamination=0.02, random_state=42)", why: "Fits a tuned model." }],
+        })),
+      },
+      calls,
+    )
+
+    const first = await server.call("POST", `/projects/${PROJECT}/ai-review`, YAZAN)
+    expect(first.status).toBe(200)
+    expect(first.json.result).toMatchObject({ unchanged: false, model: "gemini-flash-latest" })
+    expect(calls).toHaveLength(1)
+    const firstSignals = await yazanSignals()
+
+    const second = await server.call("POST", `/projects/${PROJECT}/ai-review`, YAZAN)
+    expect(second.status).toBe(200)
+    expect(second.json.result).toMatchObject({ unchanged: true, model: "gemini-flash-latest" })
+    // The model was never called a second time.
+    expect(calls).toHaveLength(1)
+    // Scores are byte-identical, not just re-computed to the same values.
+    expect(await yazanSignals()).toEqual(firstSignals)
   })
 
   it("drops a criteriaMet label the model invented instead of copying from the offered list", async () => {
@@ -248,7 +279,7 @@ describe("evidence grading through the API", () => {
 
     const ml = (await yazanSignals()).find((s) => s.skill === "Machine Learning")!
     expect(ml.evidenceConfidence).toBe(66)
-    expect(ml.aiNote).toMatch(/Graded by Groq/)
+    expect(ml.aiNote).toMatch(/Graded by openai\/gpt-oss-120b/)
     expect(ml.aiQuotes).toHaveLength(1)
   })
 

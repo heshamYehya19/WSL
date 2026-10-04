@@ -264,6 +264,12 @@ export default function ProjectWorkspace() {
                 Analyzes each required skill against your submitted evidence and shows an evidence confidence signal. It's
                 automatic and informational only — it does not represent proficiency, and it never blocks or gates your submission.
               </p>
+              {project.gradedModel && (
+                <p className="mt-1.5 text-[11px] text-ink-400">
+                  {project.gradedModel === "offline" ? "Estimated offline, not graded by the AI model" : `Graded by ${project.gradedModel}`}
+                  {project.gradedAt ? ` · ${formatRelative(project.gradedAt)}` : ""}
+                </p>
+              )}
               {myEvidence.length === 0 ? (
                 <p className="mt-4 text-sm text-ink-400">Submit evidence first, then request AI analysis.</p>
               ) : locked ? (
