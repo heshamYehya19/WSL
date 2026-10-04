@@ -1,6 +1,13 @@
 import type { DemoUserState, Snapshot } from "../types"
 
-export class ApiRequestError extends Error {}
+export class ApiRequestError extends Error {
+  /** The form field the server says this error belongs to, if any. */
+  field?: string
+  constructor(message: string, field?: string) {
+    super(message)
+    this.field = field
+  }
+}
 
 function actorHeader(session: DemoUserState): Record<string, string> {
   const id = session.role === "student" ? session.studentId : session.role === "university" ? session.universityId : session.companyId
@@ -19,7 +26,7 @@ async function request<T>(method: string, path: string, session: DemoUserState, 
     throw new ApiRequestError("Can't reach the WSL server. Is it running?")
   }
   const data = await res.json().catch(() => null)
-  if (!res.ok) throw new ApiRequestError(data?.error ?? `Request failed (${res.status}).`)
+  if (!res.ok) throw new ApiRequestError(data?.error ?? `Request failed (${res.status}).`, typeof data?.field === "string" ? data.field : undefined)
   return data as T
 }
 

@@ -27,6 +27,11 @@ const SUBMISSION_FIELD: Record<SubmittableType, { kind: "link" | "code"; label: 
 
 const TABS = ["Overview", "Evidence & AI Analysis", "Feedback"] as const
 
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null
+  return <p role="alert" className="mt-1 text-xs font-medium text-danger-600">{message}</p>
+}
+
 export default function ProjectWorkspace() {
   const { id } = useParams()
   const { student } = useDemoUser()
@@ -37,6 +42,13 @@ export default function ProjectWorkspace() {
   const [analyzing, setAnalyzing] = useState(false)
   const [form, setForm] = useState({ type: "GitHub Repository" as SubmittableType, title: "", link: "", content: "", excerpt: "" })
   const [submitting, setSubmitting] = useState(false)
+  // A rejected submission's message, shown next to the field it's about (keyed as the server keys it).
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const editField = (key: "title" | "link" | "content" | "excerpt", value: string) => {
+    setForm((f) => ({ ...f, [key]: value }))
+    const serverKey = key === "excerpt" ? "content" : key
+    setErrors((e) => (e[serverKey] ? Object.fromEntries(Object.entries(e).filter(([k]) => k !== serverKey)) : e))
+  }
 
   // Students only ever open their own project workspaces.
   const project = projects.find((p) => p.id === id && p.studentId === student?.id)
@@ -71,12 +83,17 @@ export default function ProjectWorkspace() {
     e.preventDefault()
     if (!canSubmit) return
     setSubmitting(true)
-    const ok = await addEvidence(project.id, {
-      type: form.type,
-      title: form.title.trim(),
-      link: field.kind === "link" ? form.link.trim() : "",
-      content: field.kind === "code" ? form.content.trim() : form.excerpt.trim(),
-    })
+    setErrors({})
+    const ok = await addEvidence(
+      project.id,
+      {
+        type: form.type,
+        title: form.title.trim(),
+        link: field.kind === "link" ? form.link.trim() : "",
+        content: field.kind === "code" ? form.content.trim() : form.excerpt.trim(),
+      },
+      (key, message) => setErrors({ [key]: message }),
+    )
     setSubmitting(false)
     if (ok) setForm({ type: "GitHub Repository", title: "", link: "", content: "", excerpt: "" })
   }
@@ -190,38 +207,52 @@ export default function ProjectWorkspace() {
                   <label className="mb-1 block text-xs font-medium text-ink-500">Evidence type</label>
                   <select
                     value={form.type}
-                    onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as SubmittableType, link: "", content: "" }))}
+                    onChange={(e) => {
+                      setForm((f) => ({ ...f, type: e.target.value as SubmittableType, link: "", content: "" }))
+                      setErrors({})
+                    }}
                     className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-teal-400"
                   >
                     {EVIDENCE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                   </select>
+                  <FieldError message={errors.type} />
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-medium text-ink-500">Title</label>
                   <input
                     value={form.title}
-                    onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                    onChange={(e) => editField("title", e.target.value)}
+                    aria-invalid={Boolean(errors.title)}
                     placeholder="e.g. Demand Forecasting Model — GitHub Repo"
                     className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-teal-400"
                   />
+                  <FieldError message={errors.title} />
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-medium text-ink-500">{field.label} — required</label>
                   {field.kind === "code" ? (
-                    <textarea
-                      value={form.content}
-                      onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))}
-                      rows={8}
-                      placeholder={field.placeholder}
-                      className="w-full rounded-lg border border-ink-200 px-3 py-2 font-mono text-xs outline-none focus:border-teal-400"
-                    />
+                    <>
+                      <textarea
+                        value={form.content}
+                        onChange={(e) => editField("content", e.target.value)}
+                        aria-invalid={Boolean(errors.content)}
+                        rows={8}
+                        placeholder={field.placeholder}
+                        className="w-full rounded-lg border border-ink-200 px-3 py-2 font-mono text-xs outline-none focus:border-teal-400"
+                      />
+                      <FieldError message={errors.content} />
+                    </>
                   ) : (
-                    <input
-                      value={form.link}
-                      onChange={(e) => setForm((f) => ({ ...f, link: e.target.value }))}
-                      placeholder={field.placeholder}
-                      className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-teal-400"
-                    />
+                    <>
+                      <input
+                        value={form.link}
+                        onChange={(e) => editField("link", e.target.value)}
+                        aria-invalid={Boolean(errors.link)}
+                        placeholder={field.placeholder}
+                        className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-teal-400"
+                      />
+                      <FieldError message={errors.link} />
+                    </>
                   )}
                 </div>
                 {field.kind === "link" && (
@@ -229,11 +260,13 @@ export default function ProjectWorkspace() {
                     <label className="mb-1 block text-xs font-medium text-ink-500">Representative excerpt (optional)</label>
                     <textarea
                       value={form.excerpt}
-                      onChange={(e) => setForm((f) => ({ ...f, excerpt: e.target.value }))}
+                      onChange={(e) => editField("excerpt", e.target.value)}
+                      aria-invalid={Boolean(errors.content)}
                       rows={4}
                       placeholder="Paste a representative excerpt — a code snippet, key section, or summary — so WSL can actually analyze it. Public GitHub links are read automatically (README and main source files); other links are saved for mentor review."
                       className="w-full rounded-lg border border-ink-200 px-3 py-2 font-mono text-xs outline-none focus:border-teal-400"
                     />
+                    <FieldError message={errors.content} />
                   </div>
                 )}
                 <button type="submit" disabled={submitting || !canSubmit} className="w-full rounded-lg bg-night px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-600 disabled:opacity-40">

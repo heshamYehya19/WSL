@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
 import type { ReactNode } from "react"
-import { downloadChallengeFile, fetchSnapshot, mutate } from "../lib/api"
+import { ApiRequestError, downloadChallengeFile, fetchSnapshot, mutate } from "../lib/api"
 import { useSession } from "./session"
 import type { Availability, ChallengeFileKind, ChallengeVisibility, CompanyActionKind, DataSensitivity, Difficulty, EvidenceType, ScreeningFinding, SuggestedLevel, Snapshot } from "../types"
 
@@ -27,6 +27,9 @@ export interface NewChallengeInput {
 /** Either the new challenge's id, or — if WSL's screening flagged personal data that wasn't confirmed yet — what it found. */
 export type CreateChallengeResult = { id: string } | { findings: ScreeningFinding[] }
 
+/** Lets a form show a server validation error next to the field it belongs to, instead of as a toast. */
+export type FieldErrorHandler = (field: string, message: string) => void
+
 interface StoreContextValue extends Snapshot {
   getOrg: (id: string) => Snapshot["organizations"][number] | undefined
   getUniversity: (id: string) => Snapshot["universities"][number] | undefined
@@ -38,11 +41,11 @@ interface StoreContextValue extends Snapshot {
 
   // Every action writes to the database and resolves once the fresh snapshot is in.
   // On failure the error is shown to the user and the promise resolves to undefined.
-  createChallenge: (input: NewChallengeInput) => Promise<CreateChallengeResult | undefined>
+  createChallenge: (input: NewChallengeInput, onFieldError?: FieldErrorHandler) => Promise<CreateChallengeResult | undefined>
   submitDraft: (id: string) => Promise<boolean>
   assignChallenge: (id: string, programId: string) => Promise<boolean>
   startProject: (challengeId: string) => Promise<string | undefined>
-  addEvidence: (projectId: string, input: { type: EvidenceType; title: string; link: string; content: string }) => Promise<boolean>
+  addEvidence: (projectId: string, input: { type: EvidenceType; title: string; link: string; content: string }, onFieldError?: FieldErrorHandler) => Promise<boolean>
   runAIReview: (projectId: string) => Promise<boolean>
   reviewSignal: (
     projectId: string,
@@ -111,14 +114,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const value = useMemo<StoreContextValue | null>(() => {
     if (!snapshot) return null
 
-    async function run<R>(method: "POST" | "PATCH", path: string, body?: unknown): Promise<{ ok: true; result: R } | { ok: false }> {
+    async function run<R>(method: "POST" | "PATCH", path: string, body?: unknown, onFieldError?: FieldErrorHandler): Promise<{ ok: true; result: R } | { ok: false }> {
       const seq = ++requestSeq.current
       try {
         const res = await mutate<R>(method, path, session, body)
         apply(seq, res.snapshot)
         return { ok: true, result: res.result }
       } catch (err) {
-        setToast((err as Error).message)
+        if (onFieldError && err instanceof ApiRequestError && err.field) onFieldError(err.field, err.message)
+        else setToast((err as Error).message)
         return { ok: false }
       }
     }
@@ -137,11 +141,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       studentsOfUniversity: (universityId) => snapshot.students.filter((s) => s.universityId === universityId),
       isUniversityStudent: (studentId, universityId) => studentById.get(studentId)?.universityId === universityId,
 
-      createChallenge: (input) => run<CreateChallengeResult>("POST", "/challenges", input).then((r) => (r.ok ? r.result : undefined)),
+      createChallenge: (input, onFieldError) =>
+        run<CreateChallengeResult>("POST", "/challenges", input, onFieldError).then((r) => (r.ok ? r.result : undefined)),
       submitDraft: (id) => ok(run("POST", `/challenges/${id}/submit`)),
       assignChallenge: (id, programId) => ok(run("POST", `/challenges/${id}/assign`, { programId })),
       startProject: (challengeId) => run<{ id: string }>("POST", `/challenges/${challengeId}/start`).then((r) => (r.ok ? r.result.id : undefined)),
-      addEvidence: (projectId, input) => ok(run("POST", `/projects/${projectId}/evidence`, input)),
+      addEvidence: (projectId, input, onFieldError) =>
+        run<{ notice?: string } | null>("POST", `/projects/${projectId}/evidence`, input, onFieldError).then((r) => {
+          if (r.ok && r.result?.notice) setToast(r.result.notice)
+          return r.ok
+        }),
       runAIReview: (projectId) =>
         run<{ unchanged: boolean }>("POST", `/projects/${projectId}/ai-review`).then((r) => {
           if (r.ok && r.result.unchanged) setToast("No new evidence since the last analysis.")

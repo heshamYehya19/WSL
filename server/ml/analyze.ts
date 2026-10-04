@@ -100,12 +100,49 @@ export function buildChallengeText(challenge: ChallengeContext): string {
 
 // ------------------------------------------------------------ brief echo check
 
+// One spelling per Arabic word, so a brief and a submission that write the same word
+// slightly differently (with or without short vowels, أ vs ا, ة vs ه) still match.
+export function normalizeArabic(text: string): string {
+  return text
+    .replace(/[ؐ-ًؚ-ٰٟۖ-ۭ]/g, "") // diacritics (tashkeel)
+    .replace(/ـ/g, "") // tatweel
+    .replace(/[أإآٱ]/g, "ا")
+    .replace(/ى/g, "ي")
+    .replace(/ؤ/g, "و")
+    .replace(/ئ/g, "ي")
+    .replace(/ة/g, "ه")
+    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+}
+
+const ARABIC_LETTER = /[ء-ي]/
+const ARABIC_PREFIXES = ["وال", "بال", "كال", "فال", "لل", "ال"]
+
+// Light stemming: the definite article (and "and the", "with the"...) is written attached
+// to the word — "والبيانات" is "and the data" — so it's stripped to match "بيانات".
+function stripArabicPrefix(w: string): string {
+  for (const p of ARABIC_PREFIXES) if (w.startsWith(p) && w.length - p.length >= 2) return w.slice(p.length)
+  return w
+}
+
 function words(text: string): string[] {
-  const raw = text.match(/[A-Za-z0-9_]+/g) ?? []
+  const raw = normalizeArabic(text).match(/[\p{L}\p{N}_]+/gu) ?? []
   return raw
     .flatMap((tok) => tok.split(/_+/).flatMap((part) => part.split(/(?<=[a-z0-9])(?=[A-Z])/)))
-    .map((w) => w.toLowerCase())
+    .map((w) => (ARABIC_LETTER.test(w) ? stripArabicPrefix(w) : w.toLowerCase()))
     .filter((w) => w.length >= 2)
+}
+
+type Script = "latin" | "arabic" | "other" | "none"
+
+/** The writing system most of a text's letters are in. */
+function dominantScript(text: string): Script {
+  const letters = text.match(/\p{L}/gu) ?? []
+  if (letters.length === 0) return "none"
+  const latin = letters.filter((c) => /[A-Za-z]/.test(c)).length
+  const arabic = letters.filter((c) => /[؀-ۿ]/.test(c)).length
+  if (latin / letters.length > 0.5) return "latin"
+  if (arabic / letters.length > 0.5) return "arabic"
+  return "other"
 }
 
 function shingles(ws: string[], n = 3): string[] {
@@ -162,6 +199,15 @@ const STOPWORDS = new Set(
     .split(/\s+/)
     .filter(Boolean),
 )
+// Arabic function words, normalized the same way words() normalizes text, in both their
+// written form and their article-stripped form (التي is also tokenized as تي).
+for (const w of `في من علي الي عن مع هذا هذه ذلك تلك التي الذي الذين او ان انه انها كان كانت يكون لا ما لم لن قد ثم كل بعض
+   بين عند حتي اذا هو هي هم هن نحن انا انت كما ايضا غير لكن وهو وهي عبر خلال حول ضمن مثل`.split(/\s+/)) {
+  if (!w) continue
+  const n = normalizeArabic(w)
+  STOPWORDS.add(n)
+  STOPWORDS.add(stripArabicPrefix(n))
+}
 
 function termFreq(text: string): Map<string, number> {
   const tf = new Map<string, number>()
@@ -184,7 +230,8 @@ function cosineOverlap(a: Map<string, number>, b: Map<string, number>): number {
 }
 
 export type RelevanceCheck =
-  | { relevant: true }
+  /** `unjudged` when word overlap can't say anything (a different language than the brief). */
+  | { relevant: true; unjudged?: true }
   | { relevant: false; reason: "echoes-brief"; echoPct: number }
   | { relevant: false; reason: "off-topic"; overlapPct: number }
 
@@ -192,10 +239,15 @@ export type RelevanceCheck =
  * Run when evidence is submitted, separately from rating. Rejects two things:
  * a submission that mostly repeats the challenge brief back, and one that has
  * nothing to do with the challenge at all. Short submissions (a bare link or a
- * one-line title) are too thin to judge either way and are accepted.
+ * one-line title) are too thin to judge either way and are accepted. Works for
+ * Arabic as well as English; a submission written mainly in a different script
+ * than the brief can't be compared word-for-word, so it's accepted and left for
+ * the AI grader (which reads both) to judge, rather than rejected as a 0% match.
  */
 export function checkRelevance(challenge: ChallengeContext, text: string): RelevanceCheck {
   if (text.trim().length < MIN_CONTENT_CHARS) return { relevant: true }
+  const briefText = buildChallengeText(challenge)
+  if (dominantScript(text) !== dominantScript(briefText)) return { relevant: true, unjudged: true }
   const echo = new BriefEcho(challenge)
   const ratio = echo.ratio(text)
   const ownWords = words(echo.novel(text)).length
@@ -203,7 +255,7 @@ export function checkRelevance(challenge: ChallengeContext, text: string): Relev
   if (ratio >= ECHO_REJECT || (ratio >= 0.25 && ownWords < 25)) {
     return { relevant: false, reason: "echoes-brief", echoPct: Math.round(ratio * 100) }
   }
-  const overlap = cosineOverlap(termFreq(buildChallengeText(challenge)), termFreq(text))
+  const overlap = cosineOverlap(termFreq(briefText), termFreq(text))
   if (overlap < OFF_TOPIC_REJECT) return { relevant: false, reason: "off-topic", overlapPct: Math.round(overlap * 100) }
   return { relevant: true }
 }

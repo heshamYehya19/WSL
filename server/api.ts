@@ -71,9 +71,12 @@ function isDemoMode(): boolean {
 
 class ApiError extends Error {
   status: number
-  constructor(status: number, message: string) {
+  /** The form field this error belongs to, so the client can show it inline next to that field. */
+  field?: string
+  constructor(status: number, message: string, field?: string) {
     super(message)
     this.status = status
+    this.field = field
   }
 }
 
@@ -466,22 +469,26 @@ function allSignalsResolved(db: DatabaseSync, projectId: string): boolean {
   return rows.length > 0 && rows.every((r) => r.status === "Verified" || r.status === "Rejected")
 }
 
-function text(v: unknown, field: string, { required = false, max = 4000 } = {}): string {
+// Every validation message names the field and says what to do next. `key` tags the
+// error with the form field it belongs to, so the client can show it inline.
+function text(v: unknown, field: string, { required = false, max = 4000, key }: { required?: boolean; max?: number; key?: string } = {}): string {
   const s = typeof v === "string" ? v.trim() : ""
-  if (required && !s) throw new ApiError(400, `${field} is required.`)
-  if (s.length > max) throw new ApiError(400, `${field} is too long (max ${max} characters).`)
+  if (required && !s) throw new ApiError(400, `${field} is required — fill it in and try again.`, key)
+  if (s.length > max) throw new ApiError(400, `${field} is too long (${s.length} characters; the limit is ${max}). Shorten it and try again.`, key)
   return s
 }
 
-function textList(v: unknown, field: string): string[] {
+function textList(v: unknown, field: string, key?: string): string[] {
   if (v === undefined || v === null) return []
-  if (!Array.isArray(v)) throw new ApiError(400, `${field} must be a list.`)
-  return v.map((x) => text(x, field, { max: 300 })).filter(Boolean).slice(0, 20)
+  if (!Array.isArray(v)) throw new ApiError(400, `${field} must be a list of values.`, key)
+  return v.map((x) => text(x, `Each item in ${field.toLowerCase()}`, { max: 300, key })).filter(Boolean).slice(0, 20)
 }
 
 function oneOf(v: unknown, allowed: string[], field: string, fallback: string): string {
   if (v === undefined || v === null || v === "") return fallback
-  if (typeof v !== "string" || !allowed.includes(v)) throw new ApiError(400, `Invalid ${field}.`)
+  if (typeof v !== "string" || !allowed.includes(v)) {
+    throw new ApiError(400, `“${String(v)}” isn't a valid ${field}. Choose one of: ${allowed.join(", ")}.`)
+  }
   return v
 }
 
@@ -648,14 +655,15 @@ const routes: { method: string; pattern: RegExp; prepare?: (actor: Actor, body: 
     // come back as { findings } so the company can review them and resubmit.
     handler: (db, actor, _p, body, files: PreparedFile[]) => {
       const company = requireRole(actor, "company")
-      const title = text(body.title, "Title", { required: true, max: 160 })
+      const title = text(body.title, "Challenge title", { required: true, max: 160, key: "title" })
       const descriptionFile = files.find((f) => f.kind === "description")
-      let problem = text(body.problemDescription, "Problem description", { required: !descriptionFile })
+      let problem = text(body.problemDescription, "Problem description", { required: !descriptionFile, key: "problemDescription" })
       if (!problem && descriptionFile) {
         if (descriptionFile.text.replace(/\s/g, "").length < 20) {
           throw new ApiError(
             400,
             `WSL couldn't read the text in “${descriptionFile.name}”, so add a short written description too — it's what students' work is matched against.`,
+            "problemDescription",
           )
         }
         problem = summaryFromDocument(descriptionFile.text)
@@ -663,7 +671,7 @@ const routes: { method: string; pattern: RegExp; prepare?: (actor: Actor, body: 
       // Canonicalized once, here, so "python" and "Python" are never two different skills
       // across a student's record, a university's dashboard, or Talent Discovery search —
       // and deduped case-insensitively, in case a company typed the same skill twice.
-      const rawSkills = textList(body.requiredSkills, "Required skills")
+      const rawSkills = textList(body.requiredSkills, "Required skills", "requiredSkills")
       const seenSkills = new Set<string>()
       const skills = rawSkills
         .map((s) => canonicalSkillName(s))
@@ -673,22 +681,34 @@ const routes: { method: string; pattern: RegExp; prepare?: (actor: Actor, body: 
           seenSkills.add(key)
           return true
         })
-      const outcomes = textList(body.learningOutcomes, "Learning outcomes")
+      // Skills are what every student's evidence is graded against, and outcomes are what the
+      // challenge teaches — a challenge without either can't be assessed, so neither is ever
+      // silently filled in with a placeholder. Required for drafts too: there's no draft
+      // editor, so a draft saved without them could never be submitted.
+      if (skills.length === 0) {
+        throw new ApiError(400, "Add at least one required skill students will be assessed on, separated by commas (e.g. Python, SQL).", "requiredSkills")
+      }
+      const outcomes = textList(body.learningOutcomes, "Learning outcomes", "learningOutcomes")
+      if (outcomes.length === 0) {
+        throw new ApiError(400, "Add at least one learning outcome, one per line (e.g. Build and evaluate a forecasting model).", "learningOutcomes")
+      }
       const preferred = typeof body.preferredUniversityId === "string" && body.preferredUniversityId ? body.preferredUniversityId : null
-      if (preferred && !one(db, "SELECT id FROM universities WHERE id = ?", preferred)) throw new ApiError(400, "Unknown university.")
+      if (preferred && !one(db, "SELECT id FROM universities WHERE id = ?", preferred)) {
+        throw new ApiError(400, "That preferred university isn't on WSL — choose one from the list, or leave it unset.", "preferredUniversityId")
+      }
 
       const contactId =
         typeof body.contactId === "string" && body.contactId
           ? body.contactId
           : String(one(db, "SELECT id FROM company_contacts WHERE company_id = ? ORDER BY is_primary DESC LIMIT 1", company.id)?.id ?? "")
       if (!one(db, "SELECT id FROM company_contacts WHERE id = ? AND company_id = ?", contactId, company.id)) {
-        throw new ApiError(400, "Choose a contact person from your company.")
+        throw new ApiError(400, "Choose a contact person from your company — they review submissions and sign your feedback.", "contactId")
       }
 
-      const deadlineRaw = text(body.deadline, "Deadline")
+      const deadlineRaw = text(body.deadline, "Deadline", { key: "deadline" })
       const deadline = deadlineRaw ? new Date(deadlineRaw) : new Date(Date.now() + 30 * 86_400_000)
-      if (Number.isNaN(deadline.getTime())) throw new ApiError(400, "Invalid deadline.")
-      if (deadline.getTime() < Date.now()) throw new ApiError(400, "The deadline must be in the future.")
+      if (Number.isNaN(deadline.getTime())) throw new ApiError(400, "That deadline isn't a valid date — pick one from the date picker.", "deadline")
+      if (deadline.getTime() < Date.now()) throw new ApiError(400, "The deadline has to be in the future — pick a later date, or leave it blank for 30 days from today.", "deadline")
 
       const companyRow = one(db, "SELECT name, industry FROM companies WHERE id = ?", company.id)!
       const industry = text(body.industry, "Industry", { max: 120 }) || String(companyRow.industry)
@@ -719,12 +739,12 @@ const routes: { method: string; pattern: RegExp; prepare?: (actor: Actor, body: 
           visibility, submission_requirements, status, created_at, submitted_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         id, company.id, contactId, title, problem,
-        JSON.stringify(outcomes.length ? outcomes : ["Explore the problem", "Prototype a solution", "Present findings"]),
+        JSON.stringify(outcomes),
         "A working prototype or analysis plus a short report, as detailed in submission requirements.",
         industry,
         oneOf(body.difficulty, DIFFICULTIES, "difficulty", "Intermediate"),
-        JSON.stringify(skills.length ? skills : ["Problem Solving"]),
-        JSON.stringify(outcomes.length ? outcomes : ["Apply classroom concepts to a real operational problem"]),
+        JSON.stringify(skills),
+        JSON.stringify(outcomes),
         datasetAvailability ||
           (files.some((f) => f.kind === "dataset") ? "See the attached dataset files." : "To be confirmed during WSL's automatic screening."),
         oneOf(body.dataSensitivity, SENSITIVITIES, "data sensitivity", "Low"),
@@ -836,14 +856,34 @@ const routes: { method: string; pattern: RegExp; prepare?: (actor: Actor, body: 
     handler: (db, actor, [id], body, repo: RepoSnapshot | null) => {
       const { p, student } = requireEvidenceAccess(db, actor, id, "add evidence to")
       const evType = oneOf(body.type, SUBMITTABLE_EVIDENCE_TYPES, "evidence type", "")
-      if (!evType) throw new ApiError(400, "Evidence type is required.")
-      const title = text(body.title, "Title", { required: true, max: 200 })
+      if (!evType) throw new ApiError(400, `Choose an evidence type (${SUBMITTABLE_EVIDENCE_TYPES.join(", ")}) and try again.`, "type")
+      const title = text(body.title, "Title", { required: true, max: 200, key: "title" })
       // "Code" evidence is pasted directly and always analyzed. Everything else is a
       // link to where the work lives, with an optional excerpt a mentor can paste in
       // to also have it analyzed — otherwise it's just linked for mentor review.
       const isCode = evType === "Code"
-      const link = isCode ? "" : text(body.link, "Link", { required: true, max: 500 })
-      const content = isCode ? text(body.content, "Code", { required: true, max: 20000 }) : text(body.content, "Content", { max: 20000 }) || null
+      const isRepo = evType === "GitHub Repository"
+      const link = isCode ? "" : text(body.link, isRepo ? "Repository link" : "Link", { required: true, max: 500, key: "link" })
+      if (isRepo && !parseGithubLink(link)) {
+        throw new ApiError(400, "That isn't a GitHub repository link. Use the repository's address, like https://github.com/owner/repo, and try again.", "link")
+      }
+      if (!isCode && !isRepo && (/\s/.test(link) || !/\.[a-z]{2,}/i.test(link))) {
+        throw new ApiError(400, "Link must be a web address your mentor can open, like https://docs.google.com/document/… — check it and try again.", "link")
+      }
+      const content = isCode ? text(body.content, "Code", { required: true, max: 20000, key: "content" }) : text(body.content, "Excerpt", { max: 20000, key: "content" }) || null
+      // A repository WSL can't read (private, misspelled, deleted, or GitHub's rate limit)
+      // would otherwise be accepted as "evidence" with nothing in it to analyze.
+      let notice: string | undefined
+      if (isRepo && !repo) {
+        if (!content) {
+          throw new ApiError(
+            400,
+            "WSL could not read this repository — it may be private, misspelled, or GitHub's rate limit was reached. Paste a representative excerpt (a key file or section) so WSL can analyze it, then submit again.",
+            "content",
+          )
+        }
+        notice = "WSL could not read this repository, so only your pasted excerpt will be analyzed."
+      }
 
       const checkText = [title, content, repo?.text].filter(Boolean).join(". ")
       const relevance = checkRelevance(challengeContextFor(db, p.challengeId), checkText)
@@ -851,12 +891,14 @@ const routes: { method: string; pattern: RegExp; prepare?: (actor: Actor, body: 
         throw new ApiError(
           400,
           `Most of this submission repeats the “${p.challengeTitle}” brief back (${relevance.echoPct}% of its phrases come from the challenge). WSL only counts work you produced, so submit your own code, analysis or write-up.`,
+          content ? "content" : "link",
         )
       }
       if (!relevance.relevant) {
         throw new ApiError(
           400,
-          `This doesn't look like it addresses “${p.challengeTitle}” — WSL couldn't find a meaningful connection between what you submitted and this challenge's stated problem (${relevance.overlapPct}% match). Please submit evidence for this specific challenge.`,
+          `This doesn't look like it addresses “${p.challengeTitle}” — WSL found almost no overlap (${relevance.overlapPct}%) between what you submitted and the challenge's stated problem. Check you picked the right project, then submit the code or write-up you made for this challenge.`,
+          content ? "content" : "link",
         )
       }
 
@@ -865,6 +907,7 @@ const routes: { method: string; pattern: RegExp; prepare?: (actor: Actor, body: 
         "INSERT INTO evidence (id, project_id, student_id, type, title, description, link, content, fetched_content, fetched_from, submitted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         newId("ev"), id, student.id, evType, title, "", link, content, repo?.text ?? null, repo ? JSON.stringify(repo.files) : null, nowIso(),
       )
+      return notice ? { notice } : null
     },
   },
   {
@@ -1247,7 +1290,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
 
     send(res, 404, { error: "Not found." })
   } catch (err) {
-    if (err instanceof ApiError) send(res, err.status, { error: err.message })
+    if (err instanceof ApiError) send(res, err.status, { error: err.message, ...(err.field ? { field: err.field } : {}) })
     else {
       console.error("[wsl-api]", err)
       send(res, 500, { error: "Something went wrong on the server." })

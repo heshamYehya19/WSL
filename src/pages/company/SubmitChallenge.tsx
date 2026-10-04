@@ -49,12 +49,16 @@ function fileProblem(kind: ChallengeFileKind, file: File): string | null {
   return null
 }
 
-function Field({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
+function Field({ label, children, hint, error }: { label: string; children: React.ReactNode; hint?: string; error?: string }) {
   return (
     <div>
       <label className="mb-1 block text-xs font-medium text-ink-500">{label}</label>
       {children}
-      {hint && <p className="mt-1 text-xs text-ink-400">{hint}</p>}
+      {error ? (
+        <p role="alert" className="mt-1 text-xs font-medium text-danger-600">{error}</p>
+      ) : (
+        hint && <p className="mt-1 text-xs text-ink-400">{hint}</p>
+      )}
     </div>
   )
 }
@@ -134,6 +138,17 @@ export default function SubmitChallenge() {
   const [minDeadline] = useState(() => new Date(Date.now() + 86_400_000).toISOString().slice(0, 10))
   // Set when WSL's screening found personal data: the company reviews it, then edits or confirms.
   const [screening, setScreening] = useState<{ findings: ScreeningFinding[]; asDraft: boolean } | null>(null)
+  // Shown next to the field they belong to — from the checks below, or from the server.
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const clearError = (key: string) => setErrors((e) => (e[key] ? Object.fromEntries(Object.entries(e).filter(([k]) => k !== key)) : e))
+  const formRef = useRef<HTMLFormElement>(null)
+  // The submit button is at the bottom of a long form, so bring the first problem into view.
+  const showErrors = (next: Record<string, string>) => {
+    setErrors(next)
+    if (Object.keys(next).length > 0) {
+      requestAnimationFrame(() => formRef.current?.querySelector('[role="alert"]')?.scrollIntoView({ behavior: "smooth", block: "center" }))
+    }
+  }
 
   if (!company) return null
 
@@ -157,37 +172,56 @@ export default function SubmitChallenge() {
   }
 
   const submit = async (asDraft: boolean, confirmSensitiveData = false) => {
+    const skillList = requiredSkills.split(",").map((s) => s.trim()).filter(Boolean)
+    const outcomeList = learningOutcomes.split("\n").map((s) => s.trim()).filter(Boolean)
+    const hasDescription = descriptionMode === "write" ? problemDescription.trim().length > 0 : descriptionFile !== null
+    // The same rules the server enforces, checked here first so each problem shows next to its field.
+    const found: Record<string, string> = {}
+    if (!title.trim()) found.title = "Give the challenge a title, e.g. “Forecast Weekly Support Ticket Volume”."
+    if (!hasDescription) {
+      found.problemDescription =
+        descriptionMode === "write" ? "Describe the problem in a few sentences so students know what to solve." : "Attach the challenge description document, or switch to “Write it”."
+    }
+    if (skillList.length === 0) found.requiredSkills = "Add at least one required skill students will be assessed on, separated by commas (e.g. Python, SQL)."
+    if (outcomeList.length === 0) found.learningOutcomes = "Add at least one learning outcome, one per line (e.g. Build and evaluate a forecasting model)."
+    showErrors(found)
+    if (Object.keys(found).length > 0) return
+
     setSaving(true)
     const sentDescription = descriptionMode === "upload" ? descriptionFile : null
     const files: NewChallengeInput["files"] = [
       ...(sentDescription ? [{ kind: "description" as const, name: sentDescription.name, data: sentDescription.data }] : []),
       ...datasetFiles.map((f) => ({ kind: "dataset" as const, name: f.name, data: f.data })),
     ]
-    const result = await createChallenge({
-      title,
-      problemDescription,
-      requiredSkills: requiredSkills.split(",").map((s) => s.trim()).filter(Boolean),
-      visibility,
-      industry,
-      difficulty,
-      learningOutcomes: learningOutcomes.split("\n").map((s) => s.trim()).filter(Boolean),
-      datasetAvailability,
-      dataSensitivity,
-      deadline,
-      preferredUniversityId: preferredUniversityId || null,
-      contactId,
-      asDraft,
-      files,
-      confirmSensitiveData,
-    })
+    const result = await createChallenge(
+      {
+        title,
+        problemDescription,
+        requiredSkills: skillList,
+        visibility,
+        industry,
+        difficulty,
+        learningOutcomes: outcomeList,
+        datasetAvailability,
+        dataSensitivity,
+        deadline,
+        preferredUniversityId: preferredUniversityId || null,
+        contactId,
+        asDraft,
+        files,
+        confirmSensitiveData,
+      },
+      (field, message) => showErrors({ [field]: message }),
+    )
     setSaving(false)
     if (!result) return
     if ("findings" in result) setScreening({ findings: result.findings, asDraft })
     else navigate(`/company/challenges/${result.id}`)
   }
 
-  const hasDescription = descriptionMode === "write" ? problemDescription.trim().length > 0 : descriptionFile !== null
-  const canSubmit = !saving && !reading && title.trim().length > 0 && hasDescription
+  const canSubmit = !saving && !reading
+  // Errors on fields inside the collapsed section open it, so they're never hidden.
+  const detailsHaveError = Boolean(errors.deadline || errors.preferredUniversityId || errors.contactId)
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -201,12 +235,16 @@ export default function SubmitChallenge() {
         “WSL automatically checks every challenge — and every file you attach — for personal data before it reaches a university, whatever sensitivity level you choose.”
       </div>
 
-      <form className="space-y-5 rounded-2xl border border-ink-200 bg-surface p-6" onSubmit={(e) => e.preventDefault()}>
-        <Field label="Challenge title">
+      <form ref={formRef} className="space-y-5 rounded-2xl border border-ink-200 bg-surface p-6" onSubmit={(e) => e.preventDefault()}>
+        <Field label="Challenge title" error={errors.title}>
           <input
             className={inputClass}
             value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={(e) => {
+              setTitle(e.target.value)
+              clearError("title")
+            }}
+            aria-invalid={Boolean(errors.title)}
             placeholder="e.g. Forecast Weekly Support Ticket Volume"
             autoFocus
           />
@@ -231,8 +269,17 @@ export default function SubmitChallenge() {
           </div>
           {descriptionMode === "write" ? (
             <>
-              <textarea className={inputClass} rows={3} value={problemDescription} onChange={(e) => setProblemDescription(e.target.value)} />
-              <p className="mt-1 text-xs text-ink-400">A few sentences in general terms — leave out confidential specifics.</p>
+              <textarea
+                className={inputClass}
+                rows={3}
+                value={problemDescription}
+                onChange={(e) => {
+                  setProblemDescription(e.target.value)
+                  clearError("problemDescription")
+                }}
+                aria-invalid={Boolean(errors.problemDescription)}
+              />
+              {!errors.problemDescription && <p className="mt-1 text-xs text-ink-400">A few sentences in general terms — leave out confidential specifics.</p>}
             </>
           ) : (
             <div className="space-y-3">
@@ -241,17 +288,48 @@ export default function SubmitChallenge() {
                   <FileChip file={descriptionFile} onRemove={() => setDescriptionFile(null)} />
                 </ul>
               ) : (
-                <FilePicker kind="description" label="Choose the challenge description document" onPick={(f) => pick("description", f)} />
+                <FilePicker
+                  kind="description"
+                  label="Choose the challenge description document"
+                  onPick={(f) => {
+                    clearError("problemDescription")
+                    void pick("description", f)
+                  }}
+                />
               )}
               <Field label="Short summary (optional)" hint="Shown on challenge lists. If you leave it blank, WSL uses the opening of your document.">
                 <textarea className={inputClass} rows={2} value={problemDescription} onChange={(e) => setProblemDescription(e.target.value)} />
               </Field>
             </div>
           )}
+          {errors.problemDescription && (
+            <p role="alert" className="mt-1 text-xs font-medium text-danger-600">{errors.problemDescription}</p>
+          )}
         </div>
 
-        <Field label="Required skills" hint="Comma-separated, e.g. Python, Machine Learning, Data Analysis">
-          <input className={inputClass} value={requiredSkills} onChange={(e) => setRequiredSkills(e.target.value)} />
+        <Field label="Required skills" hint="Comma-separated, e.g. Python, Machine Learning, Data Analysis" error={errors.requiredSkills}>
+          <input
+            className={inputClass}
+            value={requiredSkills}
+            onChange={(e) => {
+              setRequiredSkills(e.target.value)
+              clearError("requiredSkills")
+            }}
+            aria-invalid={Boolean(errors.requiredSkills)}
+          />
+        </Field>
+
+        <Field label="Learning outcomes" hint="What students will learn — one per line" error={errors.learningOutcomes}>
+          <textarea
+            className={inputClass}
+            rows={2}
+            value={learningOutcomes}
+            onChange={(e) => {
+              setLearningOutcomes(e.target.value)
+              clearError("learningOutcomes")
+            }}
+            aria-invalid={Boolean(errors.learningOutcomes)}
+          />
         </Field>
 
         <div className="space-y-4 rounded-xl border border-ink-100 p-4">
@@ -306,7 +384,7 @@ export default function SubmitChallenge() {
           </div>
         </div>
 
-        <details className="group rounded-xl border border-ink-100">
+        <details className="group rounded-xl border border-ink-100" open={detailsHaveError || undefined}>
           <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-ink-600 marker:hidden [&::-webkit-details-marker]:hidden">
             <span className="inline-flex items-center gap-1.5">
               <span className="text-ink-400 transition-transform group-open:rotate-90">›</span>
@@ -325,23 +403,42 @@ export default function SubmitChallenge() {
               </Field>
             </div>
 
-            <Field label="Desired learning outcomes" hint="One per line">
-              <textarea className={inputClass} rows={2} value={learningOutcomes} onChange={(e) => setLearningOutcomes(e.target.value)} />
+            <Field label="Deadline" hint="Defaults to 30 days from today." error={errors.deadline}>
+              <input
+                type="date"
+                min={minDeadline}
+                className={inputClass}
+                value={deadline}
+                onChange={(e) => {
+                  setDeadline(e.target.value)
+                  clearError("deadline")
+                }}
+              />
             </Field>
 
-            <Field label="Deadline" hint="Defaults to 30 days from today.">
-              <input type="date" min={minDeadline} className={inputClass} value={deadline} onChange={(e) => setDeadline(e.target.value)} />
-            </Field>
-
-            <Field label="Preferred university" hint="Leave unset to let WSL route it.">
-              <select className={inputClass} value={preferredUniversityId} onChange={(e) => setPreferredUniversityId(e.target.value)}>
+            <Field label="Preferred university" hint="Leave unset to let WSL route it." error={errors.preferredUniversityId}>
+              <select
+                className={inputClass}
+                value={preferredUniversityId}
+                onChange={(e) => {
+                  setPreferredUniversityId(e.target.value)
+                  clearError("preferredUniversityId")
+                }}
+              >
                 <option value="">No preference</option>
                 {universities.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
               </select>
             </Field>
 
-            <Field label="Contact person" hint="Reviews submissions and signs your company's feedback.">
-              <select className={inputClass} value={contactId} onChange={(e) => setContactId(e.target.value)}>
+            <Field label="Contact person" hint="Reviews submissions and signs your company's feedback." error={errors.contactId}>
+              <select
+                className={inputClass}
+                value={contactId}
+                onChange={(e) => {
+                  setContactId(e.target.value)
+                  clearError("contactId")
+                }}
+              >
                 {myContacts.map((c) => <option key={c.id} value={c.id}>{c.name} — {c.role}</option>)}
               </select>
             </Field>
