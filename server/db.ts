@@ -341,7 +341,7 @@ export function getDb(): DatabaseSync {
   return db
 }
 
-const SCHEMA_VERSION = 12
+const SCHEMA_VERSION = 13
 
 /**
  * Brings databases created by older versions up to date without losing their data.
@@ -386,6 +386,10 @@ const SCHEMA_VERSION = 12
  *     during re-analysis can never silently downgrade an already model-graded signal to
  *     a weaker offline estimate — only a skill with no prior model-graded result falls
  *     back to the offline scorer, clearly labeled.
+ * v13: v12 defaulted every existing signal to 'offline', including ones a model had
+ *     already graded. A model-graded note always starts "Graded by <model>", so those
+ *     rows are marked 'model' — otherwise they'd wrongly read "Estimated offline" and
+ *     be left unprotected the next time the model is unavailable.
  */
 function migrate(db: DatabaseSync) {
   const { user_version: version } = db.prepare("PRAGMA user_version").get() as { user_version: number }
@@ -547,6 +551,11 @@ function migrate(db: DatabaseSync) {
       if (!signalColumns.includes("graded_source")) {
         db.exec("ALTER TABLE skill_signals ADD COLUMN graded_source TEXT NOT NULL DEFAULT 'offline' CHECK (graded_source IN ('model', 'offline'))")
       }
+    })
+  }
+  if (version < 13) {
+    transaction(db, () => {
+      db.exec("UPDATE skill_signals SET graded_source = 'model' WHERE graded_source = 'offline' AND ai_note LIKE 'Graded by %'")
     })
   }
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`)
