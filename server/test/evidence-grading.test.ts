@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest"
 import { resetDatabase, startServer } from "./helpers.ts"
 import { checkRelevance, simulateAIReview } from "../ml/analyze.ts"
-import { geminiDeps } from "../ml/gemini.ts"
+import { llmDeps } from "../ml/llm-grader.ts"
 import { githubDeps } from "../github.ts"
 
 // The IRIS "Detect Anomalies in Network Traffic Logs" challenge, as seeded.
@@ -70,7 +70,7 @@ describe("offline scorer (the review's failing cases)", () => {
 
 const PROJECT = "prj-iris-anomaly-yazan"
 const YAZAN = "student:stu-aau-yazan"
-const realFetchGemini = geminiDeps.fetch
+const realFetchLlm = llmDeps.fetch
 const realFetchGithub = githubDeps.fetch
 
 interface Signal {
@@ -89,7 +89,7 @@ async function yazanSignals() {
 }
 
 function geminiReply(payload: unknown, calls: { url: string; init: RequestInit }[]) {
-  geminiDeps.fetch = async (url, init) => {
+  llmDeps.fetch = async (url, init) => {
     calls.push({ url, init })
     return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(payload) }] } }] }), { status: 200 })
   }
@@ -99,12 +99,12 @@ describe("evidence grading through the API", () => {
   afterAll(() => server.close())
   beforeEach(() => {
     resetDatabase()
-    delete process.env.GEMINI_API_KEY
+    for (const k of ["GEMINI_API_KEY", "GEMINI_MODEL", "GROQ_API_KEY", "GROQ_MODEL", "WSL_AI_PROVIDER"]) delete process.env[k]
   })
   afterEach(() => {
-    geminiDeps.fetch = realFetchGemini
+    llmDeps.fetch = realFetchLlm
     githubDeps.fetch = realFetchGithub
-    delete process.env.GEMINI_API_KEY
+    for (const k of ["GEMINI_API_KEY", "GEMINI_MODEL", "GROQ_API_KEY", "GROQ_MODEL", "WSL_AI_PROVIDER"]) delete process.env[k]
   })
 
   it("rejects the brief pasted back with print('hello world') at submission", async () => {
@@ -162,9 +162,53 @@ describe("evidence grading through the API", () => {
     expect(sec.evidenceConfidence).toBeLessThanOrEqual(20)
   })
 
+  it("grades with Groq when a Groq key is set, preferring it over Gemini", async () => {
+    process.env.GROQ_API_KEY = "groq-test-key"
+    process.env.GEMINI_API_KEY = "gemini-test-key"
+    const calls: { url: string; init: RequestInit }[] = []
+    const payload = {
+      restatesBrief: false,
+      skills: SKILLS.map((skill) => ({
+        skill,
+        score: 66,
+        reason: "Working anomaly detection pipeline.",
+        quotes: [{ evidenceId: "ev-yazan-1", text: "model = IsolationForest(n_estimators=300, contamination=0.02, random_state=42)", why: "Fits a tuned model." }],
+      })),
+    }
+    llmDeps.fetch = async (url, init) => {
+      calls.push({ url, init })
+      return Response.json({ choices: [{ message: { role: "assistant", content: JSON.stringify(payload) } }] })
+    }
+
+    const res = await server.call("POST", `/projects/${PROJECT}/ai-review`, YAZAN)
+    expect(res.status).toBe(200)
+    expect(calls).toHaveLength(1)
+    expect(calls[0].url).toBe("https://api.groq.com/openai/v1/chat/completions")
+    expect((calls[0].init.headers as Record<string, string>).Authorization).toBe("Bearer groq-test-key")
+    const body = JSON.parse(String(calls[0].init.body))
+    expect(body.model).toBe("openai/gpt-oss-120b")
+    expect(body.response_format.type).toBe("json_schema")
+    expect(body.response_format.json_schema.strict).toBe(true)
+
+    const ml = (await yazanSignals()).find((s) => s.skill === "Machine Learning")!
+    expect(ml.evidenceConfidence).toBe(66)
+    expect(ml.aiNote).toMatch(/Graded by Groq/)
+    expect(ml.aiQuotes).toHaveLength(1)
+  })
+
+  it("uses Gemini instead when WSL_AI_PROVIDER says so", async () => {
+    process.env.GROQ_API_KEY = "groq-test-key"
+    process.env.GEMINI_API_KEY = "gemini-test-key"
+    process.env.WSL_AI_PROVIDER = "gemini"
+    const calls: { url: string; init: RequestInit }[] = []
+    geminiReply({ restatesBrief: false, skills: [] }, calls)
+    await server.call("POST", `/projects/${PROJECT}/ai-review`, YAZAN)
+    expect(calls[0].url).toContain("generativelanguage.googleapis.com")
+  })
+
   it("falls back to the offline check when Gemini fails", async () => {
     process.env.GEMINI_API_KEY = "test-key"
-    geminiDeps.fetch = async () => new Response(JSON.stringify({ error: { message: "quota exceeded" } }), { status: 429 })
+    llmDeps.fetch = async () => new Response(JSON.stringify({ error: { message: "quota exceeded" } }), { status: 429 })
     const res = await server.call("POST", `/projects/${PROJECT}/ai-review`, YAZAN)
     expect(res.status).toBe(200)
     const ml = (await yazanSignals()).find((s) => s.skill === "Machine Learning")!
