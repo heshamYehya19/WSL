@@ -8,13 +8,14 @@ const TONE: Record<string, string> = {
   "Company Reviewed": "bg-verified-100 text-verified-600 border-verified-500/40",
 }
 
-export function StatusBadge({ status, className = "" }: { status: string; className?: string }) {
+/** `label` replaces the visible text (e.g. a translation) while the color still follows `status`. */
+export function StatusBadge({ status, label, className = "" }: { status: string; label?: string; className?: string }) {
   const tone = TONE[status] ?? "bg-ink-100 text-ink-700 border-ink-200"
   return (
     <span
       className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold whitespace-nowrap ${tone} ${className}`}
     >
-      {status}
+      {label ?? status}
     </span>
   )
 }

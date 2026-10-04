@@ -60,7 +60,8 @@ export function PublicNav() {
             </NavLink>
           ))}
         </nav>
-        <div className="flex items-center gap-3">
+        {/* Tighter on phones: with an account signed in, the default gaps overflowed a 390px screen. */}
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           <ThemeToggle />
           {session.role !== "guest" ? (
             <DemoSwitcher />
