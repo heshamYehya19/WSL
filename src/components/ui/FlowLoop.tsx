@@ -12,11 +12,13 @@ const STEPS = [
 
 export function FlowLoop({ compact = false }: { compact?: boolean }) {
   return (
-    <div className={`grid grid-cols-3 gap-3 ${compact ? "lg:grid-cols-9" : "sm:grid-cols-3"}`}>
+    // Two columns on phones: three left too little room for labels like "Opportunity" and
+    // pushed the page into sideways scroll.
+    <div className={`grid grid-cols-2 gap-3 sm:grid-cols-3 ${compact ? "lg:grid-cols-9" : ""}`}>
       {STEPS.map((step, i) => (
         <div
           key={step.label}
-          className="relative flex flex-col gap-2 rounded-xl border border-ink-200 bg-surface px-4 py-3.5 transition-all duration-300 hover:-translate-y-1 hover:border-teal-300 hover:shadow-md hover:shadow-ink-950/5"
+          className="relative flex min-w-0 flex-col gap-2 rounded-xl border border-ink-200 bg-surface px-3 py-3.5 transition-all duration-300 hover:-translate-y-1 hover:border-teal-300 hover:shadow-md hover:shadow-ink-950/5 sm:px-4"
         >
           <div className="flex items-center gap-2">
             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-night text-[11px] font-bold text-teal-300">

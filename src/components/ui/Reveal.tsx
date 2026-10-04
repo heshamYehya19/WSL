@@ -10,19 +10,18 @@ export function Reveal({
   delay?: number
 }) {
   const ref = useRef<HTMLDivElement>(null)
-  const [visible, setVisible] = useState(false)
+  // Reduced-motion visitors see everything immediately — derived up front, not set from an effect.
+  const [reducedMotion] = useState(() => window.matchMedia("(prefers-reduced-motion: reduce)").matches)
+  const [revealed, setRevealed] = useState(false)
+  const visible = reducedMotion || revealed
 
   useEffect(() => {
     const el = ref.current
-    if (!el) return
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      setVisible(true)
-      return
-    }
+    if (!el || reducedMotion) return
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
-          setVisible(true)
+          setRevealed(true)
           observer.disconnect()
         }
       },
@@ -30,7 +29,7 @@ export function Reveal({
     )
     observer.observe(el)
     return () => observer.disconnect()
-  }, [])
+  }, [reducedMotion])
 
   return (
     <div

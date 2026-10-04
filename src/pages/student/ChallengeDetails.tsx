@@ -4,6 +4,7 @@ import { useDemoUser } from "../../state/demoUser"
 import { useStore } from "../../state/store"
 import { PageHeader } from "../../components/ui/PageHeader"
 import { StatusBadge } from "../../components/ui/StatusBadge"
+import { IllustrativeDataNote } from "../../components/ui/IllustrativeDataNote"
 import { ChallengeFileList, SharedDataNotice } from "../../components/ui/ChallengeFiles"
 import { formatDate, daysUntil } from "../../lib/format"
 import { assignmentFor, canStudentSee, statusAtUniversity } from "../../lib/selectors"
@@ -55,6 +56,7 @@ export default function ChallengeDetails() {
         subtitle={undefined}
         action={<StatusBadge status={statusAtUniversity(challenge, student!.universityId, projects, students)} />}
       />
+      <IllustrativeDataNote company={org?.name} />
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="rounded-2xl border border-ink-200 bg-surface px-6 lg:col-span-2">

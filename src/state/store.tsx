@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react"
 import type { ReactNode } from "react"
 import { ApiRequestError, downloadChallengeFile, fetchSnapshot, mutate } from "../lib/api"
 import { useSession } from "./session"
@@ -71,24 +71,26 @@ interface StoreContextValue extends Snapshot {
 
 const StoreContext = createContext<StoreContextValue | null>(null)
 
+// Request numbers only need to keep increasing, so a plain counter is enough — no ref to
+// read during render.
+let lastRequestSeq = 0
+const nextRequestSeq = () => ++lastRequestSeq
+
 export function StoreProvider({ children }: { children: ReactNode }) {
   const { session } = useSession()
-  const [snapshot, setSnapshot] = useState<Snapshot | null>(null)
+  // Requests can resolve out of order (e.g. a focus refresh racing a write), so a snapshot
+  // is only applied if no newer request's snapshot has been applied already.
+  const [current, setCurrent] = useState<{ seq: number; snapshot: Snapshot | null }>({ seq: 0, snapshot: null })
+  const snapshot = current.snapshot
   const [loadError, setLoadError] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
 
-  // Requests can resolve out of order (e.g. a focus refresh racing a write), so only
-  // apply a snapshot if no newer request has already been applied.
-  const requestSeq = useRef(0)
-  const appliedSeq = useRef(0)
   const apply = useCallback((seq: number, s: Snapshot) => {
-    if (seq < appliedSeq.current) return
-    appliedSeq.current = seq
-    setSnapshot(s)
+    setCurrent((prev) => (seq < prev.seq ? prev : { seq, snapshot: s }))
   }, [])
 
   const refresh = useCallback(() => {
-    const seq = ++requestSeq.current
+    const seq = nextRequestSeq()
     fetchSnapshot(session)
       .then((s) => {
         apply(seq, s)
@@ -111,11 +113,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return () => clearTimeout(t)
   }, [toast])
 
-  const value = useMemo<StoreContextValue | null>(() => {
-    if (!snapshot) return null
-
-    async function run<R>(method: "POST" | "PATCH", path: string, body?: unknown, onFieldError?: FieldErrorHandler): Promise<{ ok: true; result: R } | { ok: false }> {
-      const seq = ++requestSeq.current
+  const run = useCallback(
+    async <R,>(method: "POST" | "PATCH", path: string, body?: unknown, onFieldError?: FieldErrorHandler): Promise<{ ok: true; result: R } | { ok: false }> => {
+      const seq = nextRequestSeq()
       try {
         const res = await mutate<R>(method, path, session, body)
         apply(seq, res.snapshot)
@@ -125,7 +125,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         else setToast((err as Error).message)
         return { ok: false }
       }
-    }
+    },
+    [session, apply],
+  )
+
+  const value = useMemo<StoreContextValue | null>(() => {
+    if (!snapshot) return null
+
     const ok = (p: Promise<{ ok: boolean }>) => p.then((r) => r.ok)
 
     const studentById = new Map(snapshot.students.map((s) => [s.id, s]))
@@ -172,7 +178,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       downloadFile: (challengeId, fileId, name) =>
         downloadChallengeFile(session, challengeId, fileId, name).catch((err: Error) => setToast(err.message)),
     }
-  }, [snapshot, session, apply])
+  }, [snapshot, session, run])
 
   if (!value) {
     return (

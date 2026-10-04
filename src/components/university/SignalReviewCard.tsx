@@ -64,7 +64,7 @@ export function SignalReviewCard({
       </div>
 
       {signal.gradedSource === "offline" && (
-        <p className="mt-2 rounded-lg bg-amber-50 px-2.5 py-1.5 text-[11px] font-medium text-amber-700">
+        <p className="mt-2 rounded-lg bg-amber-100 px-2.5 py-1.5 text-[11px] font-medium text-amber-600">
           Estimated offline, not graded by the AI model — ask the student to re-analyze once the model is available.
         </p>
       )}

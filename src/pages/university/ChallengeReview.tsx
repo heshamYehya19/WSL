@@ -4,6 +4,7 @@ import { useDemoUser } from "../../state/demoUser"
 import { useStore } from "../../state/store"
 import { PageHeader } from "../../components/ui/PageHeader"
 import { StatusBadge } from "../../components/ui/StatusBadge"
+import { IllustrativeDataNote } from "../../components/ui/IllustrativeDataNote"
 import { ChallengeFileList, SharedDataNotice } from "../../components/ui/ChallengeFiles"
 import { assignmentFor, statusAtUniversity } from "../../lib/selectors"
 import { daysUntil, formatDate, formatRelative } from "../../lib/format"
@@ -57,6 +58,7 @@ export default function ChallengeReview() {
     <div className="mx-auto max-w-4xl">
       <Link to="/university/challenges" className="text-sm text-ink-400 hover:text-teal-600">← Back to Challenges</Link>
       <PageHeader eyebrow={`${org?.name} · ${challenge.industry}`} title={challenge.title} action={<StatusBadge status={status} />} />
+      <IllustrativeDataNote company={org?.name} />
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-5 lg:col-span-2">

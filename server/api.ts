@@ -28,11 +28,13 @@ import type {
   Project,
   ProjectMember,
   ScreeningFinding,
+  ShowcaseRecord,
   SkillSignal,
   SkillSignalStatus,
   Snapshot,
   Staff,
   Student,
+  SuggestedLevel,
   University,
 } from "../src/types.ts"
 
@@ -415,7 +417,77 @@ function buildSnapshot(db: DatabaseSync, actor: Actor): Snapshot {
           createdAt: String(r.created_at),
         }))
 
-  return { universities, staff, organizations, contacts, students, challenges, projects, evidence, skillSignals, opportunities, companyActions, notifications }
+  return {
+    universities,
+    staff,
+    organizations,
+    contacts,
+    students,
+    challenges,
+    projects,
+    evidence,
+    skillSignals,
+    opportunities,
+    companyActions,
+    notifications,
+    showcase: buildShowcase(db),
+  }
+}
+
+/**
+ * The landing page's verified skill record, for every visitor including signed-out ones.
+ * Deliberately narrow: only mentor-verified skills with a quoted line, only from projects
+ * already confirmed to the company (what any signed-in company can see anyway). Picks the
+ * project with the most such skills, then shows its three strongest.
+ */
+function buildShowcase(db: DatabaseSync): ShowcaseRecord | null {
+  const rows = all(
+    db,
+    `SELECT ss.project_id, ss.skill, ss.suggested_level, ss.ai_quotes, ss.evidence_confidence, ss.verified_at,
+            st.name AS mentor, s.name AS student, pg.name AS program, u.short_name AS university,
+            c.title AS project_title, co.name AS company
+     FROM skill_signals ss
+     JOIN projects pr ON pr.id = ss.project_id
+     JOIN students s ON s.id = pr.student_id
+     JOIN programs pg ON pg.id = s.program_id
+     JOIN universities u ON u.id = s.university_id
+     JOIN challenges c ON c.id = pr.challenge_id
+     JOIN companies co ON co.id = c.company_id
+     JOIN staff st ON st.id = ss.verified_by
+     WHERE ss.status = 'Verified' AND pr.status IN (${COMPANY_VISIBLE_STATUSES.map(() => "?").join(",")})`,
+    ...COMPANY_VISIBLE_STATUSES,
+  ).filter((r) => parseQuotes(r.ai_quotes).length > 0)
+
+  const byProject = new Map<string, typeof rows>()
+  for (const r of rows) byProject.set(String(r.project_id), [...(byProject.get(String(r.project_id)) ?? []), r])
+  const latest = (rs: typeof rows) => rs.map((r) => String(r.verified_at)).sort().at(-1) ?? ""
+  const best = [...byProject.values()]
+    .filter((rs) => rs.length >= 2)
+    .sort((a, b) => b.length - a.length || latest(b).localeCompare(latest(a)))[0]
+  if (!best) return null
+
+  const evidenceTitles = new Map(all(db, "SELECT id, title FROM evidence WHERE project_id = ?", String(best[0].project_id)).map((e) => [String(e.id), String(e.title)]))
+  const first = best[0]
+  return {
+    studentName: String(first.student),
+    program: String(first.program),
+    university: String(first.university),
+    projectTitle: String(first.project_title),
+    company: String(first.company),
+    skills: [...best]
+      .sort((a, b) => Number(b.evidence_confidence) - Number(a.evidence_confidence))
+      .slice(0, 3)
+      .map((r) => {
+        const quote = parseQuotes(r.ai_quotes)[0]
+        return {
+          skill: String(r.skill),
+          level: r.suggested_level as SuggestedLevel,
+          quote: { ...quote, evidenceTitle: evidenceTitles.get(quote.evidenceId) ?? "Submitted evidence" },
+          verifiedBy: String(r.mentor),
+          verifiedAt: String(r.verified_at),
+        }
+      }),
+  }
 }
 
 // --------------------------------------------------------------------- helpers

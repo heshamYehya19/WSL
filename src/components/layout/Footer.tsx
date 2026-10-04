@@ -34,7 +34,10 @@ export function Footer() {
         </div>
         <div className="mt-8 flex flex-col gap-2 border-t border-ink-100 pt-6 text-xs text-ink-400 sm:flex-row sm:items-center sm:justify-between">
           <span>Jordan 2076 Hackathon — Amman track: Innovation in Education &amp; Learning Systems.</span>
-          <span>Universities and companies are real Jordanian institutions; student profiles, challenges, and skill signals shown are illustrative.</span>
+          <span>
+            <span className="font-semibold text-ink-500">Illustrative data:</span> universities and companies are real Jordanian institutions, but
+            every person, challenge and result shown is fictional and not endorsed by them.
+          </span>
         </div>
       </div>
     </footer>

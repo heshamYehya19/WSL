@@ -2,6 +2,7 @@ import { Link, useParams } from "react-router-dom"
 import { useStore } from "../../state/store"
 import { useDemoUser } from "../../state/demoUser"
 import { StatusBadge } from "../../components/ui/StatusBadge"
+import { IllustrativeDataNote } from "../../components/ui/IllustrativeDataNote"
 import { ChallengeFileList, SharedDataNotice } from "../../components/ui/ChallengeFiles"
 import { challengeUniversityIds } from "../../lib/selectors"
 import { PIPELINE_ORDER } from "../../lib/pipeline"
@@ -40,6 +41,7 @@ export default function ChallengeStatus() {
         </div>
         <StatusBadge status={challenge.status} />
       </div>
+      <IllustrativeDataNote company={company?.name} />
 
       <div className="rounded-2xl border border-ink-200 bg-surface p-6">
         <h3 className="mb-4 text-xs font-semibold tracking-wide text-teal-600 uppercase">Pipeline Progress</h3>
