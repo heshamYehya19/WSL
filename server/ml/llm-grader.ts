@@ -61,25 +61,64 @@ export function configuredProvider(): Provider | null {
   return groq ?? gemini
 }
 
-const HEALTH_TIMEOUT_MS = 8_000
+const HEALTH_TIMEOUT_MS = 10_000
+// The endpoint is public, so a burst of requests reuses one check instead of each spending tokens.
+const HEALTH_CACHE_MS = 60_000
+let lastHealth: { key: string; at: number; result: { ok: boolean; message?: string } } | null = null
+
+/** Provider errors can name the account's organization; that has no place in a public endpoint. */
+const redact = (message: string) => message.replace(/\borg_[A-Za-z0-9]+/g, "org_…")
+
+export interface GradingOutcome {
+  ok: boolean
+  at: string
+  message?: string
+}
+let lastGrading: GradingOutcome | null = null
 
 /**
- * A cheap, real check that the configured key actually works — lists the provider's
- * models (no grading tokens spent) with a short timeout. For GET /api/health, so the
- * team can confirm the key is live before judging without spending a grading call.
+ * The result of the most recent real grading call since the server started, or null.
+ * GET /api/health reports it next to the key check: a tiny request can't see the free
+ * tier's daily token quota (it still fits after a grading-sized request is refused), but
+ * the last grading call can — a 429 there means analyses are falling back right now.
+ */
+export function lastGradingOutcome(): GradingOutcome | null {
+  return lastGrading
+}
+
+/**
+ * Whether the configured key and model respond, for GET /api/health — a real request to
+ * the grading model for a few tokens, reused for a minute.
  */
 export async function checkProviderHealth(provider: Provider): Promise<{ ok: boolean; message?: string }> {
+  const key = `${provider.id}:${provider.model}:${provider.apiKey}`
+  if (lastHealth && lastHealth.key === key && Date.now() - lastHealth.at < HEALTH_CACHE_MS) return lastHealth.result
+  const result = await probe(provider)
+  lastHealth = { key, at: Date.now(), result }
+  return result
+}
+
+async function probe(provider: Provider): Promise<{ ok: boolean; message?: string }> {
   try {
+    const signal = AbortSignal.timeout(HEALTH_TIMEOUT_MS)
     const res =
       provider.id === "groq"
-        ? await llmDeps.fetch("https://api.groq.com/openai/v1/models", {
-            headers: { Authorization: `Bearer ${provider.apiKey}` },
-            signal: AbortSignal.timeout(HEALTH_TIMEOUT_MS),
+        ? await llmDeps.fetch(GROQ_API, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${provider.apiKey}` },
+            body: JSON.stringify({ model: provider.model, max_tokens: 16, messages: [{ role: "user", content: "Reply with OK." }] }),
+            signal,
           })
-        : await llmDeps.fetch(`${GEMINI_API}/models?key=${encodeURIComponent(provider.apiKey)}`, { signal: AbortSignal.timeout(HEALTH_TIMEOUT_MS) })
+        : await llmDeps.fetch(`${GEMINI_API}/models/${encodeURIComponent(provider.model)}:generateContent`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-goog-api-key": provider.apiKey },
+            body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: "Reply with OK." }] }], generationConfig: { maxOutputTokens: 16 } }),
+            signal,
+          })
     if (res.ok) return { ok: true }
     const body = (await res.json().catch(() => null)) as { error?: { message?: string } } | null
-    return { ok: false, message: `HTTP ${res.status}${body?.error?.message ? `: ${body.error.message.slice(0, 200)}` : ""}` }
+    const detail = body?.error?.message ? redact(body.error.message).slice(0, 200) : ""
+    return { ok: false, message: `HTTP ${res.status}${detail ? `: ${detail}` : ""}` }
   } catch (err) {
     return { ok: false, message: err instanceof Error ? err.message : String(err) }
   }
@@ -289,7 +328,14 @@ export async function gradeWithModel(
   items: EvidenceLike[],
   challenge: ChallengeContext,
 ): Promise<SimulatedRating[]> {
-  const result = await callModel(provider, buildPrompt(skills, items, challenge))
+  let result: GradeResult
+  try {
+    result = await callModel(provider, buildPrompt(skills, items, challenge))
+    lastGrading = { ok: true, at: new Date().toISOString() }
+  } catch (err) {
+    lastGrading = { ok: false, at: new Date().toISOString(), message: redact(err instanceof Error ? err.message : String(err)).slice(0, 300) }
+    throw err
+  }
   const echo = new BriefEcho(challenge)
   const ratings: SimulatedRating[] = []
 

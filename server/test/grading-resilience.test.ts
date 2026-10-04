@@ -117,16 +117,19 @@ describe("GET /api/health", () => {
     expect(res.json).toMatchObject({ provider: null, model: "offline", keyWorks: false })
   })
 
-  it("checks that a configured key actually works", async () => {
+  it("checks that the grading model actually answers, and reuses the result for a minute", async () => {
     process.env.GEMINI_API_KEY = "test-key"
     const calls: string[] = []
     llmDeps.fetch = async (url) => {
       calls.push(url)
-      return Response.json({ models: [] })
+      return Response.json({ candidates: [{ content: { parts: [{ text: "OK" }] } }] })
     }
     const res = await server.call("GET", "/health")
     expect(res.json).toMatchObject({ provider: "gemini", model: "gemini-flash-latest", keyWorks: true })
-    expect(calls[0]).toContain("/models")
+    expect(calls[0]).toContain("/models/gemini-flash-latest:generateContent")
+    // A public endpoint: a second check right away doesn't spend more tokens.
+    await server.call("GET", "/health")
+    expect(calls).toHaveLength(1)
   })
 
   it("reports a key the provider rejects", async () => {
@@ -135,6 +138,26 @@ describe("GET /api/health", () => {
     const res = await server.call("GET", "/health")
     expect(res.json).toMatchObject({ provider: "gemini", keyWorks: false })
     expect(String(res.json.message)).toMatch(/HTTP 400/)
+  })
+
+  it("reports a used-up daily quota from the last grading call, even though the key itself works", async () => {
+    resetDatabase()
+    process.env.GROQ_API_KEY = "quota-key"
+    // The free tier's daily limit refuses a grading-sized request but still answers a tiny one.
+    llmDeps.fetch = async (_url, init) =>
+      String(init.body).includes("response_format")
+        ? Response.json(
+            { error: { message: "Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01abc123XYZ` on tokens per day (TPD)" } },
+            { status: 429 },
+          )
+        : Response.json({ choices: [{ message: { content: "OK" } }] })
+    expect((await analyze()).json.result).toMatchObject({ failed: true })
+
+    const res = await server.call("GET", "/health")
+    expect(res.json).toMatchObject({ provider: "groq", keyWorks: true, lastGrading: { ok: false } })
+    const lastGrading = res.json.lastGrading as { message: string }
+    expect(lastGrading.message).toMatch(/429: Rate limit reached/)
+    expect(lastGrading.message).not.toContain("org_01abc123XYZ")
   })
 })
 

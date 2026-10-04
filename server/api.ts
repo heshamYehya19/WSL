@@ -3,7 +3,7 @@ import type { IncomingMessage, ServerResponse } from "node:http"
 import type { DatabaseSync } from "node:sqlite"
 import { getDb, resetDatabase, transaction } from "./db.ts"
 import { analyzeEvidence, canonicalSkillName, checkRelevance, currentGradingModel, hashEvidenceSet } from "./ai.ts"
-import { checkProviderHealth, configuredProvider } from "./ml/llm-grader.ts"
+import { checkProviderHealth, configuredProvider, lastGradingOutcome } from "./ml/llm-grader.ts"
 import type { ChallengeContext, EvidenceQuote, SimulatedRating, SkillCriterion } from "./ai.ts"
 import { parseGithubLink, readGithubRepo } from "./github.ts"
 import type { RepoSnapshot } from "./github.ts"
@@ -1311,7 +1311,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
   if (req.method === "GET" && path === "/health") {
     const provider = configuredProvider()
     const health = provider ? await checkProviderHealth(provider) : { ok: false, message: "No GROQ_API_KEY or GEMINI_API_KEY configured — using the offline scorer." }
-    send(res, 200, { provider: provider?.id ?? null, model: provider?.model ?? "offline", keyWorks: health.ok, message: health.message })
+    send(res, 200, { provider: provider?.id ?? null, model: provider?.model ?? "offline", keyWorks: health.ok, message: health.message, lastGrading: lastGradingOutcome() })
     return true
   }
 
