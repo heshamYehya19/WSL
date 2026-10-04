@@ -54,8 +54,46 @@ challenges, a university only its own students' work, a student only their own p
 profile. Each change runs in a transaction, notifies the affected accounts, and returns a fresh
 snapshot so every page reflects the database immediately.
 
-The "AI evidence analysis" is a deterministic, clearly-labeled simulation — there is no external
-AI API call.
+## AI evidence analysis
+
+When a student asks WSL to analyze their evidence, `server/ai.ts` grades it against each skill the
+challenge requires:
+
+- **Model grading (Groq or Gemini).** The evidence is sent to the configured model with structured JSON output: a 0-100 score per
+  skill plus the exact lines of the student's work that prove it. WSL checks every quoted line
+  against the real content and drops any that aren't there or only repeat the brief; a skill with no
+  confirmed quote is capped at 20. The quotes appear in the mentor's "Why WSL found this" box.
+- **Brief echo is never evidence.** Lines copied from the challenge brief are ignored when scoring,
+  and a submission that mostly repeats the brief is rejected when it's submitted.
+- **Only real content counts.** An evidence title or description is the student's own claim and
+  never raises a score. Public GitHub links are read automatically (the README and the top few
+  source files, `server/github.ts`); other links are left for the mentor.
+- **Personal data stays on WSL.** The same personal-data screen used for company challenges runs
+  first; if it finds anything, the evidence is not sent to the model.
+- **Offline fallback.** Without a key, on a failed call, or when personal data was found, a stricter
+  local scorer (`server/ml/analyze.ts`) looks for concrete, skill-specific signs and quotes the lines
+  it found. It never suggests "Demonstrated". The seeded demo data is scored with it.
+
+AI signals are informational only. A skill reaches a student's record only when a university mentor
+verifies it, and companies only see verified skills unless they choose to include unverified signals.
+
+| Environment variable | Purpose |
+|---|---|
+| `GROQ_API_KEY` | Enables grading with Groq. Used first when both keys are set. |
+| `GROQ_MODEL` | Optional. Defaults to `openai/gpt-oss-120b` (supports strict JSON schema output). |
+| `GEMINI_API_KEY` | Enables grading with Gemini. |
+| `GEMINI_MODEL` | Optional. Defaults to `gemini-flash-latest`, Google's alias for its newest Flash model. |
+| `WSL_AI_PROVIDER` | Optional, `groq` or `gemini`, to choose when both keys are set. With neither key, the offline scorer is used. |
+| `GITHUB_TOKEN` | Optional. Raises the GitHub API rate limit for reading repository links. |
+
+## Demo tour
+
+The sign-in page opens with **Yazan Al-Masri**, a student with a full record, and a **Take the
+tour** button. The tour follows him through all three roles: IRIS's challenge, Amman Arab
+University assigning it, Yazan's evidence (including a one-click attempt to game the AI by
+submitting the brief, which is rejected), the mentor verifying quoted evidence, and IRIS finding
+him in Talent Discovery. Run `npm run db:reset` (or the reset in the account menu) before
+rehearsing, so his project is back to "Evidence Under Review".
 
 **Demo auth, not production auth:** the signed-in account is a client-supplied `x-wsl-actor`
 header, trusted once its id is confirmed to exist — there's no password, session, or signed token.

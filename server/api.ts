@@ -2,8 +2,10 @@ import { randomUUID } from "node:crypto"
 import type { IncomingMessage, ServerResponse } from "node:http"
 import type { DatabaseSync } from "node:sqlite"
 import { getDb, resetDatabase, transaction } from "./db.ts"
-import { checkRelevance, simulateAIReview } from "./ai.ts"
-import type { ChallengeContext } from "./ai.ts"
+import { analyzeEvidence, checkRelevance } from "./ai.ts"
+import type { ChallengeContext, EvidenceQuote, SimulatedRating } from "./ai.ts"
+import { parseGithubLink, readGithubRepo } from "./github.ts"
+import type { RepoSnapshot } from "./github.ts"
 import { rank } from "../src/lib/pipeline.ts"
 import { MAX_DATASET_FILES, MAX_FILE_BYTES, prepareFile, screenChallenge, summarizeFindings, UploadError } from "./screening.ts"
 import type { PreparedFile } from "./screening.ts"
@@ -184,7 +186,10 @@ function buildSnapshot(db: DatabaseSync, actor: Actor): Snapshot {
 
   const students: Student[] = all(
     db,
-    "SELECT s.*, p.major FROM students s JOIN programs p ON p.id = s.program_id ORDER BY s.name",
+    // Students with the most verified skills first, so lists (and the sign-in page) open on a full record.
+    `SELECT s.*, p.major FROM students s JOIN programs p ON p.id = s.program_id
+     ORDER BY (SELECT COUNT(*) FROM skill_signals g WHERE g.student_id = s.id AND g.status = 'Verified') DESC,
+              (SELECT COUNT(*) FROM projects pr WHERE pr.student_id = s.id) DESC, s.name`,
   ).map((r) => {
     const name = String(r.name)
     return {
@@ -338,6 +343,7 @@ function buildSnapshot(db: DatabaseSync, actor: Actor): Snapshot {
       description: String(r.description),
       link: String(r.link),
       ...(r.content ? { content: String(r.content) } : {}),
+      ...(r.fetched_from ? { analyzedFiles: parseList(r.fetched_from) } : {}),
       submittedAt: String(r.submitted_at),
     }))
 
@@ -352,6 +358,7 @@ function buildSnapshot(db: DatabaseSync, actor: Actor): Snapshot {
       evidenceConfidence: Number(r.evidence_confidence),
       suggestedLevel: r.suggested_level as SkillSignal["suggestedLevel"],
       aiNote: String(r.ai_note ?? ""),
+      aiQuotes: parseQuotes(r.ai_quotes),
       status: r.status as SkillSignalStatus,
       ...(r.verified_by ? { verifiedBy: String(r.verified_by), verifiedAt: String(r.verified_at) } : {}),
       ...(r.reviewer_notes ? { reviewerNotes: String(r.reviewer_notes) } : {}),
@@ -506,6 +513,30 @@ function projectContext(db: DatabaseSync, projectId: string) {
   }
 }
 
+/** The student-side checks shared by adding evidence and requesting analysis. */
+function requireEvidenceAccess(db: DatabaseSync, actor: Actor, projectId: string, action: string) {
+  const student = requireRole(actor, "student")
+  const p = projectContext(db, projectId)
+  if (p.studentId !== student.id && !isProjectMember(db, projectId, student.id)) throw new ApiError(403, `You can only ${action} your own projects.`)
+  if (rank(p.status) >= rank("Verified")) throw new ApiError(409, "This evidence was already confirmed to the company.")
+  return { student, p }
+}
+
+function parseQuotes(raw: unknown): EvidenceQuote[] {
+  try {
+    const parsed = JSON.parse(String(raw ?? "[]"))
+    return Array.isArray(parsed) ? (parsed as EvidenceQuote[]) : []
+  } catch {
+    return []
+  }
+}
+
+/** Everything WSL analyzes for one evidence item: the student's pasted content plus anything read from its link. */
+function analyzableText(r: Record<string, unknown>): string | undefined {
+  const text = [r.content, r.fetched_content].filter(Boolean).map(String).join("\n\n")
+  return text || undefined
+}
+
 function challengeContextFor(db: DatabaseSync, challengeId: string): ChallengeContext {
   const row = one(db, "SELECT problem_description, objectives, expected_output FROM challenges WHERE id = ?", challengeId)!
   // A description document holds the full problem statement, so students' work is matched against it too.
@@ -594,7 +625,7 @@ type Handler = (db: DatabaseSync, actor: Actor, params: string[], body: Body, pr
 
 // `prepare` does any async work (e.g. reading uploaded files) before the handler's
 // synchronous database transaction starts; its result is passed to the handler.
-const routes: { method: string; pattern: RegExp; prepare?: (actor: Actor, body: Body) => Promise<unknown>; handler: Handler }[] = [
+const routes: { method: string; pattern: RegExp; prepare?: (actor: Actor, body: Body, params: string[]) => Promise<unknown>; handler: Handler }[] = [
   {
     method: "POST",
     pattern: /^\/challenges$/,
@@ -771,11 +802,14 @@ const routes: { method: string; pattern: RegExp; prepare?: (actor: Actor, body: 
   {
     method: "POST",
     pattern: /^\/projects\/([^/]+)\/evidence$/,
-    handler: (db, actor, [id], body) => {
-      const student = requireRole(actor, "student")
-      const p = projectContext(db, id)
-      if (p.studentId !== student.id && !isProjectMember(db, id, student.id)) throw new ApiError(403, "You can only add evidence to your own projects.")
-      if (rank(p.status) >= rank("Verified")) throw new ApiError(409, "This evidence was already confirmed to the company.")
+    // A GitHub link is read (README and top source files) before the transaction, so it can be analyzed.
+    prepare: async (actor, body, [id]) => {
+      requireEvidenceAccess(getDb(), actor, id, "add evidence to")
+      if (body.type === "Code" || typeof body.link !== "string" || !parseGithubLink(body.link)) return null
+      return readGithubRepo(body.link)
+    },
+    handler: (db, actor, [id], body, repo: RepoSnapshot | null) => {
+      const { p, student } = requireEvidenceAccess(db, actor, id, "add evidence to")
       const evType = oneOf(body.type, SUBMITTABLE_EVIDENCE_TYPES, "evidence type", "")
       if (!evType) throw new ApiError(400, "Evidence type is required.")
       const title = text(body.title, "Title", { required: true, max: 200 })
@@ -786,8 +820,14 @@ const routes: { method: string; pattern: RegExp; prepare?: (actor: Actor, body: 
       const link = isCode ? "" : text(body.link, "Link", { required: true, max: 500 })
       const content = isCode ? text(body.content, "Code", { required: true, max: 20000 }) : text(body.content, "Content", { max: 20000 }) || null
 
-      const checkText = [title, content].filter(Boolean).join(". ")
+      const checkText = [title, content, repo?.text].filter(Boolean).join(". ")
       const relevance = checkRelevance(challengeContextFor(db, p.challengeId), checkText)
+      if (!relevance.relevant && relevance.reason === "echoes-brief") {
+        throw new ApiError(
+          400,
+          `Most of this submission repeats the “${p.challengeTitle}” brief back (${relevance.echoPct}% of its phrases come from the challenge). WSL only counts work you produced, so submit your own code, analysis or write-up.`,
+        )
+      }
       if (!relevance.relevant) {
         throw new ApiError(
           400,
@@ -797,39 +837,35 @@ const routes: { method: string; pattern: RegExp; prepare?: (actor: Actor, body: 
 
       exec(
         db,
-        "INSERT INTO evidence (id, project_id, student_id, type, title, description, link, content, submitted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        newId("ev"), id, student.id, evType, title, "", link, content, nowIso(),
+        "INSERT INTO evidence (id, project_id, student_id, type, title, description, link, content, fetched_content, fetched_from, submitted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        newId("ev"), id, student.id, evType, title, "", link, content, repo?.text ?? null, repo ? JSON.stringify(repo.files) : null, nowIso(),
       )
     },
   },
   {
     method: "POST",
     pattern: /^\/projects\/([^/]+)\/ai-review$/,
-    handler: (db, actor, [id]) => {
-      const student = requireRole(actor, "student")
-      const p = projectContext(db, id)
-      if (p.studentId !== student.id && !isProjectMember(db, id, student.id)) throw new ApiError(403, "You can only request analysis for your own projects.")
-      if (rank(p.status) >= rank("Verified")) throw new ApiError(409, "This evidence was already confirmed to the company.")
+    // Grading calls Gemini, so it runs before the database transaction; the handler only saves the results.
+    prepare: async (actor, _body, [id]) => {
+      const db = getDb()
+      const { p } = requireEvidenceAccess(db, actor, id, "request analysis for")
       const ev = all(db, "SELECT * FROM evidence WHERE project_id = ? ORDER BY submitted_at", id).map((r) => ({
         id: String(r.id),
-        projectId: id,
-        studentId: student.id,
-        type: r.type as EvidenceType,
+        type: String(r.type),
         title: String(r.title),
         description: String(r.description),
-        link: String(r.link),
-        ...(r.content ? { content: String(r.content) } : {}),
-        submittedAt: String(r.submitted_at),
+        content: analyzableText(r),
       }))
       if (ev.length === 0) throw new ApiError(409, "Submit at least one piece of evidence first.")
-
       const skills = parseList(one(db, "SELECT required_skills FROM challenges WHERE id = ?", p.challengeId)!.required_skills)
-      const challenge = challengeContextFor(db, p.challengeId)
       // Re-analyzing (e.g. after the student adds more evidence) recomputes every
       // required skill against ALL current evidence and overwrites prior results,
       // rather than only ever analyzing a skill once — otherwise evidence submitted
       // after the first analysis could never be picked up at all.
-      const results = simulateAIReview(skills, ev, challenge)
+      return analyzeEvidence(skills, ev, challengeContextFor(db, p.challengeId))
+    },
+    handler: (db, actor, [id], _body, results: SimulatedRating[]) => {
+      const { p, student } = requireEvidenceAccess(db, actor, id, "request analysis for")
       const now = nowIso()
       for (const r of results) {
         const existing = one(db, "SELECT id, status FROM skill_signals WHERE project_id = ? AND skill = ?", id, r.skill)
@@ -841,14 +877,14 @@ const routes: { method: string; pattern: RegExp; prepare?: (actor: Actor, body: 
           exec(db, "DELETE FROM skill_signal_evidence WHERE signal_id = ?", sigId)
           exec(
             db,
-            "UPDATE skill_signals SET evidence_confidence = ?, ai_note = ?, suggested_level = ?, status = 'Pending Verification', analyzed_at = ? WHERE id = ?",
-            r.rating, r.note, r.suggestedLevel, now, sigId,
+            "UPDATE skill_signals SET evidence_confidence = ?, ai_note = ?, ai_quotes = ?, suggested_level = ?, status = 'Pending Verification', analyzed_at = ? WHERE id = ?",
+            r.rating, r.note, JSON.stringify(r.quotes), r.suggestedLevel, now, sigId,
           )
         } else {
           exec(
             db,
-            "INSERT INTO skill_signals (id, project_id, student_id, skill, evidence_confidence, ai_note, suggested_level, status, analyzed_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'Pending Verification', ?)",
-            sigId, id, student.id, r.skill, r.rating, r.note, r.suggestedLevel, now,
+            "INSERT INTO skill_signals (id, project_id, student_id, skill, evidence_confidence, ai_note, ai_quotes, suggested_level, status, analyzed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Pending Verification', ?)",
+            sigId, id, student.id, r.skill, r.rating, r.note, JSON.stringify(r.quotes), r.suggestedLevel, now,
           )
         }
         for (const evId of r.evidenceIds) exec(db, "INSERT INTO skill_signal_evidence (signal_id, evidence_id) VALUES (?, ?)", sigId, evId)
@@ -1136,8 +1172,9 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
       const match = route.method === req.method ? route.pattern.exec(path) : null
       if (!match) continue
       const body = await readBody(req)
-      const prepared = route.prepare ? await route.prepare(actor, body) : undefined
-      const result = transaction(db, () => route.handler(db, actor, match.slice(1).map(decodeURIComponent), body, prepared as never))
+      const params = match.slice(1).map(decodeURIComponent)
+      const prepared = route.prepare ? await route.prepare(actor, body, params) : undefined
+      const result = transaction(db, () => route.handler(db, actor, params, body, prepared as never))
       send(res, 200, { result: result ?? null, snapshot: buildSnapshot(db, actor) })
       return true
     }

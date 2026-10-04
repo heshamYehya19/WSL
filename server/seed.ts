@@ -23,6 +23,8 @@ export const EVIDENCE_LINKS: Record<string, string> = {
   "ev-yazan-1": "github.com/yazan-almasri/netflow-anomaly-detector",
   "ev-yazan-2": "github.com/yazan-almasri/netflow-anomaly-detector/blob/main/notebooks/evaluation.ipynb",
   "ev-yazan-3": "drive.google.com/file/d/1Tz6nV2qKx8LpW4mR9bE3cJhS7fY5dA0gU/view",
+  "ev-yazan-ssh-1": "github.com/yazan-almasri/ssh-bruteforce-triage",
+  "ev-yazan-ssh-2": "drive.google.com/file/d/1Qm8rT3vYp5WkL2nX7cJ9aF4hD6sB0eGu/view",
   "ev-ahmad-1": "github.com/ahmad-obeidat/erp-inventory-service",
   "ev-ahmad-2": "drive.google.com/file/d/1Pw3kR8vLx5QmT2zN7bC4sJhE9fY6gA0dK/view",
   "ev-ahmad-3": "github.com/ahmad-obeidat/erp-inventory-service/tree/main/src/test",
@@ -422,6 +424,45 @@ export function seedDatabase(db: DatabaseSync): void {
       ],
     },
     {
+      id: "chal-iris-ssh",
+      company: "org-iris",
+      contact: "ctc-iris-1",
+      title: "Triage SSH Brute-Force Attempts on Client Jump Hosts",
+      problem:
+        "IRIS's SOC sees thousands of failed SSH logins a day across client Linux jump hosts, and analysts waste time on noise. It is providing anonymized auth logs and wants a tool that groups attempts into attack campaigns, separates real threats from misconfigured scripts, and recommends host hardening.",
+      objectives: [
+        "Parse anonymized Linux auth logs into structured login attempts",
+        "Group attempts into campaigns and score how dangerous each one is",
+        "Recommend SSH hardening for the affected hosts",
+      ],
+      expected: "A log triage script, a short findings report, and a hardening checklist.",
+      industry: "IT Solutions & Security",
+      difficulty: "Intermediate",
+      skills: ["Python", "Linux", "Network Security"],
+      outcomes: [
+        "Read real authentication telemetry",
+        "Tell attack traffic apart from operational noise",
+        "Turn findings into concrete hardening steps",
+      ],
+      dataset: "14 days of anonymized /var/log/auth.log extracts from 6 jump hosts (~380k lines)",
+      sensitivity: "Moderate",
+      deadline: -60,
+      preferred: "uni-aau",
+      visibility: "University Only",
+      requirements: ["GitHub repository", "Project report"],
+      assignedUni: "uni-aau",
+      assignedProgram: "prg-aau-cyber",
+      history: [
+        ["Draft", -130],
+        ["Sent to University", -130, SCREEN_NOTE],
+        ["University Assigned", -126, "Assigned to B.Sc. Cyber Security students at Amman Arab University."],
+        ["In Progress", -120, "Yazan Al-Masri started the project."],
+        ["Evidence Under Review", -78, "WSL analyzed Yazan Al-Masri's submitted evidence automatically."],
+        ["Verified", -74, "Every required skill verified by Dr. Nidal Al-Rawabdeh and confirmed to IRIS Technology Jordan."],
+        ["Company Feedback Received", -70, "IRIS Technology Jordan reviewed the evidence and left feedback."],
+      ],
+    },
+    {
       id: "chal-iris-phishing",
       company: "org-iris",
       contact: "ctc-iris-1",
@@ -795,7 +836,11 @@ tokenizer = AutoTokenizer.from_pretrained("aubmindlab/bert-base-arabertv2")
 model = AutoModelForSequenceClassification.from_pretrained(
     "aubmindlab/bert-base-arabertv2", num_labels=df["intent_label"].nunique()
 )` },
-        { id: "ev-omar-2", type: "Project Report", title: "Call Intent Classification — Final Report", description: "22-page report covering data cleaning, model comparison, per-language accuracy, and documented failure cases.", day: -42 },
+        { id: "ev-omar-2", type: "Project Report", title: "Call Intent Classification — Final Report", description: "22-page report covering data cleaning, model comparison, per-language accuracy, and documented failure cases.", day: -42, content: `Data: 18,214 transcript snippets across 9 intents; "billing" and "technical issue" make up 58% of calls, so accuracy is reported per intent, not only overall.
+Cleaning removed Arabic diacritics, normalized alef and taa marbuta variants, and dropped 412 snippets shorter than five words.
+Results on the held-out 20%: the TF-IDF and logistic regression baseline reached macro F1 0.71; the fine-tuned Arabic BERT reached macro F1 0.84 (Arabic 0.82, English 0.88).
+The weakest intent is "contract change" (F1 0.63), which is often confused with "billing" when customers mention a price.
+Recommendation for supervisors: auto-tag calls when model confidence is above 0.8 (74% of calls) and review the rest by hand.` },
         { id: "ev-omar-3", type: "Presentation", title: "Supervisor Briefing — Automating Call Reason Tagging", description: "Slide deck for contact-center supervisors explaining what the model can and can't do, with a proposed reporting workflow.", day: -41 },
       ],
       signals: [
@@ -825,8 +870,17 @@ model = AutoModelForSequenceClassification.from_pretrained(
       tasksDone: 4,
       evidence: [
         { id: "ev-khaled-1", type: "Documentation", title: "Remote Access Architecture Map", description: "Diagrams and notes mapping VPN gateways, VDI pools, and agent endpoints in the lab replica.", day: -6 },
-        { id: "ev-khaled-2", type: "Analysis", title: "CIS Benchmark Gap Assessment", description: "Control-by-control assessment of the VPN, VDI, and Linux jump-host configurations against CIS Benchmarks.", day: -5 },
-        { id: "ev-khaled-3", type: "Project Report", title: "Remote Agent Access — Risk Assessment & Hardening Plan", description: "Risk register with likelihood/impact ratings and a 3-phase hardening plan.", day: -4 },
+        { id: "ev-khaled-2", type: "Analysis", title: "CIS Benchmark Gap Assessment", description: "Control-by-control assessment of the VPN, VDI, and Linux jump-host configurations against CIS Benchmarks.", day: -5, content: `CIS 5.2.10 (SSH root login): FAIL. /etc/ssh/sshd_config on jump-01 has PermitRootLogin yes. Fix: set PermitRootLogin no and reload with sudo systemctl reload sshd.
+CIS 5.2.4 (SSH access limited): FAIL. Any VPN user can reach port 22 on every host. Fix: restrict with ufw to the 10.30.5.0/24 admin VLAN.
+CIS 4.1.3 (audit logins): PASS. auditd is running and /var/log/audit/audit.log is shipped to the SIEM.
+VPN gateway: TLS 1.0 is still enabled for legacy agents, and split tunnelling lets agent laptops reach client systems and the internet at once.
+VDI pools: clipboard and USB redirection are enabled, so client data can be copied to personal devices; MFA is enforced only for supervisors.` },
+        { id: "ev-khaled-3", type: "Project Report", title: "Remote Agent Access — Risk Assessment & Hardening Plan", description: "Risk register with likelihood/impact ratings and a 3-phase hardening plan.", day: -4, content: `Overview: remote agents reach client systems through a VPN, a VDI pool and a Linux jump host. Twelve findings were rated by likelihood and impact.
+Top risks: (1) root SSH login on the jump host, high likelihood and critical impact; (2) clipboard and USB redirection in VDI, medium likelihood and high impact; (3) MFA missing for agents, high likelihood and high impact.
+Phase 1 (week 1): disable root SSH login, enforce MFA for every agent account, turn off TLS 1.0 on the VPN gateway.
+Phase 2 (month 1): disable VDI clipboard and USB redirection for client pools and segment the admin VLAN.
+Phase 3 (quarter): replace split tunnelling with full tunnelling and review access quarterly with each client.
+Recommendation: Phase 1 removes the two critical findings for almost no cost and should start before the next client onboarding.` },
       ],
       signals: [
         { skill: "Network Security", status: "Verified", verifiedBy: "stf-just-2", verifiedDay: -2 },
@@ -880,7 +934,31 @@ function TicketList({ tickets, onSelect }) {
     </ul>
   )
 }` },
-        { id: "ev-leen-2", type: "Documentation", title: "Helpdesk API Reference (OpenAPI)", description: "OpenAPI 3 specification for every endpoint, with role permissions documented per route.", day: -11 },
+        { id: "ev-leen-2", type: "Documentation", title: "Helpdesk API Reference (OpenAPI)", description: "OpenAPI 3 specification for every endpoint, with role permissions documented per route.", day: -11, content: `-- db/migrations/001_tickets.sql
+CREATE TABLE tickets (
+  id           SERIAL PRIMARY KEY,
+  subject      TEXT NOT NULL,
+  priority     TEXT NOT NULL CHECK (priority IN ('low', 'normal', 'urgent')),
+  requester_id INT NOT NULL REFERENCES employees(id),
+  assignee_id  INT REFERENCES employees(id),
+  status       TEXT NOT NULL DEFAULT 'open'
+);
+
+-- SLA dashboard: open tickets per agent past their response target
+SELECT e.name, COUNT(*) AS breached
+FROM tickets t
+JOIN employees e ON e.id = t.assignee_id
+WHERE t.status = 'open' AND t.created_at < now() - interval '8 hours'
+GROUP BY e.name;
+
+# openapi.yaml (excerpt)
+/api/tickets/{id}:
+  patch:
+    summary: Update a ticket's status or assignee (agents and admins only)
+    responses:
+      "200": { description: Updated ticket }
+      "403": { description: Employees can't reassign tickets }
+      "404": { description: Ticket not found }` },
         { id: "ev-leen-3", type: "Video Walkthrough", title: "Portal Walkthrough Video", description: "6-minute walkthrough: raising a ticket, triage, resolution, and the SLA dashboard.", day: -10 },
       ],
       signals: [
@@ -932,8 +1010,24 @@ model = IsolationForest(n_estimators=300, contamination=0.02, random_state=42)
 flows["anomaly_score"] = model.fit_predict(X_scaled)
 alerts = flows[flows["anomaly_score"] == -1]
 print(f"Flagged {len(alerts)} anomalous flows out of {len(flows)}")` },
-        { id: "ev-yazan-2", type: "Analysis", title: "Feature Engineering & Model Evaluation Notebook", description: "Notebook comparing models against the 41 labeled incidents with precision/recall at several alert thresholds.", day: -4 },
-        { id: "ev-yazan-3", type: "Project Report", title: "Anomaly Detection — False-Positive Trade-off Report", description: "Report recommending an alert threshold based on analyst workload, with example alerts and explanations.", day: -3 },
+        { id: "ev-yazan-2", type: "Analysis", title: "Feature Engineering & Model Evaluation Notebook", description: "Notebook comparing models against the 41 labeled incidents with precision/recall at several alert thresholds.", day: -4, content: `from sklearn.metrics import precision_score, recall_score
+
+labels = pd.read_csv("labeled_incidents.csv")
+scored = flows.merge(labels, on="flow_id", how="left").fillna({"is_incident": 0})
+hourly = scored.groupby(["dst_port", "is_offhours"])["bytes_per_sec"].median()
+
+for threshold in [0.01, 0.02, 0.05]:
+    model = IsolationForest(n_estimators=300, contamination=threshold, random_state=42)
+    pred = (model.fit_predict(X_scaled) == -1).astype(int)
+    p = precision_score(scored["is_incident"], pred)
+    r = recall_score(scored["is_incident"], pred)
+    print(f"contamination={threshold}: precision={p:.2f} recall={r:.2f} alerts/day={pred.sum() / 30:.0f}")
+
+# contamination=0.02 catches 37 of the 41 incidents at about 55 alerts a day, which the SOC can review.` },
+        { id: "ev-yazan-3", type: "Project Report", title: "Anomaly Detection — False-Positive Trade-off Report", description: "Report recommending an alert threshold based on analyst workload, with example alerts and explanations.", day: -3, content: `Recommendation: run the detector at a 2% contamination threshold. It caught 37 of the 41 labeled incidents (90% recall) at 61% precision, about 55 alerts a day for a two-analyst shift.
+The four missed incidents were slow port scans spread over several hours; a rolling 6-hour count of unique destination ports per source IP would catch them and is the next step.
+False positives cluster around nightly backup jobs, so whitelisting the three backup servers removes roughly a third of them without losing any incident.
+Each alert lists the top contributing features, for example: "10.4.2.17 sent 48x its usual bytes per second to an external IP at 03:10, outside working hours."` },
       ],
       signals: [
         { skill: "Python" },
@@ -943,6 +1037,70 @@ print(f"Flagged {len(alerts)} anomalous flows out of {len(flows)}")` },
       ],
       analyzed: -2,
       feedback: [],
+    },
+    {
+      id: "prj-iris-ssh-yazan",
+      challenge: "chal-iris-ssh",
+      student: "stu-aau-yazan",
+      status: "Company Feedback Received",
+      started: -120,
+      tasksDone: 3,
+      evidence: [
+        { id: "ev-yazan-ssh-1", type: "GitHub Repository", title: "ssh-bruteforce-triage", description: "Auth-log parser, campaign grouping, and a danger score per campaign.", day: -80, content: `import re
+from collections import defaultdict
+from datetime import datetime, timedelta
+
+FAILED = re.compile(r"Failed password for (invalid user )?(?P<user>\\S+) from (?P<ip>[\\d.]+) port (?P<port>\\d+)")
+
+def parse_auth_log(path: str) -> list[dict]:
+    attempts = []
+    with open(path) as fh:
+        for line in fh:
+            m = FAILED.search(line)
+            if m:
+                ts = datetime.strptime(line[:15], "%b %d %H:%M:%S")
+                attempts.append({"ts": ts, "ip": m["ip"], "user": m["user"], "invalid": bool(m.group(1))})
+    return attempts
+
+def group_campaigns(attempts: list[dict], gap=timedelta(minutes=30)) -> list[dict]:
+    by_ip = defaultdict(list)
+    for a in sorted(attempts, key=lambda a: a["ts"]):
+        by_ip[a["ip"]].append(a)
+    campaigns = []
+    for ip, rows in by_ip.items():
+        start = rows[0]
+        for prev, cur in zip(rows, rows[1:] + [None]):
+            if cur is None or cur["ts"] - prev["ts"] > gap:
+                window = [r for r in rows if start["ts"] <= r["ts"] <= prev["ts"]]
+                users = {r["user"] for r in window}
+                score = len(window) * (2 if len(users) > 5 else 1) * (3 if "root" in users else 1)
+                campaigns.append({"ip": ip, "attempts": len(window), "users": len(users), "score": score})
+                start = cur
+    return sorted(campaigns, key=lambda c: c["score"], reverse=True)` },
+        { id: "ev-yazan-ssh-2", type: "Project Report", title: "Jump Host Hardening Findings", description: "Findings from 14 days of auth logs and a hardening checklist for the six hosts.", day: -79, content: `Findings: 92% of failed logins came from 41 source IPs in 6 campaigns; the largest tried 1,800 usernames against root and admin in 40 minutes.
+Two "campaigns" were an internal backup script with an expired key, not an attack, so they are excluded from alerting.
+Hardening checklist for every jump host:
+1. In /etc/ssh/sshd_config set PermitRootLogin no and PasswordAuthentication no (key-only login).
+2. sudo apt install fail2ban, with maxretry = 5 and bantime = 1h on the sshd jail.
+3. sudo ufw allow from 10.20.0.0/16 to any port 22, then ufw deny 22 for everything else.
+4. Forward /var/log/auth.log to the SIEM so new campaigns raise an alert within minutes.` },
+      ],
+      signals: [
+        { skill: "Python", status: "Verified", verifiedBy: "stf-aau-1", verifiedDay: -75, reviewerNotes: "Clean parser and a sensible campaign grouping, not just a grep." },
+        { skill: "Linux", status: "Verified", verifiedBy: "stf-aau-1", verifiedDay: -75 },
+        { skill: "Network Security", status: "Verified", verifiedBy: "stf-aau-1", verifiedDay: -75, reviewerNotes: "Correctly separated the backup-script noise from real attacks." },
+      ],
+      analyzed: -78,
+      companyFeedback: {
+        day: -70,
+        strongTechnicalExecution: true,
+        relevantForInternship: true,
+        interestedInSpeaking: false,
+        note: "We rolled out the fail2ban and key-only settings on two client hosts. Spotting the backup script saved our analysts real time.",
+      },
+      feedback: [
+        ["staff", "stf-aau-1", -74, "Strong, practical work that IRIS could use straight away. Confirmed to IRIS Technology Jordan."],
+      ],
     },
     {
       id: "prj-iris-anomaly-rahaf",
@@ -989,7 +1147,26 @@ public class InventoryController {
         return ResponseEntity.ok(inventoryService.isBelowReorderThreshold(sku));
     }
 }` },
-        { id: "ev-ahmad-2", type: "Documentation", title: "Inventory Service API & Deployment Guide", description: "API reference, sequence diagrams for transfers, and Docker Compose deployment steps.", day: -63 },
+        { id: "ev-ahmad-2", type: "Documentation", title: "Inventory Service API & Deployment Guide", description: "API reference, sequence diagrams for transfers, and Docker Compose deployment steps.", day: -63, content: `-- db/migration/V1__inventory.sql (Flyway)
+CREATE TABLE warehouse (
+    id   BIGSERIAL PRIMARY KEY,
+    code VARCHAR(20) NOT NULL UNIQUE
+);
+CREATE TABLE stock_level (
+    warehouse_id BIGINT NOT NULL REFERENCES warehouse(id),
+    sku          VARCHAR(40) NOT NULL,
+    quantity     INT NOT NULL CHECK (quantity >= 0),
+    version      BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (warehouse_id, sku)
+);
+CREATE INDEX idx_stock_sku ON stock_level (sku);
+
+-- Reorder report used by GET /api/inventory/reorder-report
+SELECT s.sku, SUM(s.quantity) AS on_hand, r.reorder_point
+FROM stock_level s
+JOIN reorder_rule r ON r.sku = s.sku
+GROUP BY s.sku, r.reorder_point
+HAVING SUM(s.quantity) < r.reorder_point;` },
         { id: "ev-ahmad-3", type: "Code", title: "Test Suite & Coverage Report", description: "JUnit and Testcontainers integration tests covering concurrent transfers; 87% line coverage.", day: -62, content: `@Testcontainers
 class InventoryTransferConcurrencyTest {
 
@@ -1080,7 +1257,11 @@ JOIN dim_product p ON p.sku = s.sku
 JOIN dim_branch b ON b.branch_code = s.branch_code
 JOIN dim_date d ON d.calendar_date = s.sale_date
 WHERE s.qty > 0;` },
-        { id: "ev-tala-2", type: "Prototype", title: "SME Sales Dashboard (Power BI)", description: "Interactive dashboard with branch and product drill-downs, margin tracking, and target vs. actual views.", day: -10 },
+        { id: "ev-tala-2", type: "Prototype", title: "SME Sales Dashboard (Power BI)", description: "Interactive dashboard with branch and product drill-downs, margin tracking, and target vs. actual views.", day: -10, content: `Dashboard design notes
+Page 1, Overview: KPI cards for revenue, margin % and target attainment; a line chart of monthly revenue against target; a bar chart of margin by branch.
+Page 2, Products: a heatmap of margin by category and month, with a drill-down from category to product.
+Slicers for branch, region and month apply to every visual, and tooltips show last year's value for the same month.
+Insight from the sample clients: two branches sell the most but have the lowest margin because of discounting on electronics, so the recommendation is to cap discounts there before expanding stock.` },
         { id: "ev-tala-3", type: "Presentation", title: "Dashboard Rollout Recommendation", description: "Short deck on insights from the sample clients and how ABS could roll the template out.", day: -9 },
       ],
       signals: [
@@ -1200,9 +1381,9 @@ module polls /at-risk daily to flag parts to stock ahead of a likely failure.
         const sigId = `sig-${p.id}-${i + 1}`
         const status = s.status ?? "Pending Verification"
         run(
-          `INSERT INTO skill_signals (id, project_id, student_id, skill, evidence_confidence, ai_note, suggested_level, status, verified_by, verified_at, reviewer_notes, analyzed_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          sigId, p.id, p.student, s.skill, r.rating, r.note, r.suggestedLevel, status,
+          `INSERT INTO skill_signals (id, project_id, student_id, skill, evidence_confidence, ai_note, ai_quotes, suggested_level, status, verified_by, verified_at, reviewer_notes, analyzed_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          sigId, p.id, p.student, s.skill, r.rating, r.note, JSON.stringify(r.quotes), r.suggestedLevel, status,
           s.verifiedBy ?? null, s.verifiedBy && s.verifiedDay !== undefined ? d(s.verifiedDay) : null, s.reviewerNotes ?? null, d(p.analyzed!),
         )
         for (const ev of r.evidenceIds) run("INSERT INTO skill_signal_evidence (signal_id, evidence_id) VALUES (?, ?)", sigId, ev)

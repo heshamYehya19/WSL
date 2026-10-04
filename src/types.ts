@@ -174,7 +174,15 @@ export interface Evidence {
   link: string
   /** Optional pasted content (code, write-up, etc.) — what WSL's AI model actually analyzes. */
   content?: string
+  /** Files WSL read from the evidence's GitHub link and analyzed (README and top source files). */
+  analyzedFiles?: string[]
   submittedAt: string
+}
+
+export interface EvidenceQuote {
+  evidenceId: string
+  text: string
+  why: string
 }
 
 export type SkillSignalStatus = "Pending Verification" | "Verified" | "More Evidence Requested" | "Rejected"
@@ -197,6 +205,8 @@ export interface SkillSignal {
   suggestedLevel: SuggestedLevel
   /** Short, concrete statements behind the confidence score, e.g. "Detected Python code (92% confidence)...". */
   aiNote: string
+  /** The exact lines of the student's own work the AI relied on, each with what it shows. */
+  aiQuotes: EvidenceQuote[]
   status: SkillSignalStatus
   /** Set once a mentor verifies/rejects/requests more evidence — resolves to a staff id. */
   verifiedBy?: string

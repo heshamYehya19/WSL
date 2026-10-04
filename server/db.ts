@@ -167,6 +167,9 @@ CREATE TABLE IF NOT EXISTS evidence (
   link         TEXT NOT NULL,
   -- Optional pasted content (code, write-up, etc.) — what the AI rating actually analyzes.
   content      TEXT,
+  -- What WSL read from a linked GitHub repository (README and top source files), and which files.
+  fetched_content TEXT,
+  fetched_from    TEXT,
   submitted_at TEXT NOT NULL
 );
 
@@ -180,6 +183,8 @@ CREATE TABLE IF NOT EXISTS skill_signals (
   evidence_confidence INTEGER NOT NULL CHECK (evidence_confidence BETWEEN 0 AND 100),
   -- A short, concrete statistic behind the confidence score, e.g. "Detected Python code (92% confidence)...".
   ai_note          TEXT NOT NULL DEFAULT '',
+  -- JSON list of { evidenceId, text, why }: the exact lines of the student's work behind the score.
+  ai_quotes        TEXT NOT NULL DEFAULT '[]',
   -- Deprecated pre-verification-rework columns: a company rating was never a university
   -- verification, even under the old model. Kept only so historical seed rows still read
   -- back; no new code writes or reads them for verification purposes.
@@ -312,7 +317,7 @@ export function getDb(): DatabaseSync {
   return db
 }
 
-const SCHEMA_VERSION = 7
+const SCHEMA_VERSION = 8
 
 /**
  * Brings databases created by older versions up to date without losing their data.
@@ -338,6 +343,8 @@ const SCHEMA_VERSION = 7
  * v7: challenges gained `shared_sensitive_data` (what the privacy screen flagged and the
  *     company confirmed sharing). Attached files live in the new challenge_files table,
  *     which CREATE TABLE IF NOT EXISTS adds on its own.
+ * v8: skill_signals gained `ai_quotes` (the lines of evidence each AI signal cites), and
+ *     evidence gained `fetched_content`/`fetched_from` (what WSL read from a GitHub link).
  */
 function migrate(db: DatabaseSync) {
   const { user_version: version } = db.prepare("PRAGMA user_version").get() as { user_version: number }
@@ -419,6 +426,15 @@ function migrate(db: DatabaseSync) {
     })
     const problems = db.prepare("PRAGMA foreign_key_check").all()
     if (problems.length > 0) throw new Error(`Database migration left broken references: ${JSON.stringify(problems)}`)
+  }
+  if (version < 8) {
+    const evidenceColumns = (db.prepare("PRAGMA table_info(evidence)").all() as { name: string }[]).map((c) => c.name)
+    const signalColumns = (db.prepare("PRAGMA table_info(skill_signals)").all() as { name: string }[]).map((c) => c.name)
+    transaction(db, () => {
+      if (!evidenceColumns.includes("fetched_content")) db.exec("ALTER TABLE evidence ADD COLUMN fetched_content TEXT")
+      if (!evidenceColumns.includes("fetched_from")) db.exec("ALTER TABLE evidence ADD COLUMN fetched_from TEXT")
+      if (!signalColumns.includes("ai_quotes")) db.exec("ALTER TABLE skill_signals ADD COLUMN ai_quotes TEXT NOT NULL DEFAULT '[]'")
+    })
   }
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`)
 }

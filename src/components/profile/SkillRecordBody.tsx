@@ -90,7 +90,10 @@ function SkillCard({
           </Link>
         </div>
       ) : (
-        <p className="mt-2.5 text-[11px] text-ink-400">{s.signal.status === "Rejected" ? "Not verified by a university mentor." : "Pending university verification."}</p>
+        <div className="mt-2.5 space-y-1 text-[11px] text-ink-400">
+          <div className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">Unverified · AI signal only</div>
+          <p>{s.signal.status === "Rejected" ? "A university mentor reviewed this and did not verify it." : "Not yet checked by a university mentor."}</p>
+        </div>
       )}
     </div>
   )
@@ -99,12 +102,15 @@ function SkillCard({
 export function SkillRecordBody({
   studentId,
   projectHref,
+  verifiedOnlyByDefault = false,
 }: {
   studentId: string
   projectHref: (projectId: string) => string
+  /** For companies: open on verified skills only, so an AI signal is never mistaken for a verified skill. */
+  verifiedOnlyByDefault?: boolean
 }) {
   const { projects, challenges, evidence, skillSignals, getOrg, getStaff, getStudent } = useStore()
-  const [filter, setFilter] = useState<"all" | "verified">("all")
+  const [filter, setFilter] = useState<"all" | "verified">(verifiedOnlyByDefault ? "verified" : "all")
   const [mounted, setMounted] = useState(false)
   useEffect(() => {
     const id = requestAnimationFrame(() => setMounted(true))
@@ -139,10 +145,15 @@ export function SkillRecordBody({
           {allSkills.length > 0 && (
             <div className="inline-flex rounded-full border border-ink-200 bg-surface p-1 text-xs font-semibold">
               {(
-                [
-                  ["all", `All signals · ${allSkills.length}`],
-                  ["verified", `Verified skills · ${verifiedCount}`],
-                ] as const
+                (verifiedOnlyByDefault
+                  ? [
+                      ["verified", `Verified skills · ${verifiedCount}`],
+                      ["all", `Include unverified AI signals · ${allSkills.length - verifiedCount}`],
+                    ]
+                  : [
+                      ["all", `All signals · ${allSkills.length}`],
+                      ["verified", `Verified skills · ${verifiedCount}`],
+                    ]) as readonly (readonly ["all" | "verified", string])[]
               ).map(([key, label]) => (
                 <button
                   key={key}
@@ -181,7 +192,7 @@ export function SkillRecordBody({
           {myProjects.map((p, idx) => {
             const org = getOrg(p.organizationId)
             const challenge = challengeFor(challenges, p)
-            const signals = skillsForProject(skillSignals, p.id).filter((s) => s.studentId === studentId)
+            const signals = skillsForProject(skillSignals, p.id).filter((s) => s.studentId === studentId && (filter === "all" || s.status === "Verified"))
             const myEv = evidence.filter((e) => e.projectId === p.id && e.studentId === studentId)
             const started = new Date(p.startedAt)
             const live = p.status === "In Progress" || p.status === "Evidence Under Review" || p.status === "Skills Pending Verification"
