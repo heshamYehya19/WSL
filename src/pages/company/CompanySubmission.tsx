@@ -6,8 +6,9 @@ import { StatusBadge } from "../../components/ui/StatusBadge"
 import { ConfidenceMeter } from "../../components/ui/ConfidenceMeter"
 import { challengeFor, skillsForProject } from "../../lib/selectors"
 import { formatDate } from "../../lib/format"
-import { evidenceAnalysisLabel } from "../../lib/aiNote"
+import { assessmentLabel, evidenceAnalysisLabel, evidenceStrengthFor } from "../../lib/aiNote"
 import { EvidenceQuotes } from "../../components/ui/EvidenceQuotes"
+import { CriteriaChecklist } from "../../components/ui/CriteriaChecklist"
 
 const FEEDBACK_OPTIONS = [
   { key: "strongTechnicalExecution", label: "Strong technical execution" },
@@ -98,9 +99,17 @@ export default function CompanySubmission() {
                   {s.skill}
                   <span className="ml-1.5 text-xs font-semibold text-verified-600">✓ University Verified</span>
                 </span>
-                <span className="rounded-full bg-ink-100 px-2 py-0.5 text-[10px] font-semibold text-ink-600">{s.suggestedLevel}</span>
+                <span className="rounded-full bg-ink-100 px-2 py-0.5 text-[10px] font-semibold text-ink-600">{assessmentLabel(s.suggestedLevel)}</span>
               </div>
-              <div className="mt-2"><ConfidenceMeter value={s.evidenceConfidence} label="Evidence confidence" /></div>
+              <p className="mt-2 text-xs font-medium text-ink-700">
+                Evidence Strength: <span className="font-semibold">{evidenceStrengthFor(s.evidenceConfidence)}</span>
+              </p>
+              <div className="mt-1"><ConfidenceMeter value={s.evidenceConfidence} label="Evidence confidence" /></div>
+              {s.criteria.length > 0 && (
+                <div className="mt-3">
+                  <CriteriaChecklist criteria={s.criteria} />
+                </div>
+              )}
               {s.aiQuotes.length > 0 && (
                 <div className="mt-3">
                   <p className="mb-1 text-[11px] font-semibold tracking-wide text-ink-400 uppercase">Proof in the work</p>

@@ -4,6 +4,7 @@ import { useStore } from "../../state/store"
 import { SkillChip } from "../ui/SkillChip"
 import { StatusBadge } from "../ui/StatusBadge"
 import { formatDate } from "../../lib/format"
+import { assessmentLabel } from "../../lib/aiNote"
 import { challengeFor, skillsForProject, studentProjects, studentSignals } from "../../lib/selectors"
 import type { SkillSignal, SuggestedLevel } from "../../types"
 
@@ -19,6 +20,7 @@ const LEVEL_STYLE: Record<SuggestedLevel, { bar: string; text: string }> = {
   Advanced: { bar: "from-teal-400 to-teal-300/70", text: "text-teal-500" },
   Intermediate: { bar: "from-amber-500 to-amber-400", text: "text-amber-500" },
   Foundational: { bar: "from-ink-400 to-ink-300", text: "text-ink-500" },
+  Insufficient: { bar: "from-ink-300 to-ink-200", text: "text-ink-400" },
 }
 
 function ShieldIcon({ className = "h-3.5 w-3.5" }: { className?: string }) {
@@ -57,15 +59,23 @@ function SkillCard({
             {s.skill}
             {verified && <span className="ml-1 text-verified-600">✓</span>}
           </div>
+          <div className={`mt-0.5 text-sm font-bold ${level.text}`}>{assessmentLabel(s.signal.suggestedLevel)}</div>
           <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-ink-400">
-            <span className={`font-semibold ${level.text}`}>{s.signal.suggestedLevel}</span>
-            <span>·</span>
             <span>
               {s.projects} project{s.projects === 1 ? "" : "s"}
             </span>
+            {s.signal.criteria.length > 0 && (
+              <>
+                <span>·</span>
+                <span>
+                  {s.signal.criteria.filter((c) => c.met).length} concrete sign{s.signal.criteria.filter((c) => c.met).length === 1 ? "" : "s"} found
+                </span>
+              </>
+            )}
           </div>
         </div>
-        <span className="text-xl font-bold text-ink-950 tabular-nums">{s.signal.evidenceConfidence}%</span>
+        {/* Evidence confidence stays secondary to the assessment above — see item 1. */}
+        <span className="text-xs font-semibold text-ink-400 tabular-nums">{s.signal.evidenceConfidence}%</span>
       </div>
       <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-ink-100">
         <div
@@ -92,7 +102,13 @@ function SkillCard({
       ) : (
         <div className="mt-2.5 space-y-1 text-[11px] text-ink-400">
           <div className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">Unverified · AI signal only</div>
-          <p>{s.signal.status === "Rejected" ? "A university mentor reviewed this and did not verify it." : "Not yet checked by a university mentor."}</p>
+          <p>
+            {s.signal.status === "Rejected"
+              ? "A university mentor reviewed this and did not verify it."
+              : s.signal.suggestedLevel === "Insufficient"
+                ? "Not enough evidence yet — add more evidence and ask for analysis again."
+                : "Not yet checked by a university mentor."}
+          </p>
         </div>
       )}
     </div>

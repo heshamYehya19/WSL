@@ -49,7 +49,10 @@ export default function StudentDashboard() {
         ) : undefined,
     }))
 
-  const skillLevelItems = Array.from(topSkillsBySkill.values()).map((s) => ({ key: s.id, skill: s.skill, rating: s.evidenceConfidence, suggestedLevel: s.suggestedLevel }))
+  // An aggregate "your levels" view shouldn't average in skills WSL couldn't actually assess.
+  const skillLevelItems = Array.from(topSkillsBySkill.values())
+    .filter((s): s is typeof s & { suggestedLevel: Exclude<typeof s.suggestedLevel, "Insufficient"> } => s.suggestedLevel !== "Insufficient")
+    .map((s) => ({ key: s.id, skill: s.skill, rating: s.evidenceConfidence, suggestedLevel: s.suggestedLevel }))
 
   const currentProject = myProjects.find((p) => p.status === "In Progress")
 

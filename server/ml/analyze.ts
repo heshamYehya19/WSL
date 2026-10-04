@@ -20,13 +20,42 @@
 // indicator once, and quotes the line where it found it. It is capped below
 // "Demonstrated": only a full read of the evidence can claim that.
 
-export type SuggestedLevel = "Foundational" | "Intermediate" | "Advanced" | "Demonstrated"
+// "Insufficient" is a 5th outcome, not a low tier: it means WSL didn't find enough
+// to check multiple rubric criteria at all, so forcing a tier (even "Foundational")
+// would overstate what was actually found. See gateByCriteria below.
+export type SuggestedLevel = "Insufficient" | "Foundational" | "Intermediate" | "Advanced" | "Demonstrated"
 
 // A deterministic, tunable read of the same 0-100 confidence number — not a
 // second model. Presented to a mentor as a starting point, never as a verdict:
 // only a human verification decision can actually set a student's skill level.
-export function suggestedLevelFor(rating: number): SuggestedLevel {
+export function suggestedLevelFor(rating: number): Exclude<SuggestedLevel, "Insufficient"> {
   return rating >= 80 ? "Demonstrated" : rating >= 60 ? "Advanced" : rating >= 35 ? "Intermediate" : "Foundational"
+}
+
+// A single rubric criterion (one indicator's `what`, or one criterion label offered
+// to the LLM grader) and whether this submission showed it. Met criteria appear
+// first in SimulatedRating.criteria, so the UI can render "what was demonstrated"
+// before "what's still missing" without re-sorting.
+export interface SkillCriterion {
+  label: string
+  met: boolean
+}
+
+// Below this many *met* criteria, WSL won't claim a real tier — see gateByCriteria.
+const MIN_CRITERIA_FOR_LEVEL = 2
+
+/**
+ * The credibility gate: a raw rating alone can't justify a confident tier. Zero
+ * matched criteria means WSL found nothing concrete to check, so the honest
+ * answer is "Insufficient Evidence," not "Foundational." Exactly one matched
+ * criterion is a single signal, not the "multiple relevant criteria" a real
+ * Intermediate-or-above claim needs, so it's capped at Foundational. Two or more
+ * lets the rating stand as computed.
+ */
+export function gateByCriteria(level: Exclude<SuggestedLevel, "Insufficient">, metCount: number): SuggestedLevel {
+  if (metCount === 0) return "Insufficient"
+  if (metCount < MIN_CRITERIA_FOR_LEVEL && level !== "Foundational") return "Foundational"
+  return level
 }
 
 /** One line of the student's own content that supports a skill, and what it shows. */
@@ -43,6 +72,8 @@ export interface SimulatedRating {
   note: string
   quotes: EvidenceQuote[]
   evidenceIds: string[]
+  /** Named rubric criteria this submission was checked against, met ones first. */
+  criteria: SkillCriterion[]
 }
 
 export interface ChallengeContext {
@@ -375,6 +406,67 @@ const RUBRIC_ALIASES: Record<string, string> = {
   "nlp": "natural language processing",
 }
 
+// Display casing for WSL's known skill vocabulary (the RUBRICS keys above, plus
+// the alias names themselves — an alias is only about which rubric scores a skill,
+// never about what it's called). Keyed by lowercase so lookup is case-insensitive.
+// Anything a company types outside this list falls back to a generic capitalization
+// in canonicalSkillName below, rather than silently staying however it was typed.
+const SKILL_DISPLAY_NAMES: Record<string, string> = {
+  "python": "Python",
+  "java": "Java",
+  "sql": "SQL",
+  "javascript": "JavaScript",
+  "typescript": "TypeScript",
+  "react": "React",
+  "node.js": "Node.js",
+  "web development": "Web Development",
+  "frontend development": "Frontend Development",
+  "mobile development": "Mobile Development",
+  "machine learning": "Machine Learning",
+  "natural language processing": "Natural Language Processing",
+  "nlp": "NLP",
+  "data analysis": "Data Analysis",
+  "data visualization": "Data Visualization",
+  "power bi": "Power BI",
+  "time-series forecasting": "Time-Series Forecasting",
+  "network security": "Network Security",
+  "linux": "Linux",
+  "risk assessment": "Risk Assessment",
+  "technical writing": "Technical Writing",
+  "rest api design": "REST API Design",
+  "software testing": "Software Testing",
+  "security awareness": "Security Awareness",
+  "access control": "Access Control",
+  "business analysis": "Business Analysis",
+  "process modeling": "Process Modeling",
+  "ui/ux design": "UI/UX Design",
+  "go": "Go",
+  "golang": "Go",
+  "c++": "C++",
+  "c#": "C#",
+  ".net": ".NET",
+}
+
+/**
+ * The one casing a skill name is stored and shown with everywhere — applied once,
+ * at challenge creation, so "python" and "Python" are never two different skills
+ * across a student's record, a university's dashboard, or Talent Discovery search.
+ * Known skills (WSL's own rubric vocabulary) get their canonical display form.
+ * Anything else gets a plain per-word capitalization of any all-lowercase word,
+ * leaving words that already have a capital (JavaScript, iOS, GraphQL, Node.js)
+ * untouched rather than guessing at them.
+ */
+export function canonicalSkillName(raw: string): string {
+  const trimmed = raw.trim().replace(/\s+/g, " ")
+  if (!trimmed) return trimmed
+  const known = SKILL_DISPLAY_NAMES[trimmed.toLowerCase()]
+  if (known) return known
+  return trimmed
+    .split(" ")
+    .map((word) => (word === word.toLowerCase() ? word.charAt(0).toUpperCase() + word.slice(1) : word))
+    .join(" ")
+}
+
 // The offline scorer can't read evidence the way a model can, so it never
 // suggests "Demonstrated" (80+) — that needs a full read and a mentor.
 const LOCAL_CAP = 75
@@ -383,6 +475,9 @@ const GENERIC_CAP = 35
 const INSUFFICIENT_RATING = 10
 const MAX_QUOTES = 3
 const MAX_QUOTE_CHARS = 160
+// Unmet criteria beyond this are just noise in an "evidence gaps" list — the
+// heaviest (most meaningful) missing ones are the ones worth showing.
+const MAX_UNMET_CRITERIA = 4
 
 function rubricFor(skill: string): Indicator[] {
   const key = skill.trim().toLowerCase()
@@ -393,6 +488,13 @@ function rubricFor(skill: string): Indicator[] {
   if (names.length === 0) return []
   const escaped = names.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
   return [i(new RegExp(`\\b(${escaped.join("|")})`, "i"), `mentions ${skill} in the student's own work`, 10)]
+}
+
+/** The rubric criteria a skill is checked against — same labels shown in the UI
+ * checklist and offered to the LLM grader, so both scorers reason against one
+ * named list instead of two independently-drifting ones. */
+export function criteriaLabelsFor(skill: string): string[] {
+  return rubricFor(skill).map((ind) => ind.what)
 }
 
 export function trimQuote(line: string): string {
@@ -424,14 +526,25 @@ function scoreSkillLocally(skill: string, items: { id: string; lines: string[] }
       ? `No concrete ${skill} work was found in the student's own content. Lines that repeat the challenge brief were not counted.`
       : `Found ${hits.length} concrete sign${hits.length === 1 ? "" : "s"} of ${skill} in the student's own content. Lines that repeat the challenge brief were not counted.`
 
+  const hitIndicators = new Set(hits.map((h) => h.indicator))
+  const criteria: SkillCriterion[] = [
+    ...hits.map((h) => ({ label: h.indicator.what, met: true })),
+    ...rubric
+      .filter((ind) => !hitIndicators.has(ind))
+      .sort((a, b) => b.weight - a.weight)
+      .slice(0, MAX_UNMET_CRITERIA)
+      .map((ind) => ({ label: ind.what, met: false })),
+  ]
+
   const evidenceIds = [...new Set(quotes.map((q) => q.evidenceId))]
   return {
     skill,
     rating,
-    suggestedLevel: suggestedLevelFor(rating),
+    suggestedLevel: gateByCriteria(suggestedLevelFor(rating), hits.length),
     note,
     quotes,
     evidenceIds: evidenceIds.length > 0 ? evidenceIds : [items[0].id],
+    criteria,
   }
 }
 
@@ -459,10 +572,11 @@ export function simulateAIReview(requiredSkills: string[], submittedEvidence: Ev
       return {
         skill,
         rating: INSUFFICIENT_RATING,
-        suggestedLevel: suggestedLevelFor(INSUFFICIENT_RATING),
+        suggestedLevel: "Insufficient",
         note: `None of the evidence includes content WSL can read, so ${skill} can only be checked by a mentor from the links.`,
         quotes: [],
         evidenceIds: [submittedEvidence[0].id],
+        criteria: [],
       }
     }
     return scoreSkillLocally(skill, items)

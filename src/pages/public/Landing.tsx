@@ -61,8 +61,9 @@ export default function Landing() {
           <div className="text-xs font-semibold tracking-wide text-teal-600 uppercase">The WSL Loop</div>
           <h2 className="mt-2 text-2xl font-bold text-ink-950 sm:text-3xl">From Learning → Doing → Proving</h2>
           <p className="mx-auto mt-2 max-w-2xl text-ink-500">
-            Company submits → WSL screens it automatically → university assigns it → a student solves it solo →
-            WSL rates it → university confirms it → company rates it.
+            A company submits a real problem → a university assigns it → a student submits real evidence → WSL
+            surfaces AI skill signals → a university mentor verifies them → verified skills reach the student's
+            record → companies discover evidence, not claims.
           </p>
         </Reveal>
         <Reveal delay={100}>

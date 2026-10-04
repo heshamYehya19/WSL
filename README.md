@@ -68,11 +68,13 @@ challenge requires:
 - **Only real content counts.** An evidence title or description is the student's own claim and
   never raises a score. Public GitHub links are read automatically (the README and the top few
   source files, `server/github.ts`); other links are left for the mentor.
-- **Personal data stays on WSL.** The same personal-data screen used for company challenges runs
-  first; if it finds anything, the evidence is not sent to the model.
-- **Offline fallback.** Without a key, on a failed call, or when personal data was found, a stricter
-  local scorer (`server/ml/analyze.ts`) looks for concrete, skill-specific signs and quotes the lines
-  it found. It never suggests "Demonstrated". The seeded demo data is scored with it.
+- **Offline fallback.** Without a key, or on a failed call, a stricter local scorer
+  (`server/ml/analyze.ts`) looks for concrete, skill-specific signs and quotes the lines it found. It
+  never suggests "Demonstrated". The seeded demo data is scored with it.
+
+Student evidence is not run through the personal-data screen below — that screen exists to catch a
+company accidentally posting sensitive data in a public challenge brief, not to gate a student's own
+work, which is only ever sent to the grading provider the server is configured with.
 
 AI signals are informational only. A skill reaches a student's record only when a university mentor
 verifies it, and companies only see verified skills unless they choose to include unverified signals.

@@ -1381,9 +1381,9 @@ module polls /at-risk daily to flag parts to stock ahead of a likely failure.
         const sigId = `sig-${p.id}-${i + 1}`
         const status = s.status ?? "Pending Verification"
         run(
-          `INSERT INTO skill_signals (id, project_id, student_id, skill, evidence_confidence, ai_note, ai_quotes, suggested_level, status, verified_by, verified_at, reviewer_notes, analyzed_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          sigId, p.id, p.student, s.skill, r.rating, r.note, JSON.stringify(r.quotes), r.suggestedLevel, status,
+          `INSERT INTO skill_signals (id, project_id, student_id, skill, evidence_confidence, ai_note, ai_quotes, ai_criteria, suggested_level, status, verified_by, verified_at, reviewer_notes, analyzed_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          sigId, p.id, p.student, s.skill, r.rating, r.note, JSON.stringify(r.quotes), JSON.stringify(r.criteria), r.suggestedLevel, status,
           s.verifiedBy ?? null, s.verifiedBy && s.verifiedDay !== undefined ? d(s.verifiedDay) : null, s.reviewerNotes ?? null, d(p.analyzed!),
         )
         for (const ev of r.evidenceIds) run("INSERT INTO skill_signal_evidence (signal_id, evidence_id) VALUES (?, ?)", sigId, ev)

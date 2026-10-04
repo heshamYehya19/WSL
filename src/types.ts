@@ -185,8 +185,16 @@ export interface EvidenceQuote {
   why: string
 }
 
+/** One named rubric criterion a skill was checked against, and whether this submission showed it. */
+export interface SkillCriterion {
+  label: string
+  met: boolean
+}
+
 export type SkillSignalStatus = "Pending Verification" | "Verified" | "More Evidence Requested" | "Rejected"
-export type SuggestedLevel = "Foundational" | "Intermediate" | "Advanced" | "Demonstrated"
+// "Insufficient" is not a low tier — it means too few rubric criteria were met to
+// claim any real tier at all, so WSL says so instead of forcing one.
+export type SuggestedLevel = "Insufficient" | "Foundational" | "Intermediate" | "Advanced" | "Demonstrated"
 
 export interface SkillSignal {
   id: string
@@ -207,6 +215,8 @@ export interface SkillSignal {
   aiNote: string
   /** The exact lines of the student's own work the AI relied on, each with what it shows. */
   aiQuotes: EvidenceQuote[]
+  /** Named rubric criteria this signal was checked against, met ones first. */
+  criteria: SkillCriterion[]
   status: SkillSignalStatus
   /** Set once a mentor verifies/rejects/requests more evidence — resolves to a staff id. */
   verifiedBy?: string

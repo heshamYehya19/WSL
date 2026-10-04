@@ -2,7 +2,8 @@ import { useState } from "react"
 import { ConfidenceMeter } from "../ui/ConfidenceMeter"
 import { StatusBadge } from "../ui/StatusBadge"
 import { EvidenceQuotes } from "../ui/EvidenceQuotes"
-import { evidenceAnalysisLabel, splitAiNote } from "../../lib/aiNote"
+import { CriteriaChecklist } from "../ui/CriteriaChecklist"
+import { assessmentLabel, evidenceAnalysisLabel, evidenceStrengthFor, splitAiNote } from "../../lib/aiNote"
 import { formatDate } from "../../lib/format"
 import type { Evidence, SkillSignal } from "../../types"
 
@@ -52,12 +53,21 @@ export function SignalReviewCard({
         <div>
           <div className="flex items-center gap-2">
             <h4 className="font-semibold text-ink-900">{signal.skill}</h4>
-            <span className="rounded-full bg-ink-100 px-2 py-0.5 text-[10px] font-semibold text-ink-600">Suggested: {signal.suggestedLevel}</span>
+            <span className="rounded-full bg-ink-100 px-2 py-0.5 text-[10px] font-semibold text-ink-600">{assessmentLabel(signal.suggestedLevel)}</span>
           </div>
           <div className="mt-1"><StatusBadge status={signal.status} /></div>
         </div>
-        <div className="w-36"><ConfidenceMeter value={signal.evidenceConfidence} label="Evidence confidence" /></div>
+        <div className="w-36">
+          <p className="mb-1 text-right text-[11px] font-semibold text-ink-600">Evidence Strength: {evidenceStrengthFor(signal.evidenceConfidence)}</p>
+          <ConfidenceMeter value={signal.evidenceConfidence} label="Evidence confidence" />
+        </div>
       </div>
+
+      {signal.criteria.length > 0 && (
+        <div className="mt-3">
+          <CriteriaChecklist criteria={signal.criteria} />
+        </div>
+      )}
 
       {(signal.aiNote || signal.aiQuotes.length > 0) && (
         <div className="mt-3">

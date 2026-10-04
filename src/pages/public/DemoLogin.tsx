@@ -170,7 +170,7 @@ export default function DemoLogin() {
         <RoleCard
           delay={160}
           label="Company"
-          title="Submit challenges and discover rated talent."
+          title="Submit challenges and discover verified talent."
           icon={<RoleIcon d="M4 20.5V4.5a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v16M14 9.5h5a1 1 0 0 1 1 1v10M7.5 7.5h1M11 7.5h1M7.5 11h1M11 11h1M7.5 14.5h1M11 14.5h1" />}
         >
           <div className="space-y-2">

@@ -2,8 +2,8 @@ import { randomUUID } from "node:crypto"
 import type { IncomingMessage, ServerResponse } from "node:http"
 import type { DatabaseSync } from "node:sqlite"
 import { getDb, resetDatabase, transaction } from "./db.ts"
-import { analyzeEvidence, checkRelevance } from "./ai.ts"
-import type { ChallengeContext, EvidenceQuote, SimulatedRating } from "./ai.ts"
+import { analyzeEvidence, canonicalSkillName, checkRelevance } from "./ai.ts"
+import type { ChallengeContext, EvidenceQuote, SimulatedRating, SkillCriterion } from "./ai.ts"
 import { parseGithubLink, readGithubRepo } from "./github.ts"
 import type { RepoSnapshot } from "./github.ts"
 import { rank } from "../src/lib/pipeline.ts"
@@ -359,6 +359,7 @@ function buildSnapshot(db: DatabaseSync, actor: Actor): Snapshot {
       suggestedLevel: r.suggested_level as SkillSignal["suggestedLevel"],
       aiNote: String(r.ai_note ?? ""),
       aiQuotes: parseQuotes(r.ai_quotes),
+      criteria: parseCriteria(r.ai_criteria),
       status: r.status as SkillSignalStatus,
       ...(r.verified_by ? { verifiedBy: String(r.verified_by), verifiedAt: String(r.verified_at) } : {}),
       ...(r.reviewer_notes ? { reviewerNotes: String(r.reviewer_notes) } : {}),
@@ -531,6 +532,15 @@ function parseQuotes(raw: unknown): EvidenceQuote[] {
   }
 }
 
+function parseCriteria(raw: unknown): SkillCriterion[] {
+  try {
+    const parsed = JSON.parse(String(raw ?? "[]"))
+    return Array.isArray(parsed) ? (parsed as SkillCriterion[]) : []
+  } catch {
+    return []
+  }
+}
+
 /** Everything WSL analyzes for one evidence item: the student's pasted content plus anything read from its link. */
 function analyzableText(r: Record<string, unknown>): string | undefined {
   const text = [r.content, r.fetched_content].filter(Boolean).map(String).join("\n\n")
@@ -647,7 +657,19 @@ const routes: { method: string; pattern: RegExp; prepare?: (actor: Actor, body: 
         }
         problem = summaryFromDocument(descriptionFile.text)
       }
-      const skills = textList(body.requiredSkills, "Required skills")
+      // Canonicalized once, here, so "python" and "Python" are never two different skills
+      // across a student's record, a university's dashboard, or Talent Discovery search —
+      // and deduped case-insensitively, in case a company typed the same skill twice.
+      const rawSkills = textList(body.requiredSkills, "Required skills")
+      const seenSkills = new Set<string>()
+      const skills = rawSkills
+        .map((s) => canonicalSkillName(s))
+        .filter((s) => {
+          const key = s.toLowerCase()
+          if (seenSkills.has(key)) return false
+          seenSkills.add(key)
+          return true
+        })
       const outcomes = textList(body.learningOutcomes, "Learning outcomes")
       const preferred = typeof body.preferredUniversityId === "string" && body.preferredUniversityId ? body.preferredUniversityId : null
       if (preferred && !one(db, "SELECT id FROM universities WHERE id = ?", preferred)) throw new ApiError(400, "Unknown university.")
@@ -877,14 +899,14 @@ const routes: { method: string; pattern: RegExp; prepare?: (actor: Actor, body: 
           exec(db, "DELETE FROM skill_signal_evidence WHERE signal_id = ?", sigId)
           exec(
             db,
-            "UPDATE skill_signals SET evidence_confidence = ?, ai_note = ?, ai_quotes = ?, suggested_level = ?, status = 'Pending Verification', analyzed_at = ? WHERE id = ?",
-            r.rating, r.note, JSON.stringify(r.quotes), r.suggestedLevel, now, sigId,
+            "UPDATE skill_signals SET evidence_confidence = ?, ai_note = ?, ai_quotes = ?, ai_criteria = ?, suggested_level = ?, status = 'Pending Verification', analyzed_at = ? WHERE id = ?",
+            r.rating, r.note, JSON.stringify(r.quotes), JSON.stringify(r.criteria), r.suggestedLevel, now, sigId,
           )
         } else {
           exec(
             db,
-            "INSERT INTO skill_signals (id, project_id, student_id, skill, evidence_confidence, ai_note, ai_quotes, suggested_level, status, analyzed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Pending Verification', ?)",
-            sigId, id, student.id, r.skill, r.rating, r.note, JSON.stringify(r.quotes), r.suggestedLevel, now,
+            "INSERT INTO skill_signals (id, project_id, student_id, skill, evidence_confidence, ai_note, ai_quotes, ai_criteria, suggested_level, status, analyzed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending Verification', ?)",
+            sigId, id, student.id, r.skill, r.rating, r.note, JSON.stringify(r.quotes), JSON.stringify(r.criteria), r.suggestedLevel, now,
           )
         }
         for (const evId of r.evidenceIds) exec(db, "INSERT INTO skill_signal_evidence (signal_id, evidence_id) VALUES (?, ?)", sigId, evId)

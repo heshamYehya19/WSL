@@ -34,3 +34,6 @@ scripts/ml/cache/
 data/wsl.db
 *.db-wal
 *.db-shm
+
+# Local secrets (GROQ_API_KEY / GEMINI_API_KEY etc.) — never committed.
+.env

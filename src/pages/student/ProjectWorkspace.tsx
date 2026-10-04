@@ -8,7 +8,8 @@ import { EmptyState } from "../../components/ui/EmptyState"
 import { challengeFor, projectEvidence, skillsForProject } from "../../lib/selectors"
 import { formatDate, formatRelative } from "../../lib/format"
 import { EvidenceQuotes } from "../../components/ui/EvidenceQuotes"
-import { evidenceAnalysisLabel } from "../../lib/aiNote"
+import { CriteriaChecklist } from "../../components/ui/CriteriaChecklist"
+import { assessmentLabel, evidenceAnalysisLabel, evidenceStrengthFor } from "../../lib/aiNote"
 
 type SubmittableType = "GitHub Repository" | "Code" | "Documentation" | "Dataset / Model"
 
@@ -298,8 +299,16 @@ export default function ProjectWorkspace() {
                       <span className="text-sm font-semibold text-ink-900">{s.skill}</span>
                       <StatusBadge status={s.status} />
                     </div>
-                    <p className="mt-0.5 text-[11px] text-ink-400">Suggested level: {s.suggestedLevel}</p>
-                    <div className="mt-2"><ConfidenceMeter value={s.evidenceConfidence} label="Evidence confidence" /></div>
+                    <p className="mt-0.5 text-[11px] font-semibold text-ink-600">{assessmentLabel(s.suggestedLevel)}</p>
+                    <p className="mt-1.5 text-xs font-medium text-ink-700">
+                      Evidence Strength: <span className="font-semibold">{evidenceStrengthFor(s.evidenceConfidence)}</span>
+                    </p>
+                    <div className="mt-1"><ConfidenceMeter value={s.evidenceConfidence} label="Evidence confidence" /></div>
+                    {s.criteria.length > 0 && (
+                      <div className="mt-3">
+                        <CriteriaChecklist criteria={s.criteria} />
+                      </div>
+                    )}
                     {s.aiQuotes.length > 0 && (
                       <div className="mt-2">
                         <EvidenceQuotes quotes={s.aiQuotes} />

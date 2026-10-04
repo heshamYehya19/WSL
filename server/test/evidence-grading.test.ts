@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest"
 import { resetDatabase, startServer } from "./helpers.ts"
-import { checkRelevance, simulateAIReview } from "../ml/analyze.ts"
+import { checkRelevance, gateByCriteria, simulateAIReview } from "../ml/analyze.ts"
 import { llmDeps } from "../ml/llm-grader.ts"
 import { githubDeps } from "../github.ts"
 
@@ -66,6 +66,32 @@ describe("offline scorer (the review's failing cases)", () => {
     expect(checkRelevance(IRIS, BRIEF_AS_PROSE)).toMatchObject({ relevant: false, reason: "echoes-brief" })
     expect(checkRelevance(IRIS, REAL_SCRIPT)).toEqual({ relevant: true })
   })
+
+  it("returns a criteria checklist with both met and unmet entries for a real multi-indicator match", () => {
+    const results = simulateAIReview(SKILLS, evidence(REAL_SCRIPT), IRIS)
+    const ml = results.find((r) => r.skill === "Machine Learning")!
+    expect(ml.criteria.length).toBeGreaterThan(1)
+    expect(ml.criteria.some((c) => c.met)).toBe(true)
+    expect(ml.criteria.some((c) => !c.met)).toBe(true)
+    // Met criteria are listed first.
+    const firstUnmetIndex = ml.criteria.findIndex((c) => !c.met)
+    expect(ml.criteria.slice(0, firstUnmetIndex).every((c) => c.met)).toBe(true)
+  })
+
+  it("marks a skill Insufficient when nothing concrete was found, instead of forcing a tier", () => {
+    const results = simulateAIReview(SKILLS, evidence(BRIEF_AS_PROSE), IRIS)
+    for (const r of results) {
+      expect(r.criteria.filter((c) => c.met)).toHaveLength(0)
+      expect(r.suggestedLevel).toBe("Insufficient")
+    }
+  })
+
+  it("gateByCriteria caps a single weak signal at Foundational and treats zero as Insufficient", () => {
+    expect(gateByCriteria("Advanced", 0)).toBe("Insufficient")
+    expect(gateByCriteria("Advanced", 1)).toBe("Foundational")
+    expect(gateByCriteria("Foundational", 1)).toBe("Foundational")
+    expect(gateByCriteria("Advanced", 2)).toBe("Advanced")
+  })
 })
 
 const PROJECT = "prj-iris-anomaly-yazan"
@@ -77,8 +103,10 @@ interface Signal {
   projectId: string
   skill: string
   evidenceConfidence: number
+  suggestedLevel: string
   aiNote: string
   aiQuotes: { evidenceId: string; text: string; why: string }[]
+  criteria: { label: string; met: boolean }[]
 }
 
 const server = await startServer()
@@ -162,6 +190,34 @@ describe("evidence grading through the API", () => {
     expect(sec.evidenceConfidence).toBeLessThanOrEqual(20)
   })
 
+  it("drops a criteriaMet label the model invented instead of copying from the offered list", async () => {
+    process.env.GEMINI_API_KEY = "test-key"
+    const calls: { url: string; init: RequestInit }[] = []
+    geminiReply(
+      {
+        restatesBrief: false,
+        skills: [
+          {
+            skill: "Machine Learning",
+            score: 70,
+            // "instantiates a specific model" is a real offered criterion; the other two are not.
+            criteriaMet: ["instantiates a specific model", "achieves state-of-the-art accuracy", "deploys the model to production"],
+            reason: "Fits a tuned Isolation Forest model.",
+            quotes: [{ evidenceId: "ev-yazan-1", text: "model = IsolationForest(n_estimators=300, contamination=0.02, random_state=42)", why: "Chooses and tunes an anomaly model." }],
+          },
+        ],
+      },
+      calls,
+    )
+    const res = await server.call("POST", `/projects/${PROJECT}/ai-review`, YAZAN)
+    expect(res.status).toBe(200)
+    const ml = (await yazanSignals()).find((s) => s.skill === "Machine Learning")!
+    const met = ml.criteria.filter((c) => c.met).map((c) => c.label)
+    expect(met).toEqual(["instantiates a specific model"])
+    expect(met).not.toContain("achieves state-of-the-art accuracy")
+    expect(met).not.toContain("deploys the model to production")
+  })
+
   it("grades with Groq when a Groq key is set, preferring it over Gemini", async () => {
     process.env.GROQ_API_KEY = "groq-test-key"
     process.env.GEMINI_API_KEY = "gemini-test-key"
@@ -206,18 +262,20 @@ describe("evidence grading through the API", () => {
     expect(calls[0].url).toContain("generativelanguage.googleapis.com")
   })
 
-  it("falls back to the offline check when Gemini fails", async () => {
+  it("falls back to the offline check when Gemini fails, without leaking the provider failure into the note", async () => {
     process.env.GEMINI_API_KEY = "test-key"
     llmDeps.fetch = async () => new Response(JSON.stringify({ error: { message: "quota exceeded" } }), { status: 429 })
     const res = await server.call("POST", `/projects/${PROJECT}/ai-review`, YAZAN)
     expect(res.status).toBe(200)
     const ml = (await yazanSignals()).find((s) => s.skill === "Machine Learning")!
-    expect(ml.aiNote).toMatch(/Offline check \(Gemini was unavailable\)/)
+    // The offline scorer's own note stands alone — no "Offline check (...)" / provider-failure text.
+    expect(ml.aiNote).not.toMatch(/Offline check|Gemini|Groq/)
+    expect(ml.aiNote).toMatch(/concrete signs? of Machine Learning/)
     expect(ml.aiQuotes.length).toBeGreaterThan(0)
     expect(ml.evidenceConfidence).toBeLessThanOrEqual(75)
   })
 
-  it("never sends evidence with personal data to Gemini", async () => {
+  it("sends student evidence to Gemini even if it looks like it contains personal data (unlike company challenge uploads, student evidence is not screened)", async () => {
     process.env.GEMINI_API_KEY = "test-key"
     const calls: { url: string; init: RequestInit }[] = []
     geminiReply({ restatesBrief: false, skills: [] }, calls)
@@ -229,9 +287,7 @@ describe("evidence grading through the API", () => {
     expect(add.status).toBe(200)
     const res = await server.call("POST", `/projects/${PROJECT}/ai-review`, YAZAN)
     expect(res.status).toBe(200)
-    expect(calls).toHaveLength(0)
-    const ml = (await yazanSignals()).find((s) => s.skill === "Machine Learning")!
-    expect(ml.aiNote).toMatch(/personal data/)
+    expect(calls).toHaveLength(1)
   })
 
   it("reads a GitHub link's README and source files and analyzes them", async () => {

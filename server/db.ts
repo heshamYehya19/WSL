@@ -2,6 +2,7 @@ import { mkdirSync } from "node:fs"
 import { dirname, resolve } from "node:path"
 import { DatabaseSync } from "node:sqlite"
 import { EVIDENCE_LINKS, seedDatabase } from "./seed.ts"
+import { canonicalSkillName } from "./ml/analyze.ts"
 
 // The single source of truth for WSL. Every page reads from here (through the API)
 // and every action writes here — nothing in the client is hard-coded.
@@ -34,6 +35,43 @@ const CHALLENGE_COLUMNS = `
 const CHALLENGE_COLUMN_NAMES = CHALLENGE_COLUMNS.split("\n")
   .map((line) => line.trim().split(/\s+/)[0])
   .filter(Boolean)
+
+const SKILL_SIGNALS_COLUMNS = `
+  id               TEXT PRIMARY KEY,
+  project_id       TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  student_id       TEXT NOT NULL REFERENCES students(id),
+  skill            TEXT NOT NULL,
+  -- How strongly WSL's analysis of submitted evidence supports this skill (0-100).
+  -- Not a measure of proficiency — see suggested_level/status for the human-facing read.
+  evidence_confidence INTEGER NOT NULL CHECK (evidence_confidence BETWEEN 0 AND 100),
+  -- A short, concrete statistic behind the confidence score, e.g. "Detected Python code (92% confidence)...".
+  ai_note          TEXT NOT NULL DEFAULT '',
+  -- JSON list of { evidenceId, text, why }: the exact lines of the student's work behind the score.
+  ai_quotes        TEXT NOT NULL DEFAULT '[]',
+  -- JSON list of { label, met }: the named rubric criteria this signal was checked
+  -- against, met ones first — what the "what the evidence demonstrates" / "evidence
+  -- gaps" checklist is built from.
+  ai_criteria      TEXT NOT NULL DEFAULT '[]',
+  -- Deprecated pre-verification-rework columns: a company rating was never a university
+  -- verification, even under the old model. Kept only so historical seed rows still read
+  -- back; no new code writes or reads them for verification purposes.
+  company_rating   INTEGER CHECK (company_rating BETWEEN 0 AND 100),
+  company_rated_at TEXT,
+  status           TEXT NOT NULL DEFAULT 'Pending Verification'
+                     CHECK (status IN ('Pending Verification', 'Verified', 'More Evidence Requested', 'Rejected')),
+  -- "Insufficient" is not a low tier: it means too few rubric criteria were met to
+  -- claim any tier at all. See gateByCriteria in server/ml/analyze.ts.
+  suggested_level  TEXT NOT NULL DEFAULT 'Foundational'
+                     CHECK (suggested_level IN ('Insufficient', 'Foundational', 'Intermediate', 'Advanced', 'Demonstrated')),
+  verified_by      TEXT REFERENCES staff(id),
+  verified_at      TEXT,
+  reviewer_notes   TEXT,
+  analyzed_at      TEXT NOT NULL,
+  UNIQUE (project_id, skill)`
+
+const SKILL_SIGNALS_COLUMN_NAMES = SKILL_SIGNALS_COLUMNS.split("\n")
+  .map((line) => line.trim().split(/\s+/)[0])
+  .filter((name) => name && name !== "UNIQUE" && name !== "CHECK" && !name.startsWith("--"))
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS universities (
@@ -174,31 +212,7 @@ CREATE TABLE IF NOT EXISTS evidence (
 );
 
 CREATE TABLE IF NOT EXISTS skill_signals (
-  id               TEXT PRIMARY KEY,
-  project_id       TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-  student_id       TEXT NOT NULL REFERENCES students(id),
-  skill            TEXT NOT NULL,
-  -- How strongly WSL's analysis of submitted evidence supports this skill (0-100).
-  -- Not a measure of proficiency — see suggested_level/status for the human-facing read.
-  evidence_confidence INTEGER NOT NULL CHECK (evidence_confidence BETWEEN 0 AND 100),
-  -- A short, concrete statistic behind the confidence score, e.g. "Detected Python code (92% confidence)...".
-  ai_note          TEXT NOT NULL DEFAULT '',
-  -- JSON list of { evidenceId, text, why }: the exact lines of the student's work behind the score.
-  ai_quotes        TEXT NOT NULL DEFAULT '[]',
-  -- Deprecated pre-verification-rework columns: a company rating was never a university
-  -- verification, even under the old model. Kept only so historical seed rows still read
-  -- back; no new code writes or reads them for verification purposes.
-  company_rating   INTEGER CHECK (company_rating BETWEEN 0 AND 100),
-  company_rated_at TEXT,
-  status           TEXT NOT NULL DEFAULT 'Pending Verification'
-                     CHECK (status IN ('Pending Verification', 'Verified', 'More Evidence Requested', 'Rejected')),
-  suggested_level  TEXT NOT NULL DEFAULT 'Foundational'
-                     CHECK (suggested_level IN ('Foundational', 'Intermediate', 'Advanced', 'Demonstrated')),
-  verified_by      TEXT REFERENCES staff(id),
-  verified_at      TEXT,
-  reviewer_notes   TEXT,
-  analyzed_at      TEXT NOT NULL,
-  UNIQUE (project_id, skill)
+${SKILL_SIGNALS_COLUMNS}
 );
 
 CREATE TABLE IF NOT EXISTS skill_signal_evidence (
@@ -317,7 +331,7 @@ export function getDb(): DatabaseSync {
   return db
 }
 
-const SCHEMA_VERSION = 8
+const SCHEMA_VERSION = 10
 
 /**
  * Brings databases created by older versions up to date without losing their data.
@@ -345,6 +359,17 @@ const SCHEMA_VERSION = 8
  *     which CREATE TABLE IF NOT EXISTS adds on its own.
  * v8: skill_signals gained `ai_quotes` (the lines of evidence each AI signal cites), and
  *     evidence gained `fetched_content`/`fetched_from` (what WSL read from a GitHub link).
+ * v9: skill_signals gained `ai_criteria` (the named rubric criteria a signal was checked
+ *     against, met and unmet), and `suggested_level` can now be `'Insufficient'` — too few
+ *     criteria met to claim any real tier, rather than forcing a low tier regardless.
+ *     Widening that CHECK constraint needs a table rebuild (SQLite can't ALTER a CHECK in
+ *     place), so skill_signals is rebuilt the same way challenges was in v7.
+ * v10: skill names are canonicalized (server/ml/analyze.ts's canonicalSkillName) wherever
+ *     they're stored, so a company typing "python" instead of "Python" at challenge
+ *     creation no longer fragments into a second, separate skill across dashboards,
+ *     a student's record, and Talent Discovery search. One-time best-effort cleanup of
+ *     challenges.required_skills and skill_signals.skill for existing rows below; every
+ *     new challenge is canonicalized going forward at the point it's created.
  */
 function migrate(db: DatabaseSync) {
   const { user_version: version } = db.prepare("PRAGMA user_version").get() as { user_version: number }
@@ -434,6 +459,62 @@ function migrate(db: DatabaseSync) {
       if (!evidenceColumns.includes("fetched_content")) db.exec("ALTER TABLE evidence ADD COLUMN fetched_content TEXT")
       if (!evidenceColumns.includes("fetched_from")) db.exec("ALTER TABLE evidence ADD COLUMN fetched_from TEXT")
       if (!signalColumns.includes("ai_quotes")) db.exec("ALTER TABLE skill_signals ADD COLUMN ai_quotes TEXT NOT NULL DEFAULT '[]'")
+    })
+  }
+  if (version < 9) {
+    const signalColumns = (db.prepare("PRAGMA table_info(skill_signals)").all() as { name: string }[]).map((c) => c.name)
+    // Only the CHECK constraint actually needs the rebuild; skip it if a prior partial
+    // run already got this database onto the wide suggested_level CHECK.
+    const alreadyWide = (db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'skill_signals'").get() as { sql: string }).sql.includes(
+      "'Insufficient'",
+    )
+    if (!alreadyWide) {
+      transaction(db, () => {
+        const selectCols = SKILL_SIGNALS_COLUMN_NAMES.map((name) => (name === "ai_criteria" && !signalColumns.includes("ai_criteria") ? "'[]'" : name)).join(", ")
+        db.exec(`
+          CREATE TABLE skill_signals_v2 (${SKILL_SIGNALS_COLUMNS});
+          INSERT INTO skill_signals_v2 SELECT ${selectCols} FROM skill_signals;
+          DROP TABLE skill_signals;
+          ALTER TABLE skill_signals_v2 RENAME TO skill_signals;
+          CREATE INDEX IF NOT EXISTS idx_signals_project ON skill_signals (project_id);
+        `)
+      })
+      const problems = db.prepare("PRAGMA foreign_key_check").all()
+      if (problems.length > 0) throw new Error(`Database migration left broken references: ${JSON.stringify(problems)}`)
+    }
+  }
+  if (version < 10) {
+    transaction(db, () => {
+      const challengeRows = db.prepare("SELECT id, required_skills FROM challenges").all() as { id: string; required_skills: string }[]
+      const updateChallenge = db.prepare("UPDATE challenges SET required_skills = ? WHERE id = ?")
+      for (const row of challengeRows) {
+        const skills: string[] = JSON.parse(row.required_skills)
+        const canonical = skills.map((s) => canonicalSkillName(s))
+        if (JSON.stringify(canonical) !== JSON.stringify(skills)) updateChallenge.run(JSON.stringify(canonical), row.id)
+      }
+
+      const signalRows = db.prepare("SELECT id, project_id, skill FROM skill_signals").all() as { id: string; project_id: string; skill: string }[]
+      // Rows already in canonical form reserve their spot first, so a malformed sibling
+      // ("python" alongside an already-correct "Python" in the same project — the
+      // UNIQUE(project_id, skill) constraint means both can never coexist post-migration)
+      // is the one left untouched, not the one that was already right.
+      const claimed = new Map<string, Set<string>>() // project_id -> lowercase skill names already spoken for
+      for (const row of signalRows) {
+        if (row.skill !== canonicalSkillName(row.skill)) continue
+        const set = claimed.get(row.project_id) ?? new Set<string>()
+        set.add(row.skill.toLowerCase())
+        claimed.set(row.project_id, set)
+      }
+      const updateSignal = db.prepare("UPDATE skill_signals SET skill = ? WHERE id = ?")
+      for (const row of signalRows) {
+        const canonical = canonicalSkillName(row.skill)
+        if (canonical === row.skill) continue
+        const set = claimed.get(row.project_id) ?? new Set<string>()
+        if (set.has(canonical.toLowerCase())) continue // leave this one be — this is a one-time best-effort pass
+        set.add(canonical.toLowerCase())
+        claimed.set(row.project_id, set)
+        updateSignal.run(canonical, row.id)
+      }
     })
   }
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`)
