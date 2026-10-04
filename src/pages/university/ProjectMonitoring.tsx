@@ -6,6 +6,7 @@ import { StatusBadge } from "../../components/ui/StatusBadge"
 import { SignalReviewCard } from "../../components/university/SignalReviewCard"
 import { challengeFor, skillsForProject } from "../../lib/selectors"
 import { formatDate } from "../../lib/format"
+import { evidenceAnalysisLabel } from "../../lib/aiNote"
 
 export default function ProjectMonitoring() {
   const { id } = useParams()
@@ -108,7 +109,7 @@ export default function ProjectMonitoring() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
+        <div className="min-w-0 space-y-6 lg:col-span-2">
           <div>
             <h3 className="mb-3 font-semibold text-ink-900">All Evidence</h3>
             <div className="space-y-2">
@@ -117,12 +118,9 @@ export default function ProjectMonitoring() {
                   <span className="rounded-md bg-ink-50 px-2 py-0.5 text-[11px] font-semibold text-ink-600">{e.type}</span>
                   <p className="mt-1.5 text-sm font-medium text-ink-900">{e.title}</p>
                   <p className="text-xs text-ink-500">{e.description}</p>
-                  {e.link && <p className="mt-1 text-[11px] text-ink-400">{e.link}</p>}
-                  {e.content ? (
-                    <pre className="mt-2 max-h-24 overflow-hidden rounded-lg bg-ink-50 px-2.5 py-2 font-mono text-[11px] text-ink-600">{e.content}</pre>
-                  ) : (
-                    <p className="mt-1.5 text-[11px] text-ink-400">Supporting evidence — linked for mentor review, not automatically analyzed.</p>
-                  )}
+                  {e.link && <p className="mt-1 text-[11px] break-all text-ink-400">{e.link}</p>}
+                  {e.content && <pre className="mt-2 max-h-24 overflow-hidden rounded-lg whitespace-pre-wrap [overflow-wrap:anywhere] bg-ink-50 px-2.5 py-2 font-mono text-[11px] text-ink-600">{e.content}</pre>}
+                  <p className="mt-1.5 text-[11px] text-ink-400">{evidenceAnalysisLabel(e)}</p>
                 </div>
               ))}
               {projectEvidence.length === 0 && <p className="text-sm text-ink-400">No evidence submitted yet.</p>}

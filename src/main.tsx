@@ -6,6 +6,7 @@ import App from "./App.tsx"
 import { StoreProvider } from "./state/store"
 import { SessionProvider } from "./state/session"
 import { ThemeProvider } from "./state/theme"
+import { TourProvider } from "./state/tour"
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -13,7 +14,9 @@ createRoot(document.getElementById("root")!).render(
       <ThemeProvider>
         <SessionProvider>
           <StoreProvider>
-            <App />
+            <TourProvider>
+              <App />
+            </TourProvider>
           </StoreProvider>
         </SessionProvider>
       </ThemeProvider>

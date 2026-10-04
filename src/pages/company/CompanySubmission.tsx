@@ -6,6 +6,8 @@ import { StatusBadge } from "../../components/ui/StatusBadge"
 import { ConfidenceMeter } from "../../components/ui/ConfidenceMeter"
 import { challengeFor, skillsForProject } from "../../lib/selectors"
 import { formatDate } from "../../lib/format"
+import { evidenceAnalysisLabel } from "../../lib/aiNote"
+import { EvidenceQuotes } from "../../components/ui/EvidenceQuotes"
 
 const FEEDBACK_OPTIONS = [
   { key: "strongTechnicalExecution", label: "Strong technical execution" },
@@ -20,6 +22,9 @@ export default function CompanySubmission() {
   // Companies only see submissions to their own challenges.
   const project = projects.find((p) => p.id === projectId && p.organizationId === company?.id)
   const signals = project ? skillsForProject(skillSignals, project.id) : []
+  // Companies only see what a mentor verified; AI signals alone are never presented as skills.
+  const verifiedSignals = signals.filter((s) => s.status === "Verified")
+  const unverifiedCount = signals.length - verifiedSignals.length
   const [flags, setFlags] = useState<Record<(typeof FEEDBACK_OPTIONS)[number]["key"], boolean>>(() => ({
     strongTechnicalExecution: project?.companyFeedback?.strongTechnicalExecution ?? false,
     relevantForInternship: project?.companyFeedback?.relevantForInternship ?? false,
@@ -76,12 +81,9 @@ export default function CompanySubmission() {
               <span className="rounded bg-ink-50 px-1.5 py-0.5 text-[11px] font-semibold text-ink-600">{e.type}</span>{" "}
               <span className="text-sm font-medium text-ink-800">{e.title}</span>
               <p className="mt-1 text-xs text-ink-500">{e.description}</p>
-              {e.link && <p className="mt-1 text-xs text-teal-600">{e.link}</p>}
-              {e.content ? (
-                <pre className="mt-2 max-h-24 overflow-hidden rounded-lg bg-ink-50 px-2.5 py-2 font-mono text-[11px] text-ink-600">{e.content}</pre>
-              ) : (
-                <p className="mt-1 text-[11px] text-ink-400">Supporting evidence — linked for mentor review, not automatically analyzed.</p>
-              )}
+              {e.link && <p className="mt-1 text-xs break-all text-teal-600">{e.link}</p>}
+              {e.content && <pre className="mt-2 max-h-24 overflow-hidden rounded-lg whitespace-pre-wrap [overflow-wrap:anywhere] bg-ink-50 px-2.5 py-2 font-mono text-[11px] text-ink-600">{e.content}</pre>}
+              <p className="mt-1 text-[11px] text-ink-400">{evidenceAnalysisLabel(e)}</p>
             </div>
           ))}
           {projectEvidence.length === 0 && <p className="text-sm text-ink-400">No evidence submitted.</p>}
@@ -89,16 +91,22 @@ export default function CompanySubmission() {
 
         <h3 className="mt-6 mb-3 text-xs font-semibold tracking-wide text-teal-600 uppercase">Verified Skills</h3>
         <div className="space-y-3">
-          {signals.map((s) => (
+          {verifiedSignals.map((s) => (
             <div key={s.id} className="rounded-xl border border-ink-200 p-4">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-semibold text-ink-900">
                   {s.skill}
-                  {s.status === "Verified" && <span className="ml-1.5 text-xs font-semibold text-verified-600">✓ University Verified</span>}
+                  <span className="ml-1.5 text-xs font-semibold text-verified-600">✓ University Verified</span>
                 </span>
                 <span className="rounded-full bg-ink-100 px-2 py-0.5 text-[10px] font-semibold text-ink-600">{s.suggestedLevel}</span>
               </div>
               <div className="mt-2"><ConfidenceMeter value={s.evidenceConfidence} label="Evidence confidence" /></div>
+              {s.aiQuotes.length > 0 && (
+                <div className="mt-3">
+                  <p className="mb-1 text-[11px] font-semibold tracking-wide text-ink-400 uppercase">Proof in the work</p>
+                  <EvidenceQuotes quotes={s.aiQuotes} evidenceTitle={(id) => projectEvidence.find((e) => e.id === id)?.title} />
+                </div>
+              )}
               {s.verifiedBy && (
                 <p className="mt-1.5 text-[11px] text-ink-400">
                   Verified by {getStaff(s.verifiedBy)?.name ?? "a university mentor"}
@@ -107,7 +115,12 @@ export default function CompanySubmission() {
               )}
             </div>
           ))}
-          {signals.length === 0 && <p className="text-sm text-ink-400">No skill signals yet.</p>}
+          {verifiedSignals.length === 0 && <p className="text-sm text-ink-400">No skills from this project have been verified yet.</p>}
+          {unverifiedCount > 0 && (
+            <p className="text-[11px] text-ink-400">
+              {unverifiedCount} other skill signal{unverifiedCount === 1 ? " was" : "s were"} not verified by the university, so {unverifiedCount === 1 ? "it isn't" : "they aren't"} shown.
+            </p>
+          )}
         </div>
 
         <h3 className="mt-6 mb-3 text-xs font-semibold tracking-wide text-teal-600 uppercase">

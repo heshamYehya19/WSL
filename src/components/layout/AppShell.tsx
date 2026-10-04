@@ -10,6 +10,8 @@ import { useStore } from "../../state/store"
 import { formatRelative } from "../../lib/format"
 import { AmbientConstellation } from "../ui/AmbientConstellation"
 import type { Role } from "../../types"
+import { TourPanel } from "../tour/TourPanel"
+import { useTour } from "../../state/tour"
 
 interface NavItem {
   to: string
@@ -57,6 +59,7 @@ const ROLE_LABEL: Record<Exclude<Role, "guest">, string> = {
 export function AppShell({ role }: { role: Exclude<Role, "guest"> }) {
   const { session, student, university, company } = useDemoUser()
   const { notifications, markNotificationsRead } = useStore()
+  const { step: tourStep } = useTour()
   const [notifOpen, setNotifOpen] = useState(false)
   const { pathname } = useLocation()
 
@@ -146,7 +149,7 @@ export function AppShell({ role }: { role: Exclude<Role, "guest"> }) {
             <Wordmark />
           </div>
           <div className="hidden text-sm text-ink-400 md:block">Jordan 2076 · Amman — Innovation in Education &amp; Learning Systems</div>
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <div className="relative">
               <button
                 onClick={toggleNotifications}
@@ -204,7 +207,10 @@ export function AppShell({ role }: { role: Exclude<Role, "guest"> }) {
               <Outlet />
             </Suspense>
           </div>
+          {/* Room to scroll the page's last content above the tour panel. */}
+          {tourStep !== null && <div className="h-64 sm:h-48" aria-hidden />}
         </main>
+        <TourPanel />
       </div>
     </div>
   )

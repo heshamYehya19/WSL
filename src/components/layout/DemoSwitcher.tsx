@@ -86,7 +86,7 @@ export function DemoSwitcher() {
       <button
         onClick={() => (open ? close() : setOpen(true))}
         aria-expanded={open}
-        className="group flex max-w-[60vw] items-center gap-2 rounded-full border border-ink-200 bg-surface py-1 pr-3 pl-1 text-sm font-medium text-ink-700 transition-all duration-200 hover:border-teal-400 hover:shadow-md hover:shadow-teal-500/10"
+        className="group flex max-w-[40vw] sm:max-w-[60vw] items-center gap-2 rounded-full border border-ink-200 bg-surface py-1 pr-3 pl-1 text-sm font-medium text-ink-700 transition-all duration-200 hover:border-teal-400 hover:shadow-md hover:shadow-teal-500/10"
       >
         <span className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-teal-400 to-teal-600 text-[10px] font-bold text-ink-950">
           {currentInitials}

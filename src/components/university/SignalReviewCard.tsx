@@ -1,7 +1,8 @@
 import { useState } from "react"
 import { ConfidenceMeter } from "../ui/ConfidenceMeter"
 import { StatusBadge } from "../ui/StatusBadge"
-import { splitAiNote } from "../../lib/aiNote"
+import { EvidenceQuotes } from "../ui/EvidenceQuotes"
+import { evidenceAnalysisLabel, splitAiNote } from "../../lib/aiNote"
 import { formatDate } from "../../lib/format"
 import type { Evidence, SkillSignal } from "../../types"
 
@@ -58,9 +59,14 @@ export function SignalReviewCard({
         <div className="w-36"><ConfidenceMeter value={signal.evidenceConfidence} label="Evidence confidence" /></div>
       </div>
 
-      {signal.aiNote && (
+      {(signal.aiNote || signal.aiQuotes.length > 0) && (
         <div className="mt-3">
           <p className="text-[11px] font-semibold tracking-wide text-ink-400 uppercase">Why WSL found this</p>
+          {signal.aiQuotes.length > 0 && (
+            <div className="mt-1.5 mb-2">
+              <EvidenceQuotes quotes={signal.aiQuotes} evidenceTitle={(id) => evidence.find((e) => e.id === id)?.title} />
+            </div>
+          )}
           <ul className="mt-1 space-y-0.5">
             {splitAiNote(signal.aiNote).map((line) => (
               <li key={line} className="flex gap-1.5 text-xs text-ink-600">
@@ -80,7 +86,7 @@ export function SignalReviewCard({
             <div key={e.id} className="rounded-lg border border-ink-100 px-2.5 py-1.5 text-xs">
               <span className="font-semibold text-ink-800">{e.type}</span> <span className="text-ink-600">{e.title}</span>
               <p className="mt-0.5 text-[11px] text-ink-400">
-                {e.content ? "Evidence analyzed." : "Supporting evidence — linked for mentor review, not automatically analyzed."}
+                {evidenceAnalysisLabel(e)}
               </p>
             </div>
           ))}
