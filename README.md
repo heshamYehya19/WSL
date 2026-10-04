@@ -59,10 +59,15 @@ snapshot so every page reflects the database immediately.
 When a student asks WSL to analyze their evidence, `server/ai.ts` grades it against each skill the
 challenge requires:
 
-- **Model grading (Groq or Gemini).** The evidence is sent to the configured model with structured JSON output: a 0-100 score per
-  skill plus the exact lines of the student's work that prove it. WSL checks every quoted line
+- **Model grading (Groq or Gemini).** The evidence is sent to the configured model with structured JSON output: one of five
+  fixed levels per skill (none, basic, solid, strong, exceptional, which WSL turns into 5, 30, 55, 75 or 90) plus the
+  exact lines of the student's work that prove it. WSL checks every quoted line
   against the real content and drops any that aren't there or only repeat the brief; a skill with no
   confirmed quote is capped at 20. The quotes appear in the mentor's "Why WSL found this" box.
+- **The same work gets the same score.** Calls run at temperature 0 with a fixed seed, each grade is the
+  median of three calls, and results are cached by a hash of the evidence, challenge, skills and model, so
+  re-analyzing unchanged evidence returns the same scores. `node scripts/ml/grader-bench.ts` measures the
+  spread per model (on 2026-10-04 `openai/gpt-oss-120b` was the most stable and discriminating Groq model).
 - **Brief echo is never evidence.** Lines copied from the challenge brief are ignored when scoring,
   and a submission that mostly repeats the brief is rejected when it's submitted.
 - **Only real content counts.** An evidence title or description is the student's own claim and
@@ -81,9 +86,11 @@ verifies it, and companies only see verified skills unless they choose to includ
 |---|---|
 | `GROQ_API_KEY` | Enables grading with Groq. Used first when both keys are set. |
 | `GROQ_MODEL` | Optional. Defaults to `openai/gpt-oss-120b` (supports strict JSON schema output). |
+| `GROQ_REASONING_EFFORT` | Optional, for gpt-oss models: `low`, `medium` (default) or `high`. |
 | `GEMINI_API_KEY` | Enables grading with Gemini. |
 | `GEMINI_MODEL` | Optional. Defaults to `gemini-flash-latest`, Google's alias for its newest Flash model. |
 | `WSL_AI_PROVIDER` | Optional, `groq` or `gemini`, to choose when both keys are set. With neither key, the offline scorer is used. |
+| `WSL_AI_SAMPLES` | Optional. How many model calls each grade takes the median of (default 3, 1-5). Use 1 on a tight rate limit. |
 | `GITHUB_TOKEN` | Optional. Raises the GitHub API rate limit for reading repository links. |
 
 ## Demo tour

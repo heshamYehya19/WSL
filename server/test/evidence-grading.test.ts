@@ -100,11 +100,12 @@ describe("evidence grading through the API", () => {
   beforeEach(() => {
     resetDatabase()
     for (const k of ["GEMINI_API_KEY", "GEMINI_MODEL", "GROQ_API_KEY", "GROQ_MODEL", "WSL_AI_PROVIDER"]) delete process.env[k]
+    process.env.WSL_AI_SAMPLES = "1"
   })
   afterEach(() => {
     llmDeps.fetch = realFetchLlm
     githubDeps.fetch = realFetchGithub
-    for (const k of ["GEMINI_API_KEY", "GEMINI_MODEL", "GROQ_API_KEY", "GROQ_MODEL", "WSL_AI_PROVIDER"]) delete process.env[k]
+    for (const k of ["GEMINI_API_KEY", "GEMINI_MODEL", "GROQ_API_KEY", "GROQ_MODEL", "WSL_AI_PROVIDER", "WSL_AI_SAMPLES"]) delete process.env[k]
   })
 
   it("rejects the brief pasted back with print('hello world') at submission", async () => {
@@ -122,7 +123,7 @@ describe("evidence grading through the API", () => {
         skills: [
           {
             skill: "Machine Learning",
-            score: 88,
+            level: "strong",
             reason: "Fits an Isolation Forest with a tuned contamination rate and evaluates precision and recall.",
             quotes: [
               { evidenceId: "ev-yazan-1", text: "model = IsolationForest(n_estimators=300, contamination=0.02, random_state=42)", why: "Chooses and tunes an anomaly model." },
@@ -131,12 +132,12 @@ describe("evidence grading through the API", () => {
           },
           {
             skill: "Network Security",
-            score: 90,
+            level: "exceptional",
             reason: "Claims strong security work.",
             quotes: [{ evidenceId: "ev-yazan-1", text: "Build and evaluate an anomaly detection model against the labeled incidents", why: "Quotes the brief." }],
           },
-          { skill: "Python", score: 70, reason: "Idiomatic pandas.", quotes: [{ evidenceId: "ev-yazan-1", text: "def extract_features(flows: pd.DataFrame) -> pd.DataFrame:", why: "Typed helper function." }] },
-          { skill: "Data Analysis", score: 65, reason: "Derives features.", quotes: [{ evidenceId: "ev-yazan-1", text: 'flows = pd.read_parquet("netflow_logs.parquet")', why: "Loads the logs." }] },
+          { skill: "Python", level: "strong", reason: "Idiomatic pandas.", quotes: [{ evidenceId: "ev-yazan-1", text: "def extract_features(flows: pd.DataFrame) -> pd.DataFrame:", why: "Typed helper function." }] },
+          { skill: "Data Analysis", level: "solid", reason: "Derives features.", quotes: [{ evidenceId: "ev-yazan-1", text: 'flows = pd.read_parquet("netflow_logs.parquet")', why: "Loads the logs." }] },
         ],
       },
       calls,
@@ -150,10 +151,13 @@ describe("evidence grading through the API", () => {
     const body = JSON.parse(String(calls[0].init.body))
     expect(body.generationConfig.responseMimeType).toBe("application/json")
     expect(body.generationConfig.responseSchema.required).toContain("skills")
+    expect(body.generationConfig.temperature).toBe(0)
+    expect(typeof body.generationConfig.seed).toBe("number")
 
     const signals = await yazanSignals()
     const ml = signals.find((s) => s.skill === "Machine Learning")!
-    expect(ml.evidenceConfidence).toBe(88)
+    // The model picks a level; WSL turns "strong" into the score.
+    expect(ml.evidenceConfidence).toBe(75)
     expect(ml.aiQuotes.map((q) => q.text)).toEqual(["model = IsolationForest(n_estimators=300, contamination=0.02, random_state=42)"])
     expect(ml.aiNote).toMatch(/Gemini/)
     // Its only "proof" was the brief itself, so the score is capped.
@@ -170,7 +174,7 @@ describe("evidence grading through the API", () => {
       restatesBrief: false,
       skills: SKILLS.map((skill) => ({
         skill,
-        score: 66,
+        level: "solid",
         reason: "Working anomaly detection pipeline.",
         quotes: [{ evidenceId: "ev-yazan-1", text: "model = IsolationForest(n_estimators=300, contamination=0.02, random_state=42)", why: "Fits a tuned model." }],
       })),
@@ -189,11 +193,69 @@ describe("evidence grading through the API", () => {
     expect(body.model).toBe("openai/gpt-oss-120b")
     expect(body.response_format.type).toBe("json_schema")
     expect(body.response_format.json_schema.strict).toBe(true)
+    expect(body.temperature).toBe(0)
+    expect(typeof body.seed).toBe("number")
 
     const ml = (await yazanSignals()).find((s) => s.skill === "Machine Learning")!
-    expect(ml.evidenceConfidence).toBe(66)
+    expect(ml.evidenceConfidence).toBe(55)
     expect(ml.aiNote).toMatch(/Graded by Groq/)
     expect(ml.aiQuotes).toHaveLength(1)
+  })
+
+  it("takes the median of several calls, so one odd answer can't move a score", async () => {
+    process.env.GROQ_API_KEY = "groq-test-key"
+    process.env.WSL_AI_SAMPLES = "3"
+    const levels = ["basic", "strong", "exceptional"]
+    let call = 0
+    llmDeps.fetch = async () => {
+      const level = levels[call++ % levels.length]
+      const payload = {
+        restatesBrief: false,
+        skills: SKILLS.map((skill) => ({
+          skill,
+          level,
+          reason: `Graded ${level}.`,
+          quotes: [{ evidenceId: "ev-yazan-1", text: "model = IsolationForest(n_estimators=300, contamination=0.02, random_state=42)", why: "Fits a tuned model." }],
+        })),
+      }
+      return Response.json({ choices: [{ message: { content: JSON.stringify(payload) } }] })
+    }
+    await server.call("POST", `/projects/${PROJECT}/ai-review`, YAZAN)
+    expect(call).toBe(3)
+    const ml = (await yazanSignals()).find((s) => s.skill === "Machine Learning")!
+    expect(ml.evidenceConfidence).toBe(75)
+    expect(ml.aiNote).toMatch(/Graded strong/)
+  })
+
+  it("returns the same scores when unchanged evidence is analyzed again, and re-grades after new evidence", async () => {
+    process.env.GROQ_API_KEY = "groq-test-key"
+    let call = 0
+    llmDeps.fetch = async () => {
+      // A different answer every call: only the cache can keep the scores the same.
+      const level = call++ % 2 === 0 ? "solid" : "strong"
+      const payload = {
+        restatesBrief: false,
+        skills: SKILLS.map((skill) => ({
+          skill,
+          level,
+          reason: "Working pipeline.",
+          quotes: [{ evidenceId: "ev-yazan-1", text: "model = IsolationForest(n_estimators=300, contamination=0.02, random_state=42)", why: "Fits a tuned model." }],
+        })),
+      }
+      return Response.json({ choices: [{ message: { content: JSON.stringify(payload) } }] })
+    }
+    const scores = async () => (await yazanSignals()).map((s) => `${s.skill}:${s.evidenceConfidence}`).sort()
+
+    await server.call("POST", `/projects/${PROJECT}/ai-review`, YAZAN)
+    const first = await scores()
+    await server.call("POST", `/projects/${PROJECT}/ai-review`, YAZAN)
+    expect(call).toBe(1)
+    expect(await scores()).toEqual(first)
+
+    const add = await server.call("POST", `/projects/${PROJECT}/evidence`, YAZAN, { type: "Code", title: "Alert formatter", content: REAL_SCRIPT })
+    expect(add.status).toBe(200)
+    await server.call("POST", `/projects/${PROJECT}/ai-review`, YAZAN)
+    expect(call).toBe(2)
   })
 
   it("uses Gemini instead when WSL_AI_PROVIDER says so", async () => {
@@ -208,7 +270,7 @@ describe("evidence grading through the API", () => {
 
   it("falls back to the offline check when Gemini fails", async () => {
     process.env.GEMINI_API_KEY = "test-key"
-    llmDeps.fetch = async () => new Response(JSON.stringify({ error: { message: "quota exceeded" } }), { status: 429 })
+    llmDeps.fetch = async () => new Response(JSON.stringify({ error: { message: "quota exceeded" } }), { status: 429, headers: { "retry-after": "600" } })
     const res = await server.call("POST", `/projects/${PROJECT}/ai-review`, YAZAN)
     expect(res.status).toBe(200)
     const ml = (await yazanSignals()).find((s) => s.skill === "Machine Learning")!

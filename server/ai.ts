@@ -7,10 +7,16 @@
 // and falls back to the stricter offline scorer (server/ml/analyze.ts) whenever the
 // model can't be used: no API key, a failed call, or personal data in the evidence,
 // which never leaves WSL. The demo keeps working in every one of those cases.
+// Model grades are cached by a hash of everything the model saw, so analyzing the
+// same evidence again returns the same scores instead of a fresh, slightly different
+// opinion. Offline results are deterministic already and aren't cached.
 
+import { createHash } from "node:crypto"
+import { getDb } from "./db.ts"
 import { analyzableContent, simulateAIReview } from "./ml/analyze.ts"
 import type { ChallengeContext, EvidenceLike, SimulatedRating } from "./ml/analyze.ts"
-import { configuredProvider, gradeWithModel } from "./ml/llm-grader.ts"
+import { GRADER_VERSION, configuredProvider, gradeWithModel, sampleCount } from "./ml/llm-grader.ts"
+import type { Provider } from "./ml/llm-grader.ts"
 import { screenChallenge, summarizeFindings } from "./screening.ts"
 
 export { checkRelevance, simulateAIReview, suggestedLevelFor } from "./ml/analyze.ts"
@@ -18,6 +24,28 @@ export type { ChallengeContext, EvidenceQuote, RelevanceCheck, SimulatedRating, 
 
 function withPrefix(ratings: SimulatedRating[], prefix: string): SimulatedRating[] {
   return ratings.map((r) => ({ ...r, note: `${prefix} ${r.note}` }))
+}
+
+function cacheKey(provider: Provider, skills: string[], evidence: EvidenceLike[], challenge: ChallengeContext): string {
+  const seen = {
+    grader: GRADER_VERSION,
+    provider: provider.id,
+    model: provider.model,
+    samples: sampleCount(),
+    skills,
+    challenge,
+    evidence: evidence.map((e) => [e.id, e.type, e.title, e.description, e.content ?? ""]),
+  }
+  return createHash("sha256").update(JSON.stringify(seen)).digest("hex")
+}
+
+function cachedGrade(key: string): SimulatedRating[] | null {
+  const row = getDb().prepare("SELECT ratings FROM ai_grade_cache WHERE key = ?").get(key) as { ratings: string } | undefined
+  return row ? (JSON.parse(row.ratings) as SimulatedRating[]) : null
+}
+
+function saveGrade(key: string, ratings: SimulatedRating[]) {
+  getDb().prepare("INSERT OR REPLACE INTO ai_grade_cache (key, ratings, created_at) VALUES (?, ?, ?)").run(key, JSON.stringify(ratings), new Date().toISOString())
 }
 
 export async function analyzeEvidence(skills: string[], evidence: EvidenceLike[], challenge: ChallengeContext): Promise<SimulatedRating[]> {
@@ -43,9 +71,16 @@ export async function analyzeEvidence(skills: string[], evidence: EvidenceLike[]
     return withPrefix(offline(), `Offline check: WSL found possible personal data (${summarizeFindings(findings)}), so this evidence was not sent to ${provider.label}.`)
   }
 
+  const key = cacheKey(provider, skills, readable, challenge)
+  const cached = cachedGrade(key)
+  if (cached) return cached
+
   try {
     const graded = await gradeWithModel(provider, skills, readable, challenge)
-    if (graded.length === skills.length) return graded
+    if (graded.length === skills.length) {
+      saveGrade(key, graded)
+      return graded
+    }
     // Fill any skill the model skipped with the offline score rather than leaving a gap.
     const fallback = offline()
     return skills.map((skill, i) => graded.find((g) => g.skill === skill) ?? withPrefix([fallback[i]], `Offline check (${provider.label} skipped this skill).`)[0])

@@ -267,6 +267,14 @@ CREATE TABLE IF NOT EXISTS notifications (
   created_at     TEXT NOT NULL
 );
 
+-- AI grades keyed by a hash of everything the grader saw (evidence, challenge, skills,
+-- model, grader version), so re-analyzing unchanged evidence gives the same result.
+CREATE TABLE IF NOT EXISTS ai_grade_cache (
+  key        TEXT PRIMARY KEY,
+  ratings    TEXT NOT NULL, -- JSON array of SimulatedRating
+  created_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_notifications_recipient ON notifications (recipient_role, recipient_id);
 CREATE INDEX IF NOT EXISTS idx_projects_student ON projects (student_id);
 CREATE INDEX IF NOT EXISTS idx_evidence_project ON evidence (project_id);
@@ -276,6 +284,7 @@ CREATE INDEX IF NOT EXISTS idx_challenge_files_challenge ON challenge_files (cha
 `
 
 const TABLES_IN_DROP_ORDER = [
+  "ai_grade_cache",
   "notifications",
   "company_actions",
   "opportunities",
