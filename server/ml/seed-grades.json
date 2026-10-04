@@ -1,0 +1,231 @@
+{
+  "prj-estarta-intent-omar": {
+    "model": "openai/gpt-oss-120b",
+    "hash": "8c8c6eecc891b0d225e187aa8bbbcadccd6c48529317b0aa8f25125de9df0a87",
+    "gradedAt": "2026-10-04T21:49:40.600Z",
+    "results": [
+      {
+        "skill": "Python",
+        "rating": 62,
+        "suggestedLevel": "Advanced",
+        "note": "Graded by openai/gpt-oss-120b against this challenge. The code imports pandas, defines a function with type hints, and uses pandas to read a CSV, showing solid Python usage.",
+        "quotes": [
+          {
+            "evidenceId": "ev-omar-1",
+            "text": "import pandas as pd",
+            "why": "shows import of a Python module (pandas)"
+          },
+          {
+            "evidenceId": "ev-omar-1",
+            "text": "def normalize_text(text: str) -> str:",
+            "why": "defines a function with type hints"
+          },
+          {
+            "evidenceId": "ev-omar-1",
+            "text": "df = pd.read_csv(\"call_transcripts.csv\")",
+            "why": "uses pandas to load data, demonstrating work with pandas"
+          }
+        ],
+        "evidenceIds": [
+          "ev-omar-1"
+        ],
+        "criteria": [
+          {
+            "label": "imports Python modules",
+            "met": true
+          },
+          {
+            "label": "defines its own functions",
+            "met": true
+          },
+          {
+            "label": "uses type hints",
+            "met": true
+          },
+          {
+            "label": "works with pandas or NumPy",
+            "met": true
+          },
+          {
+            "label": "defines classes",
+            "met": false
+          },
+          {
+            "label": "formats output with f-strings",
+            "met": false
+          },
+          {
+            "label": "uses a list comprehension",
+            "met": false
+          },
+          {
+            "label": "handles files or errors",
+            "met": false
+          }
+        ],
+        "source": "model",
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "skill": "Natural Language Processing",
+        "rating": 71,
+        "suggestedLevel": "Advanced",
+        "note": "Graded by openai/gpt-oss-120b against this challenge. The pipeline normalizes Arabic text, vectorizes it for modeling, and the report provides evaluation metrics per intent and language.",
+        "quotes": [
+          {
+            "evidenceId": "ev-omar-1",
+            "text": "def normalize_text(text: str) -> str:",
+            "why": "cleans and normalizes text"
+          },
+          {
+            "evidenceId": "ev-omar-1",
+            "text": "X = vectorizer.fit_transform(df[\"clean_text\"])",
+            "why": "represents text for a model via TF‑IDF"
+          },
+          {
+            "evidenceId": "ev-omar-2",
+            "text": "Results on the held-out 20%: the TF-IDF and logistic regression baseline reached macro F1 0.71; the fine-tuned Arabic BERT reached macro F1 0.84 (Arabic 0.82, …",
+            "why": "evaluates text predictions with macro F1 scores"
+          }
+        ],
+        "evidenceIds": [
+          "ev-omar-1",
+          "ev-omar-2"
+        ],
+        "criteria": [
+          {
+            "label": "represents text for a model",
+            "met": true
+          },
+          {
+            "label": "cleans and normalizes text",
+            "met": true
+          },
+          {
+            "label": "evaluates text predictions",
+            "met": true
+          },
+          {
+            "label": "builds a language task",
+            "met": false
+          }
+        ],
+        "source": "model",
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "skill": "Machine Learning",
+        "rating": 77,
+        "suggestedLevel": "Advanced",
+        "note": "Graded by openai/gpt-oss-120b against this challenge. The project imports sklearn and transformers, creates logistic regression and BERT models, trains them, prepares TF‑IDF features, and reports performance metrics.",
+        "quotes": [
+          {
+            "evidenceId": "ev-omar-1",
+            "text": "from sklearn.linear_model import LogisticRegression",
+            "why": "imports a machine learning library"
+          },
+          {
+            "evidenceId": "ev-omar-1",
+            "text": "baseline = LogisticRegression(max_iter=1000, class_weight=\"balanced\")",
+            "why": "instantiates a specific model"
+          },
+          {
+            "evidenceId": "ev-omar-1",
+            "text": "baseline.fit(X, df[\"intent_label\"])",
+            "why": "trains the model on data"
+          }
+        ],
+        "evidenceIds": [
+          "ev-omar-1"
+        ],
+        "criteria": [
+          {
+            "label": "imports a machine learning library",
+            "met": true
+          },
+          {
+            "label": "instantiates a specific model",
+            "met": true
+          },
+          {
+            "label": "trains a model on data",
+            "met": true
+          },
+          {
+            "label": "prepares features or splits data",
+            "met": true
+          },
+          {
+            "label": "evaluates the model",
+            "met": true
+          },
+          {
+            "label": "uses the model's predictions",
+            "met": false
+          },
+          {
+            "label": "tunes hyperparameters",
+            "met": false
+          }
+        ],
+        "source": "model",
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "skill": "Data Analysis",
+        "rating": 68,
+        "suggestedLevel": "Advanced",
+        "note": "Graded by openai/gpt-oss-120b against this challenge. The notebook loads a CSV, creates a cleaned text column, and the report lists dataset size, intent distribution, and performance statistics.",
+        "quotes": [
+          {
+            "evidenceId": "ev-omar-1",
+            "text": "df = pd.read_csv(\"call_transcripts.csv\")",
+            "why": "loads a real dataset"
+          },
+          {
+            "evidenceId": "ev-omar-1",
+            "text": "df[\"clean_text\"] = df[\"transcript\"].map(normalize_text)",
+            "why": "derives a new column"
+          },
+          {
+            "evidenceId": "ev-omar-2",
+            "text": "Data: 18,214 transcript snippets across 9 intents; \"billing\" and \"technical issue\" make up 58% of calls",
+            "why": "reports counts of data"
+          }
+        ],
+        "evidenceIds": [
+          "ev-omar-1",
+          "ev-omar-2"
+        ],
+        "criteria": [
+          {
+            "label": "loads a real dataset",
+            "met": true
+          },
+          {
+            "label": "derives new columns",
+            "met": true
+          },
+          {
+            "label": "computes statistics",
+            "met": true
+          },
+          {
+            "label": "reports counts",
+            "met": true
+          },
+          {
+            "label": "aggregates or reshapes data",
+            "met": false
+          },
+          {
+            "label": "filters or cleans data",
+            "met": false
+          }
+        ],
+        "source": "model",
+        "model": "openai/gpt-oss-120b"
+      }
+    ]
+  }
+}
