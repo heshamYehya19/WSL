@@ -1,4 +1,4 @@
-import type { Challenge, ChallengeStatus, Evidence, Project, SkillSignal, Student } from "../types.ts"
+import type { Challenge, ChallengeStatus, Evidence, Project, SkillSignal, Student, TalentCandidate } from "../types.ts"
 import { rank } from "./pipeline.ts"
 
 // Pure helpers over data that came from the database. Entity lookups (getOrg,
@@ -11,6 +11,62 @@ export function companyProjectAccess(projects: Project[], signals: SkillSignal[]
   if (project.organizationId === companyId) return { project, own: true }
   // A company is only ever sent verified, current proof, so having any signal on a project means it was shared with them.
   return signals.some((s) => s.projectId === project.id) ? { project, own: false } : undefined
+}
+
+/** One verified skill of a candidate, with the evidence that backs it. */
+export interface ProofSkill {
+  skill: string
+  verifiedAt: string
+  verifyingUniversity: string
+  /** WSL's grounded read of the work (met criteria, quoted lines) for this skill, when the company was sent it. */
+  signal?: SkillSignal
+  /** The student's own work the verification cites — the proof itself. */
+  evidence: Evidence[]
+}
+
+/** The proof a candidate has on one project: where it was shown, what they say they did, and the skills it proves. */
+export interface ProofProject {
+  projectId: string
+  projectTitle: string
+  industry: string
+  organizationId?: string
+  /** What the student says they contributed — their own account, never proof. */
+  contribution: string
+  skills: ProofSkill[]
+}
+
+/**
+ * A candidate's Verified Proof Profile: the server's own list of what is currently verified for them (`candidate.matched`,
+ * the same eligibility Talent Discovery uses) grouped by the project that proves it, each skill joined to the evidence it
+ * cites. Only that student's own evidence is ever attached, and nothing outside `matched` is ever listed.
+ */
+export function proofByProject(candidate: TalentCandidate, projects: Project[], signals: SkillSignal[], evidence: Evidence[]): ProofProject[] {
+  const groups: ProofProject[] = []
+  for (const m of candidate.matched) {
+    const signal = signals.find((g) => g.studentId === candidate.studentId && g.projectId === m.projectId && g.skill === m.skill && g.status === "Verified")
+    const proof: ProofSkill = {
+      skill: m.skill,
+      verifiedAt: m.verifiedAt,
+      verifyingUniversity: m.verifyingUniversity,
+      signal,
+      evidence: signal ? evidence.filter((e) => signal.evidenceIds.includes(e.id) && e.studentId === candidate.studentId && e.projectId === m.projectId) : [],
+    }
+    const group = groups.find((x) => x.projectId === m.projectId)
+    if (group) group.skills.push(proof)
+    else
+      groups.push({
+        projectId: m.projectId,
+        projectTitle: m.projectTitle,
+        industry: m.industry,
+        organizationId: projects.find((p) => p.id === m.projectId)?.organizationId,
+        contribution: m.contribution,
+        skills: [proof],
+      })
+  }
+  // Most recently verified project first; skills in a stable order within it.
+  const latest = (g: ProofProject) => g.skills.reduce((a, x) => (x.verifiedAt > a ? x.verifiedAt : a), "")
+  for (const g of groups) g.skills.sort((a, b) => (a.skill < b.skill ? -1 : 1))
+  return groups.sort((a, b) => (latest(a) < latest(b) ? 1 : latest(a) > latest(b) ? -1 : a.projectTitle < b.projectTitle ? -1 : 1))
 }
 
 /**
