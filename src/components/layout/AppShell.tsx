@@ -41,6 +41,7 @@ const NAV: Record<Exclude<Role, "guest">, NavItem[]> = {
     { to: "/university/projects", label: "Projects", icon: <Icon d="M4 6h16M4 12h16M4 18h10" /> },
     { to: "/university/submissions", label: "Submissions", icon: <Icon d="M9 12l2 2 4-4M12 21c4-1.5 8-4.5 8-10V5l-8-3-8 3v6c0 5.5 4 8.5 8 10z" /> },
     { to: "/university/students", label: "Students", icon: <Icon d="M16 11a4 4 0 10-8 0 4 4 0 008 0zM2 21c1.5-5 6-7 10-7s8.5 2 10 7" /> },
+    { to: "/university/insights", label: "Industry Insights", icon: <Icon d="M4 20V10M10 20V4M16 20v-7M22 20H2" /> },
   ],
   company: [
     { to: "/company", label: "Dashboard", icon: <Icon d="M3 12l9-9 9 9M5 10v10h14V10" /> },

@@ -461,3 +461,13 @@ export interface TalentSearchResult {
   candidates: TalentCandidate[]
   facets: TalentFacets
 }
+
+/** What companies ask for across the challenges sent to one university — counts only, nothing that names a student or a company. */
+export interface IndustryInsights {
+  /** How many challenges the counts below are over. */
+  challengeCount: number
+  /** Each requested skill: in how many challenges, and how many of this university's students have it currently verified. */
+  skills: { skill: string; challengeCount: number; verifiedStudentCount: number }[]
+  /** Each industry (the challenge's own industry text), with the skills most requested within it. */
+  industries: { industry: string; challengeCount: number; topSkills: string[] }[]
+}

@@ -173,3 +173,14 @@ export function challengeUniversityIds(challenge: Challenge): string[] {
   if (challenge.assignments.length > 0) return challenge.assignments.map((a) => a.universityId)
   return challenge.preferredUniversityId ? [challenge.preferredUniversityId] : []
 }
+
+/**
+ * One plain sentence about demand, derived only from the counts: the (up to) three most requested skills, in the order the
+ * server sorted them. No model writes it.
+ */
+export function demandSummary(skills: { skill: string }[]): string {
+  const top = skills.slice(0, 3).map((s) => s.skill)
+  if (top.length === 0) return "No company challenges have been sent to your university yet."
+  const list = top.length === 1 ? top[0] : `${top.slice(0, -1).join(", ")} and ${top[top.length - 1]}`
+  return top.length === 1 ? `${list} is currently the most requested skill across company challenges.` : `${list} are currently among the most requested skills across company challenges.`
+}

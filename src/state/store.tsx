@@ -1,8 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react"
 import type { ReactNode } from "react"
-import { ApiRequestError, downloadChallengeFile, downloadEvidenceFile, fetchCandidate, fetchSnapshot, fetchTalent, mutate } from "../lib/api"
+import { ApiRequestError, downloadChallengeFile, downloadEvidenceFile, fetchCandidate, fetchIndustryInsights, fetchSnapshot, fetchTalent, mutate } from "../lib/api"
 import { useSession } from "./session"
-import type { Availability, ChallengeFileKind, ChallengeVisibility, CompanyActionKind, DataSensitivity, Difficulty, EvidenceType, ScreeningFinding, SuggestedLevel, Snapshot, TalentCandidate, TalentSearchResult } from "../types"
+import type { Availability, ChallengeFileKind, ChallengeVisibility, CompanyActionKind, DataSensitivity, Difficulty, EvidenceType, ScreeningFinding, SuggestedLevel, Snapshot, TalentCandidate, TalentSearchResult, IndustryInsights } from "../types"
 
 export interface NewChallengeInput {
   title: string
@@ -77,6 +77,8 @@ interface StoreContextValue extends Snapshot {
   /** Verified Talent Discovery. Rejects with the server's message; the page decides how to show it. */
   searchTalent: (filters: { skills: string[]; university: string; industry: string }) => Promise<TalentSearchResult>
   getCandidate: (studentId: string) => Promise<TalentCandidate>
+  /** A university's Industry Insights. Rejects with the server's message. */
+  getIndustryInsights: () => Promise<IndustryInsights>
   toggleSavedStudent: (studentId: string) => Promise<boolean>
   toggleInterested: (studentId: string) => Promise<boolean>
   inviteStudent: (studentId: string, opportunityId: string, note: string) => Promise<boolean>
@@ -199,6 +201,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       submitCompanyFeedback: (projectId, feedback) => ok(run("POST", `/projects/${projectId}/company-feedback`, feedback)),
       searchTalent: (filters) => fetchTalent(session, filters),
       getCandidate: (studentId) => fetchCandidate(session, studentId),
+      getIndustryInsights: () => fetchIndustryInsights(session),
       toggleSavedStudent: (studentId) => ok(run("POST", `/students/${studentId}/company-actions`, { kind: "saved" satisfies CompanyActionKind })),
       toggleInterested: (studentId) => ok(run("POST", `/students/${studentId}/company-actions`, { kind: "interested" satisfies CompanyActionKind })),
       inviteStudent: (studentId, opportunityId, note) =>

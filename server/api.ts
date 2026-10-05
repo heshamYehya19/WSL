@@ -38,6 +38,7 @@ import type {
   SkillSignal,
   SkillSignalStatus,
   Snapshot,
+  IndustryInsights,
   Staff,
   Student,
   TalentCandidate,
@@ -919,6 +920,73 @@ function talentCandidate(db: DatabaseSync, studentId: string): TalentCandidate {
   const found = talentSearch(db, { skills: [], university: null, industry: null }).candidates.find((c) => c.studentId === studentId)
   if (!found) throw new ApiError(404, "That student has no verified proof you can see.")
   return found
+}
+
+// ------------------------------------------------------ university industry insights
+
+const INSIGHT_TOP_SKILLS = 5
+
+/**
+ * What companies are asking for, as one university sees it: a plain count over the challenges sent to it (the same
+ * rule as isRoutedTo — not a draft, and open to every university or addressed to this one). A skill counts once per
+ * challenge however it is written (case and spacing follow canonicalSkillName), and an industry is the challenge's own
+ * industry text. "Verified students" is the number of THIS university's students with that skill currently verified,
+ * taken from eligibleProofs — the same authority Talent Discovery uses, so pending, rejected, insufficient, stale and
+ * other universities' proof are never counted. Only counts leave here: no student, company or challenge is named.
+ */
+function industryInsights(db: DatabaseSync, universityId: string): IndustryInsights {
+  const challenges = all(
+    db,
+    "SELECT id, industry, required_skills FROM challenges WHERE status <> 'Draft' AND (preferred_university_id IS NULL OR preferred_university_id = ?) ORDER BY id",
+    universityId,
+  )
+  const skills = new Map<string, { skill: string; challenges: number }>()
+  const industries = new Map<string, { challenges: number; skills: Map<string, { skill: string; challenges: number }> }>()
+  for (const c of challenges) {
+    const industry = String(c.industry ?? "").trim() || "Not specified"
+    const entry = industries.get(industry) ?? { challenges: 0, skills: new Map() }
+    entry.challenges++
+    industries.set(industry, entry)
+    // Once per challenge, whatever the spelling.
+    const once = new Map<string, string>()
+    for (const raw of parseList(c.required_skills)) {
+      const name = canonicalSkillName(raw)
+      if (name && !once.has(name.toLowerCase())) once.set(name.toLowerCase(), name)
+    }
+    for (const [key, name] of once) {
+      const overall = skills.get(key) ?? { skill: name, challenges: 0 }
+      overall.challenges++
+      skills.set(key, overall)
+      const inIndustry = entry.skills.get(key) ?? { skill: name, challenges: 0 }
+      inIndustry.challenges++
+      entry.skills.set(key, inIndustry)
+    }
+  }
+
+  const verified = new Map<string, Set<string>>()
+  for (const proof of eligibleProofs(db)) {
+    if (proof.universityId !== universityId) continue
+    const key = proof.skill.toLowerCase()
+    verified.set(key, (verified.get(key) ?? new Set()).add(proof.studentId))
+  }
+
+  const byCountThenName = <T,>(count: (x: T) => number, name: (x: T) => string) => (a: T, b: T) => count(b) - count(a) || (name(a) < name(b) ? -1 : name(a) > name(b) ? 1 : 0)
+  return {
+    challengeCount: challenges.length,
+    skills: [...skills]
+      .map(([key, v]) => ({ skill: v.skill, challengeCount: v.challenges, verifiedStudentCount: verified.get(key)?.size ?? 0 }))
+      .sort(byCountThenName((x) => x.challengeCount, (x) => x.skill)),
+    industries: [...industries]
+      .map(([industry, v]) => ({
+        industry,
+        challengeCount: v.challenges,
+        topSkills: [...v.skills.values()]
+          .sort(byCountThenName((x) => x.challenges, (x) => x.skill))
+          .slice(0, INSIGHT_TOP_SKILLS)
+          .map((x) => x.skill),
+      }))
+      .sort(byCountThenName((x) => x.challengeCount, (x) => x.industry)),
+  }
 }
 
 const REVIEW_STATE_WORDS: Record<ReviewState, string> = {
@@ -2036,6 +2104,13 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
 
     if (req.method === "GET" && path === "/snapshot") {
       send(res, 200, { snapshot: buildSnapshot(db, actor) })
+      return true
+    }
+
+    // Industry Insights: a university's own read of what companies ask for. Counts only.
+    if (req.method === "GET" && path === "/university/industry-insights") {
+      const uni = requireRole(actor, "university")
+      send(res, 200, industryInsights(db, uni.id))
       return true
     }
 

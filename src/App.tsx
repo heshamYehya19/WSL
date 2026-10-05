@@ -30,6 +30,7 @@ const StudentProjects = lazy(() => import("./pages/university/StudentProjects"))
 const ProjectMonitoring = lazy(() => import("./pages/university/ProjectMonitoring"))
 const SubmissionsQueue = lazy(() => import("./pages/university/SubmissionsQueue"))
 const SkillsOverview = lazy(() => import("./pages/university/SkillsOverview"))
+const IndustryInsights = lazy(() => import("./pages/university/IndustryInsights"))
 const UniversityStudentDetail = lazy(() => import("./pages/university/UniversityStudentDetail"))
 
 const CompanyDashboard = lazy(() => import("./pages/company/CompanyDashboard"))
@@ -86,6 +87,7 @@ export default function App() {
         <Route path="submissions" element={<SubmissionsQueue />} />
         <Route path="students" element={<SkillsOverview />} />
         <Route path="students/:id" element={<UniversityStudentDetail />} />
+        <Route path="insights" element={<IndustryInsights />} />
       </Route>
 
       <Route path="/company" element={<AppShell role="company" />}>

@@ -1,4 +1,4 @@
-import type { DemoUserState, Snapshot, TalentCandidate, TalentSearchResult } from "../types"
+import type { DemoUserState, IndustryInsights, Snapshot, TalentCandidate, TalentSearchResult } from "../types"
 
 export class ApiRequestError extends Error {
   /** The form field the server says this error belongs to, if any. */
@@ -32,6 +32,11 @@ async function request<T>(method: string, path: string, session: DemoUserState, 
 
 export function fetchSnapshot(session: DemoUserState) {
   return request<{ snapshot: Snapshot }>("GET", "/snapshot", session).then((d) => d.snapshot)
+}
+
+/** A university's Industry Insights: what companies ask for, and how many of its students have it verified. */
+export function fetchIndustryInsights(session: DemoUserState) {
+  return request<IndustryInsights>("GET", "/university/industry-insights", session)
 }
 
 /** Verified Talent Discovery: the server decides who is eligible; this only says what was asked for. */
