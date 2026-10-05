@@ -6,7 +6,10 @@
 //
 // Run with `npm run db:grade-seed`. Needs GROQ_API_KEY or GEMINI_API_KEY; with
 // neither set, it prints a message and exits without changing anything, so it's
-// always safe to run.
+// always safe to run. It paces itself for Groq's free-tier tokens-per-minute limit
+// (waiting and retrying when it is hit), moves to the other provider when one is out
+// of quota for the day, and skips anything already graded for the current evidence,
+// so it can be re-run until every project is covered.
 
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -18,11 +21,11 @@ import { fileURLToPath } from "node:url"
 process.env.WSL_DB_PATH = join(mkdtempSync(join(tmpdir(), "wsl-grade-seed-")), "wsl.db")
 
 const { getDb } = await import("../server/db.ts")
-const { configuredProvider, gradeWithModel } = await import("../server/ml/llm-grader.ts")
+const { configuredProviders, gradeWithModel } = await import("../server/ml/llm-grader.ts")
 const { hashEvidenceSet } = await import("../server/ai.ts")
 
-const provider = configuredProvider()
-if (!provider) {
+const providers = configuredProviders()
+if (providers.length === 0) {
   console.log("No GROQ_API_KEY or GEMINI_API_KEY configured — skipping. Set a key and re-run to pre-grade the seed data.")
   process.exit(0)
 }
@@ -45,6 +48,34 @@ try {
 }
 const output: Record<string, Entry> = { ...existing }
 let graded = 0
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+// Groq's free tier allows 8,000 tokens a minute and one grade uses 2-4k, so space them out.
+const PACE_MS = 25_000
+
+/** Grades with the first provider that works: waits out per-minute limits, skips providers out of daily quota. */
+async function gradeWithAnyProvider(skills: string[], evidence: Parameters<typeof gradeWithModel>[2], challenge: Parameters<typeof gradeWithModel>[3]) {
+  let lastError: unknown
+  for (const provider of providers) {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const results = await gradeWithModel(provider, skills, evidence, challenge)
+        if (results.length === skills.length) return { provider, results }
+        throw new Error(`${provider.label} only answered ${results.length}/${skills.length} required skills`)
+      } catch (err) {
+        lastError = err
+        const message = err instanceof Error ? err.message : String(err)
+        if (/HTTP 429/.test(message)) {
+          if (/per day|\(TPD\)/i.test(message)) break
+          console.log(`  ${provider.label} per-minute limit reached, waiting 65s…`)
+          await sleep(65_000)
+        } else if (attempt === 2) {
+          break
+        }
+      }
+    }
+  }
+  throw lastError
+}
 
 const projects = db.prepare("SELECT id, challenge_id, student_id FROM projects").all() as Row[]
 // Evidence the analysis never reads (statements, videos, screenshots) — mirrors src/lib/evidenceTypes.ts.
@@ -87,23 +118,27 @@ for (const { proj, studentId } of pairs) {
     expectedOutput: String(challengeRow.expected_output),
   }
 
+  // Already graded for exactly this evidence by some model: nothing to do (keeps re-runs cheap).
+  const prior = existing[key]
+  if (prior && prior.hash === hashEvidenceSet(skills, evidence, prior.model)) {
+    console.log(`Already graded ${key} with ${prior.model}, skipping.`)
+    continue
+  }
+
   try {
-    const results = await gradeWithModel(provider, skills, evidence, challenge)
-    if (results.length !== skills.length) {
-      console.warn(`Skipping ${key}: the model only answered ${results.length}/${skills.length} required skills.`)
-      continue
-    }
+    const { provider, results } = await gradeWithAnyProvider(skills, evidence, challenge)
     output[key] = { model: provider.model, hash: hashEvidenceSet(skills, evidence, provider.model), gradedAt: new Date().toISOString(), results }
     graded++
     console.log(`Graded ${key} (${skills.length} skills) with ${provider.model}`)
+    writeFileSync(outPath, `${JSON.stringify(output, null, 2)}\n`)
+    await sleep(PACE_MS)
   } catch (err) {
     console.warn(`Failed to grade ${key}${existing[key] ? " — keeping its previous entry" : ""}:`, err instanceof Error ? err.message : err)
   }
 }
 
 if (graded === 0) {
-  console.log(`No project could be graded this run, so ${outPath} was left unchanged.`)
-  process.exit(1)
+  console.log(`No project needed (or could be) graded this run, so ${outPath} was left unchanged.`)
+  process.exit(0)
 }
-writeFileSync(outPath, `${JSON.stringify(output, null, 2)}\n`)
 console.log(`Graded ${graded} project(s); ${Object.keys(output).length} pre-graded project(s) now in ${outPath}`)
