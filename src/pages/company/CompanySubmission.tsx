@@ -4,7 +4,7 @@ import { Link, useParams } from "react-router-dom"
 import { useStore } from "../../state/store"
 import { useDemoUser } from "../../state/demoUser"
 import { StatusBadge } from "../../components/ui/StatusBadge"
-import { challengeFor, evidenceBy, signalsBy, skillsForProject, teamOf } from "../../lib/selectors"
+import { challengeFor, companyProjectAccess, evidenceBy, signalsBy, skillsForProject, teamOf } from "../../lib/selectors"
 import { evidenceTypeLabel } from "../../lib/evidenceTypes"
 import { formatDate } from "../../lib/format"
 import { EvidenceSources } from "../../components/ui/EvidenceSources"
@@ -21,8 +21,11 @@ export default function CompanySubmission() {
   const { projectId } = useParams()
   const { company } = useDemoUser()
   const { projects, challenges, evidence, skillSignals, submitCompanyFeedback, getStudent, getUniversity } = useStore()
-  // Companies only see submissions to their own challenges.
-  const project = projects.find((p) => p.id === projectId && p.organizationId === company?.id)
+  // A company opens a project of its own challenge, or any project whose verified proof it was sent through Talent Discovery.
+  // What it can read there is only what the server sent it: verified skills and the evidence behind them.
+  const access = companyProjectAccess(projects, skillSignals, projectId, company?.id)
+  const project = access?.project
+  const own = access?.own ?? false
   const signals = project ? skillsForProject(skillSignals, project.id) : []
   // Companies only see what a university verified, student by student; an unverified skill is never presented as proven.
   const [flags, setFlags] = useState<Record<(typeof FEEDBACK_OPTIONS)[number]["key"], boolean>>(() => ({
@@ -36,18 +39,22 @@ export default function CompanySubmission() {
   if (!project) {
     return (
       <div className="py-20 text-center">
-        <h2 className="font-semibold text-ink-800">Submission not found</h2>
+        <h2 className="font-semibold text-ink-800">No verified proof to show</h2>
+        <p className="mx-auto mt-1.5 max-w-sm text-sm text-ink-500">This project isn't one of yours, and no university has shared verified proof from it with you.</p>
         <Link to="/company/talent" className="mt-3 inline-block text-sm text-teal-600 hover:underline">← Back to Talent Discovery</Link>
       </div>
     )
   }
 
   const student = getStudent(project.studentId)
-  const uni = student ? getUniversity(student.universityId) : undefined
+  // Another company's project has no owner/university of its own for you: name the university that verified the work.
+  const uni = student ? getUniversity(student.universityId) : getUniversity(project.universityId ?? signals.find((s) => s.verifiedByUniversityId)?.verifiedByUniversityId ?? "")
   const challenge = challengeFor(challenges, project)
   const projectEvidence = evidence.filter((e) => e.projectId === project.id)
   const canReview = project.status === "Verified" || project.status === "Completed" || project.status === "Company Feedback Received"
   const alreadyReviewed = project.status === "Company Feedback Received"
+  // Feedback is for the company whose challenge it was; anyone else is only reading verified proof.
+  const canGiveFeedback = own
 
   const submit = async () => {
     setSaving(true)
@@ -69,6 +76,12 @@ export default function CompanySubmission() {
         </div>
         <StatusBadge status={project.status} />
       </div>
+
+      {!own && (
+        <div className="mb-6 rounded-xl border border-ink-200 bg-ink-50 px-4 py-3 text-sm text-ink-600">
+          This project belongs to another company's challenge. You can read the skills a university verified here and the evidence behind them.
+        </div>
+      )}
 
       {!canReview ? (
         <div className="mb-6 rounded-xl border border-amber-400/40 bg-amber-100 px-4 py-3 text-sm text-ink-700">
@@ -155,6 +168,8 @@ export default function CompanySubmission() {
           })}
         </div>
 
+        {canGiveFeedback && (
+        <>
         <h3 className="mt-6 mb-3 text-xs font-semibold tracking-wide text-teal-600 uppercase">
           {alreadyReviewed ? "Your Feedback" : "Company Feedback"}
         </h3>
@@ -202,6 +217,8 @@ export default function CompanySubmission() {
           <p className="mt-5 text-xs text-verified-600">
             ✓ You gave feedback on {formatDate(project.companyFeedback.submittedAt)}.
           </p>
+        )}
+        </>
         )}
       </div>
       )}

@@ -1,8 +1,25 @@
-import type { Challenge, ChallengeStatus, Evidence, Project, SkillSignal, Student } from "../types"
-import { rank } from "./pipeline"
+import type { Challenge, ChallengeStatus, Evidence, Project, SkillSignal, Student } from "../types.ts"
+import { rank } from "./pipeline.ts"
 
 // Pure helpers over data that came from the database. Entity lookups (getOrg,
 // getStudent, ...) live on the store, since they need the loaded snapshot.
+
+/** What a company may open at /company/submissions/:id: a project of its own challenge, or any project whose verified proof it was sent. */
+export function companyProjectAccess(projects: Project[], signals: SkillSignal[], projectId: string | undefined, companyId: string | undefined) {
+  const project = projects.find((p) => p.id === projectId)
+  if (!project || !companyId) return undefined
+  if (project.organizationId === companyId) return { project, own: true }
+  // A company is only ever sent verified, current proof, so having any signal on a project means it was shared with them.
+  return signals.some((s) => s.projectId === project.id) ? { project, own: false } : undefined
+}
+
+/**
+ * How many students are on a company's projects. A company is not told who a project's owner is unless they are
+ * discoverable, so an owner it cannot identify counts as one student per project.
+ */
+export function engagedStudentCount(projects: Project[]) {
+  return new Set(projects.filter((p) => p.studentId).map((p) => p.studentId)).size + projects.filter((p) => !p.studentId).length
+}
 
 export function studentProjects(projects: Project[], studentId: string) {
   return projects.filter((p) => p.studentId === studentId || p.members.some((m) => m.studentId === studentId))
@@ -11,7 +28,7 @@ export function studentProjects(projects: Project[], studentId: string) {
 /** The people on a project, owner first, each with what they say they contributed. */
 export function teamOf(project: Project) {
   return [
-    { studentId: project.studentId, roleNote: project.ownerRoleNote, isOwner: true },
+    ...(project.studentId ? [{ studentId: project.studentId, roleNote: project.ownerRoleNote, isOwner: true }] : []),
     ...project.members.map((m) => ({ studentId: m.studentId, roleNote: m.roleNote, isOwner: false })),
   ]
 }
@@ -83,7 +100,7 @@ export function statusAtUniversity(challenge: Challenge, universityId: string, p
   // "Completed" share a rank but are distinct, equally-final statuses worth telling apart.
   let best: ChallengeStatus = "University Assigned"
   for (const p of projects) {
-    if (p.challengeId === challenge.id && (ours.has(p.studentId) || p.members.some((m) => ours.has(m.studentId))) && rank(p.status) > rank(best)) {
+    if (p.challengeId === challenge.id && ((p.studentId !== undefined && ours.has(p.studentId)) || p.members.some((m) => ours.has(m.studentId))) && rank(p.status) > rank(best)) {
       best = p.status
     }
   }

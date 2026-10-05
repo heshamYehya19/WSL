@@ -5,7 +5,7 @@ import { useStore } from "../../state/store"
 import { StatusBadge } from "../../components/ui/StatusBadge"
 import { CountUp } from "../../hooks/useCountUp"
 import { PIPELINE } from "../../lib/pipeline"
-import { challengeUniversityIds } from "../../lib/selectors"
+import { challengeUniversityIds, engagedStudentCount } from "../../lib/selectors"
 import { daysUntil, formatRelative } from "../../lib/format"
 import type { ChallengeStatus } from "../../types"
 
@@ -60,7 +60,7 @@ export default function CompanyDashboard() {
   const visibleSignals = skillSignals.filter((s) => confirmedProjectIds.has(s.projectId))
 
   const awaiting = myProjects.filter((p) => p.status === "Verified" || p.status === "Completed")
-  const studentsEngaged = new Set(myProjects.map((p) => p.studentId)).size
+  const studentsEngaged = engagedStudentCount(myProjects)
   const universitiesReached = new Set(myChallenges.flatMap((c) => c.assignments.map((a) => a.universityId))).size
   const verifiedSkillCount = visibleSignals.filter((s) => s.status === "Verified").length
 

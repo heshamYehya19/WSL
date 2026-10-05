@@ -38,11 +38,12 @@ export type ReviewDecision = "verify" | "request-more-evidence" | "reject" | "in
 interface StoreContextValue extends Snapshot {
   getOrg: (id: string) => Snapshot["organizations"][number] | undefined
   getUniversity: (id: string) => Snapshot["universities"][number] | undefined
-  getStudent: (id: string) => Snapshot["students"][number] | undefined
+  /** `undefined` for an id that is absent — a company is not told who every project's owner is. */
+  getStudent: (id: string | undefined) => Snapshot["students"][number] | undefined
   getProgram: (id: string) => Snapshot["universities"][number]["programs"][number] | undefined
   getStaff: (id: string) => Snapshot["staff"][number] | undefined
   studentsOfUniversity: (universityId: string) => Snapshot["students"]
-  isUniversityStudent: (studentId: string, universityId: string) => boolean
+  isUniversityStudent: (studentId: string | undefined, universityId: string) => boolean
 
   // Every action writes to the database and resolves once the fresh snapshot is in.
   // On failure the error is shown to the user and the promise resolves to undefined.
@@ -160,11 +161,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       ...snapshot,
       getOrg: (id) => snapshot.organizations.find((o) => o.id === id),
       getUniversity: (id) => snapshot.universities.find((u) => u.id === id),
-      getStudent: (id) => studentById.get(id),
+      getStudent: (id) => (id === undefined ? undefined : studentById.get(id)),
       getProgram: (id) => programs.find((p) => p.id === id),
       getStaff: (id) => snapshot.staff.find((s) => s.id === id),
       studentsOfUniversity: (universityId) => snapshot.students.filter((s) => s.universityId === universityId),
-      isUniversityStudent: (studentId, universityId) => studentById.get(studentId)?.universityId === universityId,
+      isUniversityStudent: (studentId, universityId) => studentId !== undefined && studentById.get(studentId)?.universityId === universityId,
 
       createChallenge: (input, onFieldError) =>
         run<CreateChallengeResult>("POST", "/challenges", input, onFieldError).then((r) => (r.ok ? r.result : undefined)),

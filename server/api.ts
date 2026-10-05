@@ -220,8 +220,6 @@ function buildSnapshot(db: DatabaseSync, actor: Actor): Snapshot {
   }))
 
   // A company deals with a university, never with the individual who reviewed: it is sent no staff list at all.
-  const staffRows = all(db, "SELECT st.name AS name, u.name AS university FROM staff st JOIN universities u ON u.id = st.university_id")
-  const scrub = (text: string) => (actor.role === "company" ? staffRows.reduce((acc, r) => acc.split(String(r.name)).join(String(r.university)), text) : text)
   const staff: Staff[] = all(db, "SELECT * FROM staff ORDER BY name")
     .filter(() => actor.role !== "company")
     .map((r) => ({
@@ -259,6 +257,27 @@ function buildSnapshot(db: DatabaseSync, actor: Actor): Snapshot {
   const eligibleSignalIds = new Set(eligible.map((p) => p.signalId))
   const verifierOf = new Map(eligible.map((p) => [p.signalId, p.universityId]))
   const discoverable = new Set(eligible.map((p) => p.studentId))
+
+  // Free text a company is sent (history notes, notifications, feedback) never names a person it has no business knowing:
+  // a reviewer becomes their university, and a student the company cannot discover through eligible proof becomes "a
+  // student". Students it CAN discover keep their names. `discoverable` is the same set that builds the student list.
+  const staffRows = all(db, "SELECT st.name AS name, u.name AS university FROM staff st JOIN universities u ON u.id = st.university_id")
+  const hiddenStudentNames =
+    actor.role === "company"
+      ? all(db, "SELECT id, name FROM students")
+          .filter((r) => !discoverable.has(String(r.id)))
+          .map((r) => String(r.name))
+          .sort((a, b) => b.length - a.length)
+      : []
+  const escapeRegExp = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  const scrub = (text: string) => {
+    if (actor.role !== "company") return text
+    let out = staffRows.reduce((acc, r) => acc.split(String(r.name)).join(String(r.university)), text)
+    for (const name of hiddenStudentNames) {
+      out = out.replace(new RegExp(escapeRegExp(name), "g"), (_m, offset: number, whole: string) => (/(^|[.!?]\s+)$/.test(whole.slice(0, offset)) ? "A student" : "a student"))
+    }
+    return out
+  }
   // Who is on which team (owner and members), so work by someone who is no longer on it is never read as the team's.
   const memberRows = all(db, "SELECT * FROM project_members")
   const teamOfProject = new Map<string, Set<string>>()
@@ -412,7 +431,9 @@ function buildSnapshot(db: DatabaseSync, actor: Actor): Snapshot {
       challengeId: String(r.challenge_id),
       title: String(r.challenge_title),
       organizationId: String(r.company_id),
-      studentId: String(r.student_id),
+      // A company learns a project's owner only if that student is discoverable through eligible proof — taking part in a
+      // project is not enough. (Universities and students always receive it.)
+      ...(actor.role !== "company" || discoverable.has(String(r.student_id)) ? { studentId: String(r.student_id) } : {}),
       // A company is not given a student directory, so it is told the owner's university for its own challenges' projects.
       ...(actor.role !== "company" || actor.id === r.company_id ? { universityId: String(r.owner_university) } : {}),
       ownerRoleNote: shareNote(r.id, r.student_id, r.owner_role_note),
@@ -531,7 +552,10 @@ function buildSnapshot(db: DatabaseSync, actor: Actor): Snapshot {
 
   const companyActions: CompanyAction[] =
     actor.role === "company"
-      ? all(db, "SELECT * FROM company_actions WHERE company_id = ? ORDER BY created_at DESC", actor.id).map((r) => ({
+      ? all(db, "SELECT * FROM company_actions WHERE company_id = ? ORDER BY created_at DESC", actor.id)
+          // Only for students the company can discover now: a student whose proof is no longer current is not named here either.
+          .filter((r) => discoverable.has(String(r.student_id)))
+          .map((r) => ({
           id: String(r.id),
           organizationId: String(r.company_id),
           studentId: String(r.student_id),
@@ -552,7 +576,7 @@ function buildSnapshot(db: DatabaseSync, actor: Actor): Snapshot {
           actor.id,
         ).map((r) => ({
           id: String(r.id),
-          title: String(r.title),
+          title: scrub(String(r.title)),
           body: scrub(String(r.body)),
           link: (r.link as string | null) ?? null,
           read: Number(r.read) === 1,

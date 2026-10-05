@@ -5,7 +5,7 @@ import { useStore } from "../../state/store"
 import { StatusBadge } from "../../components/ui/StatusBadge"
 import { EmptyState } from "../../components/ui/EmptyState"
 import { DeadlinePill, DifficultyBars, PageHero, Pills, SearchInput, StageTrack } from "../../components/ui/ListKit"
-import { challengeUniversityIds } from "../../lib/selectors"
+import { challengeUniversityIds, engagedStudentCount } from "../../lib/selectors"
 import { daysUntil, formatRelative } from "../../lib/format"
 import type { Challenge } from "../../types"
 
@@ -56,7 +56,7 @@ export default function MyChallenges() {
           { label: "total", value: mine.length },
           { label: "in motion", value: count("moving") },
           { label: "ready for your review", value: count("ready"), accent: count("ready") > 0 },
-          { label: "students engaged", value: new Set(projects.filter((p) => p.organizationId === company.id).map((p) => p.studentId)).size },
+          { label: "students engaged", value: engagedStudentCount(projects.filter((p) => p.organizationId === company.id)) },
         ]}
       />
 

@@ -313,8 +313,11 @@ export interface Project {
   challengeId: string
   title: string
   organizationId: string
-  /** The project's owner — the student who started it. */
-  studentId: string
+  /**
+   * The project's owner — the student who started it. A company is sent it only when that student is discoverable through
+   * eligible verified proof; otherwise it is absent, so a project is never a way to learn who a student is.
+   */
+  studentId?: string
   /** The owner's university (a company is told it only for its own challenges' projects). */
   universityId?: string
   /** What the owner says they contributed ("" until they write it). Members' statements are in `members`. */
