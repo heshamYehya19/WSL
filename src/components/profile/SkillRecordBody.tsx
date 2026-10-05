@@ -55,11 +55,12 @@ function VerificationLine({
   if (signals.length === 0) return null
   const verified = signals.filter((s) => s.status === "Verified")
   const reviewer = verified.length > 0 && verified[0].verifiedBy ? getStaff(verified[0].verifiedBy) : undefined
+  const verifyingUniversityId = verified[0]?.verifiedByUniversityId ?? reviewer?.universityId
   return (
     <p className="mt-4 border-t border-ink-100 pt-3 text-xs">
       {verified.length > 0 ? (
         <span className="text-ink-500">
-          <span className="font-semibold text-verified-600">✓ Verified by {(reviewer && universityOf(reviewer.universityId)) ?? "the university"}</span>
+          <span className="font-semibold text-verified-600">✓ Verified by {(verifyingUniversityId && universityOf(verifyingUniversityId)) ?? "the university"}</span>
           {reviewer ? ` · Reviewed by ${reviewer.name}` : ""}
           {verified.length < signals.length ? ` · ${signals.length - verified.length} skill${signals.length - verified.length === 1 ? "" : "s"} still pending` : ""}
         </span>
@@ -91,6 +92,7 @@ function SkillCard({
 }) {
   const verified = s.signal.status === "Verified"
   const verifier = s.signal.verifiedBy ? getStaff(s.signal.verifiedBy) : undefined
+  const verifyingUniversityId = s.signal.verifiedByUniversityId ?? verifier?.universityId
   const metCount = s.signal.criteria.filter((c) => c.met).length
   const contribution = project ? contributionOf(project, studentId) : ""
   return (
@@ -146,12 +148,12 @@ function SkillCard({
         <div className="mt-2.5 space-y-0.5 text-[11px] text-ink-500">
           <div className="inline-flex items-center gap-1 rounded-full bg-verified-100 px-2 py-0.5 text-[10px] font-semibold text-verified-600">
             <ShieldIcon className="h-3 w-3" />
-            Verified by {(verifier && universityOf(verifier.universityId)) ?? "the university"}
+            Verified by {(verifyingUniversityId && universityOf(verifyingUniversityId)) ?? "the university"}
           </div>
-          {verifier && (
+          {(verifier || s.signal.verifiedAt) && (
             <p className="pt-1">
-              Reviewed by {verifier.name}
-              {s.signal.verifiedAt ? ` · ${formatDate(s.signal.verifiedAt)}` : ""}
+              {verifier ? `Reviewed by ${verifier.name}` : "Verified"}
+              {s.signal.verifiedAt ? `${verifier ? " · " : " on "}${formatDate(s.signal.verifiedAt)}` : ""}
             </p>
           )}
           <Link to={projectHref(s.projectId)} className="inline-block pt-0.5 text-teal-600 hover:underline">
@@ -179,18 +181,18 @@ function SkillCard({
 export function SkillRecordBody({
   studentId,
   projectHref,
-  verifiedOnlyByDefault = false,
+  verifiedOnly = false,
 }: {
   studentId: string
   projectHref: (projectId: string) => string
-  /** For companies: open on verified skills only, so an unverified skill is never mistaken for a verified one. */
-  verifiedOnlyByDefault?: boolean
+  /** For companies: only verified skills, with no way to include others — an unverified skill is never shown to them. */
+  verifiedOnly?: boolean
 }) {
   const { projects, challenges, evidence, skillSignals, getOrg, getStaff, getStudent, getUniversity } = useStore()
   const { student: viewer } = useDemoUser()
   const self = viewer?.id === studentId
   const universityOf = (id: string) => getUniversity(id)?.name
-  const [filter, setFilter] = useState<"all" | "verified">(verifiedOnlyByDefault ? "verified" : "all")
+  const [filter, setFilter] = useState<"all" | "verified">(verifiedOnly ? "verified" : "all")
   const [mounted, setMounted] = useState(false)
   useEffect(() => {
     const id = requestAnimationFrame(() => setMounted(true))
@@ -205,7 +207,7 @@ export function SkillRecordBody({
     const cur = bySkill.get(s.skill)
     // Prefer a verified signal over any other; among equally-verified (or equally
     // unverified) signals, the strongest evidence confidence wins.
-    const better = !cur || (s.status === "Verified" && cur.signal.status !== "Verified") || (s.status === cur.signal.status && s.evidenceConfidence > cur.signal.evidenceConfidence)
+    const better = !cur || (s.status === "Verified" && cur.signal.status !== "Verified") || (s.status === cur.signal.status && (s.evidenceConfidence ?? 0) > (cur.signal.evidenceConfidence ?? 0))
     if (better) bySkill.set(s.skill, { skill: s.skill, signal: s, projectId: s.projectId, projects: (cur?.projects ?? 0) + 1 })
     else if (cur) cur.projects += 1
   }
@@ -221,19 +223,14 @@ export function SkillRecordBody({
       </p>
       <div>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h3 className="text-lg font-semibold text-ink-900">Demonstrated Skills</h3>
-          {allSkills.length > 0 && (
+          <h3 className="text-lg font-semibold text-ink-900">{verifiedOnly ? "Verified Skills" : "Demonstrated Skills"}</h3>
+          {allSkills.length > 0 && !verifiedOnly && (
             <div className="inline-flex rounded-full border border-ink-200 bg-surface p-1 text-xs font-semibold">
               {(
-                (verifiedOnlyByDefault
-                  ? [
-                      ["verified", `Verified skills · ${verifiedCount}`],
-                      ["all", `Include skills awaiting verification · ${allSkills.length - verifiedCount}`],
-                    ]
-                  : [
-                      ["all", `All skills · ${allSkills.length}`],
-                      ["verified", `Verified skills · ${verifiedCount}`],
-                    ]) as readonly (readonly ["all" | "verified", string])[]
+                [
+                  ["all", `All skills · ${allSkills.length}`],
+                  ["verified", `Verified skills · ${verifiedCount}`],
+                ] as readonly (readonly ["all" | "verified", string])[]
               ).map(([key, label]) => (
                 <button
                   key={key}
@@ -250,7 +247,7 @@ export function SkillRecordBody({
         </div>
         {allSkills.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-ink-200 bg-surface p-6 text-center text-sm text-ink-400">
-            No skills identified yet — submit evidence on a project and run the analysis.
+            {verifiedOnly ? "No verified skills to show." : "No skills identified yet — submit evidence on a project and run the analysis."}
           </p>
         ) : shownSkills.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-ink-200 bg-surface p-6 text-center text-sm text-ink-400">

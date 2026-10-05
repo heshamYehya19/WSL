@@ -1,4 +1,4 @@
-import type { DemoUserState, Snapshot } from "../types"
+import type { DemoUserState, Snapshot, TalentCandidate, TalentSearchResult } from "../types"
 
 export class ApiRequestError extends Error {
   /** The form field the server says this error belongs to, if any. */
@@ -32,6 +32,21 @@ async function request<T>(method: string, path: string, session: DemoUserState, 
 
 export function fetchSnapshot(session: DemoUserState) {
   return request<{ snapshot: Snapshot }>("GET", "/snapshot", session).then((d) => d.snapshot)
+}
+
+/** Verified Talent Discovery: the server decides who is eligible; this only says what was asked for. */
+export function fetchTalent(session: DemoUserState, filters: { skills: string[]; university: string; industry: string }) {
+  const params = new URLSearchParams()
+  if (filters.skills.length > 0) params.set("skills", filters.skills.join(","))
+  if (filters.university) params.set("university", filters.university)
+  if (filters.industry) params.set("industry", filters.industry)
+  const query = params.toString()
+  return request<TalentSearchResult>("GET", `/talent${query ? `?${query}` : ""}`, session)
+}
+
+/** One discoverable student with their verified proof; a 404 means they have none a company can see. */
+export function fetchCandidate(session: DemoUserState, studentId: string) {
+  return request<{ candidate: TalentCandidate }>("GET", `/talent/${encodeURIComponent(studentId)}`, session).then((d) => d.candidate)
 }
 
 /** Every write returns the fresh database snapshot, so the UI never drifts from what's stored. */

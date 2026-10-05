@@ -40,6 +40,10 @@ import type {
   Snapshot,
   Staff,
   Student,
+  TalentCandidate,
+  TalentFacets,
+  TalentProof,
+  TalentSearchResult,
   University,
 } from "../src/types.ts"
 
@@ -144,13 +148,15 @@ function visibleProjectIds(db: DatabaseSync, actor: Actor): Set<string> {
   )
 }
 
-/** The evidence a verified skill cites — the only evidence a company ever sees. */
-function verifiedEvidenceIds(db: DatabaseSync): Set<string> {
-  return new Set(
-    all(db, "SELECT DISTINCT se.evidence_id FROM skill_signal_evidence se JOIN skill_signals s ON s.id = se.signal_id WHERE s.status = 'Verified'").map((r) =>
-      String(r.evidence_id),
-    ),
-  )
+/** Initials for an avatar: skips "Al-"/"Abu-" style prefixes, at most two letters. */
+function initialsOf(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter((w) => !/^(al|abu|bani)-?$/i.test(w))
+    .map((w) => w.replace(/^(Al|Abu)-/, "")[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase()
 }
 
 /**
@@ -213,7 +219,12 @@ function buildSnapshot(db: DatabaseSync, actor: Actor): Snapshot {
     programs: programs.filter((p) => p.universityId === r.id),
   }))
 
-  const staff: Staff[] = all(db, "SELECT * FROM staff ORDER BY name").map((r) => ({
+  // A company deals with a university, never with the individual who reviewed: it is sent no staff list at all.
+  const staffRows = all(db, "SELECT st.name AS name, u.name AS university FROM staff st JOIN universities u ON u.id = st.university_id")
+  const scrub = (text: string) => (actor.role === "company" ? staffRows.reduce((acc, r) => acc.split(String(r.name)).join(String(r.university)), text) : text)
+  const staff: Staff[] = all(db, "SELECT * FROM staff ORDER BY name")
+    .filter(() => actor.role !== "company")
+    .map((r) => ({
     id: String(r.id),
     universityId: String(r.university_id),
     name: String(r.name),
@@ -237,11 +248,17 @@ function buildSnapshot(db: DatabaseSync, actor: Actor): Snapshot {
     isPrimary: Number(r.is_primary) === 1,
   }))
 
-  // A company learns who contributed to a project only through verified skills: for a student with none
-  // on a project, their own account of their contribution is not shared either.
-  const verifiedPairs = new Set(all(db, "SELECT DISTINCT project_id, student_id FROM skill_signals WHERE status = 'Verified'").map((r) => `${r.project_id}|${r.student_id}`))
-  // Students a company may discover: verified proof on a project a university confirmed to it.
-  const discoverable = new Set([...verifiedPairs].filter((k) => visible.has(k.split("|")[0])).map((k) => k.split("|")[1]))
+  // What a company may be shown is exactly its eligible proof (see eligibleProofs): a company learns who contributed to
+  // a project only through skills verified right now, and a student is discoverable only through them.
+  const eligible = actor.role === "company" ? eligibleProofs(db) : []
+  const verifiedPairs = new Set(
+    actor.role === "company"
+      ? eligible.map((p) => `${p.projectId}|${p.studentId}`)
+      : all(db, "SELECT DISTINCT project_id, student_id FROM skill_signals WHERE status = 'Verified'").map((r) => `${r.project_id}|${r.student_id}`),
+  )
+  const eligibleSignalIds = new Set(eligible.map((p) => p.signalId))
+  const verifierOf = new Map(eligible.map((p) => [p.signalId, p.universityId]))
+  const discoverable = new Set(eligible.map((p) => p.studentId))
   // Who is on which team (owner and members), so work by someone who is no longer on it is never read as the team's.
   const memberRows = all(db, "SELECT * FROM project_members")
   const teamOfProject = new Map<string, Set<string>>()
@@ -255,7 +272,10 @@ function buildSnapshot(db: DatabaseSync, actor: Actor): Snapshot {
     `SELECT s.*, p.major FROM students s JOIN programs p ON p.id = s.program_id
      ORDER BY (SELECT COUNT(*) FROM skill_signals g WHERE g.student_id = s.id AND g.status = 'Verified') DESC,
               (SELECT COUNT(*) FROM projects pr WHERE pr.student_id = s.id) DESC, s.name`,
-  ).map((r) => {
+  )
+    // A company is not sent a directory: only students it can discover through eligible verified proof.
+    .filter((r) => actor.role !== "company" || discoverable.has(String(r.id)))
+    .map((r) => {
     const name = String(r.name)
     // Who may read a student's academic and personal details: the student, their own university, and a company only
     // once the student has verified proof it can discover (and then never the university's student number). Everyone
@@ -281,13 +301,7 @@ function buildSnapshot(db: DatabaseSync, actor: Actor): Snapshot {
             availability: r.availability as Student["availability"],
           }
         : {}),
-      initials: name
-        .split(/\s+/)
-        .filter((w) => !/^(al|abu|bani)-?$/i.test(w))
-        .map((w) => w.replace(/^(Al|Abu)-/, "")[0])
-        .slice(0, 2)
-        .join("")
-        .toUpperCase(),
+      initials: initialsOf(name),
     }
   })
 
@@ -348,7 +362,7 @@ function buildSnapshot(db: DatabaseSync, actor: Actor): Snapshot {
     submittedAt: (r.submitted_at as string | null) ?? null,
     history: historyRows
       .filter((h) => h.challenge_id === r.id)
-      .map((h) => ({ status: h.status as ChallengeStatus, at: String(h.at), ...(h.note ? { note: String(h.note) } : {}) })),
+      .map((h) => ({ status: h.status as ChallengeStatus, at: String(h.at), ...(h.note ? { note: scrub(String(h.note)) } : {}) })),
   }))
 
   const taskRows = all(db, "SELECT * FROM project_tasks ORDER BY position")
@@ -356,6 +370,7 @@ function buildSnapshot(db: DatabaseSync, actor: Actor): Snapshot {
     db,
     `SELECT f.*,
        COALESCE(st.name, cc.name) AS author_name,
+       u.name AS university_name,
        CASE f.author_kind
          WHEN 'staff' THEN st.title || ' · ' || u.short_name
          ELSE cc.role || ' · ' || co.name
@@ -387,8 +402,8 @@ function buildSnapshot(db: DatabaseSync, actor: Actor): Snapshot {
   }
   const projects: Project[] = all(
     db,
-    `SELECT pr.*, c.title AS challenge_title, c.company_id
-     FROM projects pr JOIN challenges c ON c.id = pr.challenge_id
+    `SELECT pr.*, c.title AS challenge_title, c.company_id, so.university_id AS owner_university
+     FROM projects pr JOIN challenges c ON c.id = pr.challenge_id JOIN students so ON so.id = pr.student_id
      ORDER BY pr.started_at DESC`,
   ).map((r) => {
     const cf = companyFeedbackRows.find((f) => f.project_id === r.id)
@@ -398,6 +413,8 @@ function buildSnapshot(db: DatabaseSync, actor: Actor): Snapshot {
       title: String(r.challenge_title),
       organizationId: String(r.company_id),
       studentId: String(r.student_id),
+      // A company is not given a student directory, so it is told the owner's university for its own challenges' projects.
+      ...(actor.role !== "company" || actor.id === r.company_id ? { universityId: String(r.owner_university) } : {}),
       ownerRoleNote: shareNote(r.id, r.student_id, r.owner_role_note),
       // The team is for those who can see the project; a company is told of the members its verified proof comes from.
       members: memberRows
@@ -421,14 +438,17 @@ function buildSnapshot(db: DatabaseSync, actor: Actor): Snapshot {
       feedback: feedbackRows
         .filter((f) => f.project_id === r.id && visible.has(String(r.id)) && (actor.role !== "company" || actor.id === r.company_id))
         .map(
-          (f): FeedbackEntry => ({
-            id: String(f.id),
-            author: String(f.author_name ?? "Unknown reviewer"),
-            role: String(f.author_role ?? ""),
-            authorKind: f.author_kind as FeedbackEntry["authorKind"],
-            note: String(f.note),
-            at: String(f.at),
-          }),
+          (f): FeedbackEntry => {
+            const asUniversity = actor.role === "company" && f.author_kind === "staff"
+            return {
+              id: String(f.id),
+              author: asUniversity ? String(f.university_name ?? "The university") : String(f.author_name ?? "Unknown reviewer"),
+              role: asUniversity ? "University" : String(f.author_role ?? ""),
+              authorKind: f.author_kind as FeedbackEntry["authorKind"],
+              note: scrub(String(f.note)),
+              at: String(f.at),
+            }
+          },
         ),
       ...(cf && visible.has(String(r.id)) && (actor.role !== "company" || actor.id === r.company_id)
         ? {
@@ -446,7 +466,7 @@ function buildSnapshot(db: DatabaseSync, actor: Actor): Snapshot {
 
   // Metadata only — a file's bytes are served one at a time by GET /evidence/:id/file.
   const evidenceFiles = new Map(all(db, "SELECT evidence_id, name, size FROM evidence_files").map((f) => [String(f.evidence_id), { name: String(f.name), size: Number(f.size) }]))
-  const citedByVerified = actor.role === "company" ? verifiedEvidenceIds(db) : new Set<string>()
+  const citedByVerified = new Set(eligible.flatMap((p) => p.evidenceIds))
   const evidence: Evidence[] = all(db, "SELECT * FROM evidence ORDER BY submitted_at DESC")
     .filter((r) =>
       evidenceReadableBy(actor, visible, { id: String(r.id), projectId: String(r.project_id), studentId: String(r.student_id) }, citedByVerified, onTeam(r.project_id, r.student_id)),
@@ -473,22 +493,27 @@ function buildSnapshot(db: DatabaseSync, actor: Actor): Snapshot {
       (r) =>
         visible.has(String(r.project_id)) &&
         onTeam(r.project_id, r.student_id) &&
-        (actor.role === "student" ? r.student_id === actor.id : actor.role === "company" ? r.status === "Verified" : true),
+        (actor.role === "student" ? r.student_id === actor.id : actor.role === "company" ? eligibleSignalIds.has(String(r.id)) : true),
     )
     .map((r) => ({
       id: String(r.id),
       projectId: String(r.project_id),
       studentId: String(r.student_id),
       skill: String(r.skill),
-      evidenceConfidence: Number(r.evidence_confidence),
       suggestedLevel: r.suggested_level as SkillSignal["suggestedLevel"],
-      aiNote: String(r.ai_note ?? ""),
       aiQuotes: parseQuotes(r.ai_quotes),
       criteria: parseCriteria(r.ai_criteria),
-      gradedSource: r.graded_source as SkillSignal["gradedSource"],
       status: r.status as SkillSignalStatus,
-      ...(r.verified_by ? { verifiedBy: String(r.verified_by), verifiedAt: String(r.verified_at) } : {}),
-      ...(r.reviewer_notes && actor.role !== "company" ? { reviewerNotes: String(r.reviewer_notes) } : {}),
+      // A company is told which university verified a skill and when — never which person, and never WSL's score or reasoning.
+      ...(actor.role === "company"
+        ? { verifiedByUniversityId: verifierOf.get(String(r.id)), verifiedAt: String(r.verified_at) }
+        : {
+            evidenceConfidence: Number(r.evidence_confidence),
+            aiNote: String(r.ai_note ?? ""),
+            gradedSource: r.graded_source as SkillSignal["gradedSource"],
+            ...(r.verified_by ? { verifiedBy: String(r.verified_by), verifiedAt: String(r.verified_at) } : {}),
+            ...(r.reviewer_notes ? { reviewerNotes: String(r.reviewer_notes) } : {}),
+          }),
       evidenceIds: signalEvidence.filter((se) => se.signal_id === r.id).map((se) => String(se.evidence_id)),
       analyzedAt: String(r.analyzed_at),
     }))
@@ -528,7 +553,7 @@ function buildSnapshot(db: DatabaseSync, actor: Actor): Snapshot {
         ).map((r) => ({
           id: String(r.id),
           title: String(r.title),
-          body: String(r.body),
+          body: scrub(String(r.body)),
           link: (r.link as string | null) ?? null,
           read: Number(r.read) === 1,
           createdAt: String(r.created_at),
@@ -610,11 +635,7 @@ function reviewReadiness(db: DatabaseSync, projectId: string): ProjectReview {
     if (who.universityId !== p.universityId) {
       problems.push(`${who.name} studies at a different university than the rest of the team, so ${p.universityName} cannot review ${who.name}'s work. Remove ${who.name} from the team (the project owner or ${p.universityName} can) before confirming.`)
     }
-    const latestEvidenceAt = String(one(db, "SELECT MAX(submitted_at) AS at FROM evidence WHERE project_id = ? AND student_id = ?", projectId, studentId)?.at ?? "")
-    const run = one(db, "SELECT evidence_hash, model, graded_at FROM analysis_runs WHERE project_id = ? AND student_id = ?", projectId, studentId)
-    const analyzable = analyzableEvidenceOf(db, projectId, studentId)
-    // Evidence WSL reads must have been analyzed in its current form; with nothing to analyze there is nothing to wait for.
-    const analysisCurrent = analyzable.length === 0 || (!!run && run.evidence_hash === hashEvidenceSet(skills, analyzable, String(run.model)))
+    const fresh = studentFreshness(db, projectId, studentId, skills)
 
     for (const skill of skills) {
       const s = signals.find((x) => x.student_id === studentId && x.skill === skill)
@@ -627,14 +648,253 @@ function reviewReadiness(db: DatabaseSync, projectId: string): ProjectReview {
       else state = s.suggested_level === "Insufficient" ? "unreviewed" : "pending"
 
       const decided = !!s && DECIDED_STATUSES.includes(s.status as SkillSignalStatus)
-      const decidedAt = decided ? String(s!.verified_at ?? s!.analyzed_at) : ""
-      // Stale: the student's current evidence was never analyzed, they added evidence after the decision, or this very
-      // signal was re-analyzed after it. (A re-analysis that left a verified signal as it was does not count.)
-      const stale = !analysisCurrent || (decided && (latestEvidenceAt > decidedAt || String(s!.analyzed_at) > decidedAt))
+      const stale = isStale(fresh, s)
       items.push({ studentId, skill, state, stale, resolved: decided && !stale })
     }
   }
   return { ready: problems.length === 0 && items.length > 0 && items.every((i) => i.resolved), problems, items }
+}
+
+/** What a student's decisions are measured against: when they last added evidence, and whether their current evidence was analyzed. */
+interface Freshness {
+  latestEvidenceAt: string
+  analysisCurrent: boolean
+}
+
+function studentFreshness(db: DatabaseSync, projectId: string, studentId: string, skills: string[]): Freshness {
+  const latestEvidenceAt = String(one(db, "SELECT MAX(submitted_at) AS at FROM evidence WHERE project_id = ? AND student_id = ?", projectId, studentId)?.at ?? "")
+  const run = one(db, "SELECT evidence_hash, model, graded_at FROM analysis_runs WHERE project_id = ? AND student_id = ?", projectId, studentId)
+  const analyzable = analyzableEvidenceOf(db, projectId, studentId)
+  // Evidence WSL reads must have been analyzed in its current form; with nothing to analyze there is nothing to wait for.
+  const analysisCurrent = analyzable.length === 0 || (!!run && run.evidence_hash === hashEvidenceSet(skills, analyzable, String(run.model)))
+  return { latestEvidenceAt, analysisCurrent }
+}
+
+/**
+ * Stale: the student's current evidence was never analyzed, they added evidence after the decision, or this very
+ * signal was re-analyzed after it. (A re-analysis that left a verified signal as it was does not count.) The one rule
+ * behind both confirmation and Talent Discovery, so what a university may confirm and what a company may find can
+ * never disagree about whether a verification is current.
+ */
+function isStale(fresh: Freshness, s: Row | undefined): boolean {
+  const decided = !!s && DECIDED_STATUSES.includes(s.status as SkillSignalStatus)
+  const decidedAt = decided ? String(s!.verified_at ?? s!.analyzed_at) : ""
+  return !fresh.analysisCurrent || (decided && (fresh.latestEvidenceAt > decidedAt || String(s!.analyzed_at) > decidedAt))
+}
+
+// ------------------------------------------------------- verified talent discovery
+
+/**
+ * One skill of one student that a company may be shown, with the project that proves it. THE discovery invariant:
+ * a skill is eligible only when it is verified right now — the signal is Verified (and not one WSL found nothing
+ * for), its project was confirmed to companies, the student is on that project's team at the same university that
+ * verified them, the verification is current by the same freshness rule confirmation uses, and every piece of
+ * evidence it cites is that student's own work on that project. Nothing else is ever shown to a company, whatever
+ * its route or request: the snapshot, the evidence files, company actions and Talent Discovery all start here.
+ */
+interface EligibleProof {
+  studentId: string
+  skill: string
+  projectId: string
+  projectTitle: string
+  industry: string
+  verifiedAt: string
+  universityId: string
+  universityName: string
+  /** What the student says they contributed to that project — their own account, never proof. */
+  contribution: string
+  signalId: string
+  evidenceIds: string[]
+}
+
+function eligibleProofs(db: DatabaseSync): EligibleProof[] {
+  const projects = all(
+    db,
+    `SELECT pr.id, pr.student_id AS owner_id, pr.owner_role_note, c.title, c.industry, c.required_skills, so.university_id AS owner_university
+     FROM projects pr JOIN challenges c ON c.id = pr.challenge_id JOIN students so ON so.id = pr.student_id
+     WHERE pr.status IN (${COMPANY_VISIBLE_STATUSES.map(() => "?").join(",")})
+     ORDER BY pr.id`,
+    ...COMPANY_VISIBLE_STATUSES,
+  )
+  const proofs: EligibleProof[] = []
+  for (const p of projects) {
+    const projectId = String(p.id)
+    const skills = parseList(p.required_skills)
+    // Owner first, then each current member, with what each says they contributed.
+    const team = new Map<string, string>([[String(p.owner_id), String(p.owner_role_note ?? "")]])
+    for (const m of all(db, "SELECT student_id, role_note FROM project_members WHERE project_id = ? ORDER BY added_at", projectId)) team.set(String(m.student_id), String(m.role_note ?? ""))
+
+    for (const [studentId, contribution] of team) {
+      const who = one(db, "SELECT s.university_id, u.name AS university_name FROM students s JOIN universities u ON u.id = s.university_id WHERE s.id = ?", studentId)
+      // Someone at another university than the project's owner cannot be verified on it.
+      if (!who || who.university_id !== p.owner_university) continue
+      const fresh = studentFreshness(db, projectId, studentId, skills)
+      const signals = all(
+        db,
+        `SELECT g.id, g.skill, g.status, g.verified_at, g.analyzed_at, st.university_id AS verifier_university
+         FROM skill_signals g LEFT JOIN staff st ON st.id = g.verified_by
+         WHERE g.project_id = ? AND g.student_id = ? AND g.status = 'Verified' AND g.suggested_level <> 'Insufficient' AND g.verified_at IS NOT NULL
+         ORDER BY g.skill`,
+        projectId,
+        studentId,
+      )
+      for (const g of signals) {
+        if (!skills.includes(String(g.skill))) continue
+        // The student's own university is the verifier.
+        if (g.verifier_university !== who.university_id) continue
+        if (isStale(fresh, g)) continue
+        const cited = all(
+          db,
+          "SELECT e.id, e.student_id, e.project_id FROM skill_signal_evidence se LEFT JOIN evidence e ON e.id = se.evidence_id WHERE se.signal_id = ? ORDER BY e.id",
+          String(g.id),
+        )
+        if (cited.length === 0 || cited.some((e) => e.id === null || e.student_id !== studentId || e.project_id !== projectId)) continue
+        proofs.push({
+          studentId,
+          skill: String(g.skill),
+          projectId,
+          projectTitle: String(p.title),
+          industry: String(p.industry),
+          verifiedAt: String(g.verified_at),
+          universityId: String(who.university_id),
+          universityName: String(who.university_name),
+          contribution: contribution.trim(),
+          signalId: String(g.id),
+          evidenceIds: cited.map((e) => String(e.id)),
+        })
+      }
+    }
+  }
+  return proofs
+}
+
+/** Evidence a company may read: exactly what the eligible skills cite. */
+function companyEvidenceIds(db: DatabaseSync): Set<string> {
+  return new Set(eligibleProofs(db).flatMap((p) => p.evidenceIds))
+}
+
+function requireDiscoverable(db: DatabaseSync, studentId: string) {
+  if (!eligibleProofs(db).some((p) => p.studentId === studentId)) throw new ApiError(404, "That student has no verified proof you can see.")
+}
+
+interface TalentFilters {
+  /** Canonical skill names, deduplicated, in the order asked. Empty = browse everyone with verified proof. */
+  skills: string[]
+  university: string | null
+  industry: string | null
+}
+
+const MAX_TALENT_SKILLS = 8
+const MAX_TALENT_SKILLS_CHARS = 600
+
+/** Reads a search from the query string: nothing here can name anything but a skill, a university id, or an industry. */
+function parseTalentQuery(url: URL): TalentFilters {
+  const raw = url.searchParams.getAll("skills")
+  if (raw.join(",").length > MAX_TALENT_SKILLS_CHARS) throw new ApiError(400, "That search is too long. Pick a few skills and try again.")
+  const seen = new Set<string>()
+  const skills: string[] = []
+  for (const part of raw.flatMap((s) => s.split(","))) {
+    const name = canonicalSkillName(part)
+    if (!name || seen.has(name.toLowerCase())) continue
+    seen.add(name.toLowerCase())
+    skills.push(name)
+  }
+  if (skills.length > MAX_TALENT_SKILLS) throw new ApiError(400, `Search up to ${MAX_TALENT_SKILLS} skills at once.`)
+  return {
+    skills,
+    university: url.searchParams.get("university")?.trim() || null,
+    industry: url.searchParams.get("industry")?.trim() || null,
+  }
+}
+
+const byCountThenName = <T extends { count: number }>(name: (x: T) => string) => (a: T, b: T) => b.count - a.count || (name(a) < name(b) ? -1 : name(a) > name(b) ? 1 : 0)
+
+/**
+ * Verified Talent Discovery. A student is a result only when EVERY requested skill is currently verified for them
+ * (and, if an industry is asked for, proven on a project in that industry); no skills asked = everyone with at least
+ * one. Matching is exact on the skill name, case-insensitive. Order is explainable from the card: most verified
+ * skills, then most recent verification, then name, then id. There is no score anywhere in it.
+ */
+function talentSearch(db: DatabaseSync, filters: TalentFilters): TalentSearchResult {
+  const proofs = eligibleProofs(db)
+  const byStudent = new Map<string, EligibleProof[]>()
+  for (const p of proofs) byStudent.set(p.studentId, [...(byStudent.get(p.studentId) ?? []), p])
+
+  // Facets describe eligible talent only, so a value in them never hints at anyone who is not discoverable.
+  const countStudents = <K extends string>(key: (p: EligibleProof) => K) => {
+    const m = new Map<K, Set<string>>()
+    for (const p of proofs) m.set(key(p), (m.get(key(p)) ?? new Set()).add(p.studentId))
+    return m
+  }
+  const universityNames = new Map(proofs.map((p) => [p.universityId, p.universityName]))
+  const facets: TalentFacets = {
+    skills: [...countStudents((p) => p.skill)].map(([skill, s]) => ({ skill, count: s.size })).sort(byCountThenName((x) => x.skill)),
+    universities: [...countStudents((p) => p.universityId)].map(([id, s]) => ({ id, name: universityNames.get(id) ?? id, count: s.size })).sort(byCountThenName((x) => x.name)),
+    industries: [...countStudents((p) => p.industry)].map(([industry, s]) => ({ industry, count: s.size })).sort(byCountThenName((x) => x.industry)),
+  }
+
+  /** One proof per skill: the most recently verified, then the lowest project id, so the choice is stable. */
+  const bestPerSkill = (list: EligibleProof[]) => {
+    const best = new Map<string, EligibleProof>()
+    for (const p of list) {
+      const key = p.skill.toLowerCase()
+      const cur = best.get(key)
+      if (!cur || p.verifiedAt > cur.verifiedAt || (p.verifiedAt === cur.verifiedAt && p.projectId < cur.projectId)) best.set(key, p)
+    }
+    return best
+  }
+  const wanted = filters.skills.map((s) => s.toLowerCase())
+  const asMatched = (p: EligibleProof): TalentProof => ({
+    skill: p.skill,
+    projectId: p.projectId,
+    projectTitle: p.projectTitle,
+    industry: p.industry,
+    verifiedAt: p.verifiedAt,
+    verifyingUniversity: p.universityName,
+    contribution: p.contribution,
+  })
+
+  const candidates: TalentCandidate[] = []
+  for (const [studentId, list] of byStudent) {
+    if (filters.university && list[0].universityId !== filters.university) continue
+    const inScope = bestPerSkill(filters.industry ? list.filter((p) => p.industry === filters.industry) : list)
+    if (inScope.size === 0 || !wanted.every((w) => inScope.has(w))) continue
+    const everySkill = bestPerSkill(list)
+    const matchedProofs = wanted.length > 0 ? wanted.map((w) => inScope.get(w)!) : [...inScope.values()].sort((a, b) => (a.skill < b.skill ? -1 : 1))
+    const matchedSkills = new Set(matchedProofs.map((p) => p.skill.toLowerCase()))
+    const who = one(
+      db,
+      "SELECT s.name, s.year, pr.name AS program, u.name AS university FROM students s JOIN programs pr ON pr.id = s.program_id JOIN universities u ON u.id = s.university_id WHERE s.id = ?",
+      studentId,
+    )!
+    candidates.push({
+      studentId,
+      name: String(who.name),
+      initials: initialsOf(String(who.name)),
+      year: String(who.year),
+      program: String(who.program),
+      university: String(who.university),
+      verifiedSkillCount: everySkill.size,
+      latestVerifiedAt: list.reduce((latest, p) => (p.verifiedAt > latest ? p.verifiedAt : latest), ""),
+      matched: matchedProofs.map(asMatched),
+      otherVerifiedSkills: [...everySkill.values()].filter((p) => !matchedSkills.has(p.skill.toLowerCase())).map((p) => p.skill).sort(),
+    })
+  }
+  candidates.sort(
+    (a, b) =>
+      b.verifiedSkillCount - a.verifiedSkillCount ||
+      (a.latestVerifiedAt < b.latestVerifiedAt ? 1 : a.latestVerifiedAt > b.latestVerifiedAt ? -1 : 0) ||
+      (a.name < b.name ? -1 : a.name > b.name ? 1 : 0) ||
+      (a.studentId < b.studentId ? -1 : 1),
+  )
+  return { query: { skills: filters.skills, university: filters.university, industry: filters.industry }, candidates, facets }
+}
+
+/** One discoverable student with every skill currently verified for them, or a 404 that says nothing about whether they exist. */
+function talentCandidate(db: DatabaseSync, studentId: string): TalentCandidate {
+  const found = talentSearch(db, { skills: [], university: null, industry: null }).candidates.find((c) => c.studentId === studentId)
+  if (!found) throw new ApiError(404, "That student has no verified proof you can see.")
+  return found
 }
 
 const REVIEW_STATE_WORDS: Record<ReviewState, string> = {
@@ -733,7 +993,7 @@ function decideSkill(db: DatabaseSync, universityId: string, p: ReturnType<typeo
   // only an explicit /confirm (once every student's every skill has a current decision) does that.
   if (p.status === "In Progress" || p.status === "Evidence Under Review") {
     exec(db, "UPDATE projects SET status = 'Skills Pending Verification' WHERE id = ?", p.id)
-    advanceIfFurther(db, p.challengeId, "Skills Pending Verification", `${mentor.name} began reviewing ${subject.name}'s skill signals.`)
+    advanceIfFurther(db, p.challengeId, "Skills Pending Verification", `${p.universityName} began reviewing the team's skill signals.`)
   }
 }
 
@@ -1547,7 +1807,7 @@ const routes: { method: string; pattern: RegExp; prepare?: (actor: Actor, body: 
       const note = text(body.note, "Note", { max: 1000 }) || `Reviewed and confirmed to ${p.companyName}.`
       exec(db, "INSERT INTO feedback (id, project_id, author_kind, author_id, note, at) VALUES (?, ?, 'staff', ?, ?, ?)", newId("fb"), id, mentor.id, note, nowIso())
       exec(db, "UPDATE projects SET status = ? WHERE id = ?", finalStatus, id)
-      advanceIfFurther(db, p.challengeId, finalStatus, `Reviewed by ${mentor.name} and confirmed to ${p.companyName}.`)
+      advanceIfFurther(db, p.challengeId, finalStatus, `Reviewed by ${p.universityName} and confirmed to ${p.companyName}.`)
       notify(db, "company", p.companyId, "Evidence ready for your review", `${p.universityName} shared verified evidence for ${p.studentName}'s work on “${p.challengeTitle}”.`, `/company/submissions/${id}`)
       for (const memberId of teamIds(db, id)) {
         notify(db, "student", memberId, `Evidence confirmed to ${p.companyName}`, `${mentor.name} confirmed your team's evidence for “${p.challengeTitle}”.`, `/student/projects/${id}`)
@@ -1596,7 +1856,9 @@ const routes: { method: string; pattern: RegExp; prepare?: (actor: Actor, body: 
     pattern: /^\/students\/([^/]+)\/company-actions$/,
     handler: (db, actor, [studentId], body) => {
       const company = requireRole(actor, "company")
-      if (!one(db, "SELECT id FROM students WHERE id = ?", studentId)) throw new ApiError(404, "Student not found.")
+      // Saving, showing interest and inviting are for students a company can discover through verified proof — an id
+      // alone is never enough, so this cannot be used to reach or probe an arbitrary student.
+      requireDiscoverable(db, studentId)
       const kind = oneOf(body.kind, COMPANY_ACTION_KINDS, "kind", "")
       if (!kind) throw new ApiError(400, "Kind is required.")
       const now = nowIso()
@@ -1753,6 +2015,23 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
       return true
     }
 
+    // Verified Talent Discovery: companies only, and only what is currently verified.
+    const talentMatch = req.method === "GET" ? /^\/talent(?:\/([^/]+))?$/.exec(path) : null
+    if (talentMatch) {
+      requireRole(actor, "company")
+      if (talentMatch[1] === undefined) send(res, 200, talentSearch(db, parseTalentQuery(url)))
+      else {
+        let studentId: string
+        try {
+          studentId = decodeURIComponent(talentMatch[1])
+        } catch {
+          throw new ApiError(404, "That student has no verified proof you can see.")
+        }
+        send(res, 200, { candidate: talentCandidate(db, studentId) })
+      }
+      return true
+    }
+
     const fileMatch = req.method === "GET" ? /^\/challenges\/([^/]+)\/files\/([^/]+)$/.exec(path) : null
     if (fileMatch) {
       const [challengeId, fileId] = fileMatch.slice(1).map(decodeURIComponent)
@@ -1778,7 +2057,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
         actor,
         visibleProjectIds(db, actor),
         { id: evidenceId, projectId: String(file.project_id), studentId: String(owner?.student_id ?? "") },
-        actor.role === "company" ? verifiedEvidenceIds(db) : new Set<string>(),
+        actor.role === "company" ? companyEvidenceIds(db) : new Set<string>(),
         isOnTeam(db, String(file.project_id), String(owner?.student_id ?? "")),
       )
       if (!readable) throw new ApiError(403, "You don't have access to this file.")

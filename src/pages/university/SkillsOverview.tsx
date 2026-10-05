@@ -24,7 +24,7 @@ export default function SkillsOverview() {
     // A skill WSL found no evidence of is not something the student has practised.
     const signals = studentSignals(skillSignals, s.id).filter(isEvidenced)
     const best = new Map<string, number>()
-    for (const sig of signals) best.set(sig.skill, Math.max(best.get(sig.skill) ?? 0, sig.evidenceConfidence))
+    for (const sig of signals) best.set(sig.skill, Math.max(best.get(sig.skill) ?? 0, sig.evidenceConfidence ?? 0))
     const scores = [...best.values()]
     const lastActive = signals.reduce<string | null>((l, sig) => (!l || sig.analyzedAt > l ? sig.analyzedAt : l), null)
     return {

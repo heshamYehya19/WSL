@@ -16,7 +16,7 @@ export function useShowcase() {
       .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())[0]
     if (!project) continue
     const student = getStudent(project.studentId)
-    const signals = skillSignals.filter((s) => s.projectId === project.id).sort((a, b) => b.evidenceConfidence - a.evidenceConfidence)
+    const signals = skillSignals.filter((s) => s.projectId === project.id).sort((a, b) => (b.evidenceConfidence ?? 0) - (a.evidenceConfidence ?? 0))
     return {
       project,
       signals,

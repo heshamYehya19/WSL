@@ -20,7 +20,7 @@ const FEEDBACK_OPTIONS = [
 export default function CompanySubmission() {
   const { projectId } = useParams()
   const { company } = useDemoUser()
-  const { projects, challenges, evidence, skillSignals, submitCompanyFeedback, getStudent, getUniversity, getStaff } = useStore()
+  const { projects, challenges, evidence, skillSignals, submitCompanyFeedback, getStudent, getUniversity } = useStore()
   // Companies only see submissions to their own challenges.
   const project = projects.find((p) => p.id === projectId && p.organizationId === company?.id)
   const signals = project ? skillsForProject(skillSignals, project.id) : []
@@ -125,7 +125,7 @@ export default function CompanySubmission() {
                     <div key={s.id} className="rounded-lg border border-verified-500/30 p-3">
                       <span className="text-sm font-semibold text-ink-900">
                         {s.skill}
-                        <span className="ml-1.5 text-xs font-semibold text-verified-600">✓ Verified by {getUniversity(getStaff(s.verifiedBy ?? "")?.universityId ?? "")?.name ?? "the university"}</span>
+                        <span className="ml-1.5 text-xs font-semibold text-verified-600">✓ Verified by {getUniversity(s.verifiedByUniversityId ?? "")?.name ?? "the university"}</span>
                       </span>
                       {s.criteria.length > 0 && (
                         <div className="mt-3">
@@ -144,12 +144,7 @@ export default function CompanySubmission() {
                           {s.evidenceIds.map((id) => projectEvidence.find((e) => e.id === id)?.title).filter(Boolean).join("; ")}
                         </p>
                       )}
-                      {s.verifiedBy && (
-                        <p className="mt-1.5 text-[11px] text-ink-400">
-                          {getStaff(s.verifiedBy) ? `Reviewed by ${getStaff(s.verifiedBy)!.name}` : ""}
-                          {s.verifiedAt ? ` · ${formatDate(s.verifiedAt)}` : ""}
-                        </p>
-                      )}
+                      {s.verifiedAt && <p className="mt-1.5 text-[11px] text-ink-400">Verified {formatDate(s.verifiedAt)}</p>}
                     </div>
                   ))}
                   {theirVerified.length === 0 && <p className="text-sm text-ink-400">No skills have been verified for {person?.name.split(" ")[0]} on this project.</p>}

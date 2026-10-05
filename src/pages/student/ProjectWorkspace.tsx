@@ -416,7 +416,7 @@ export default function ProjectWorkspace() {
                         )}
                       </>
                     )}
-                    {studentNote(s.aiNote) && <p className="mt-2 text-[11px] text-ink-400">{studentNote(s.aiNote)}</p>}
+                    {studentNote(s.aiNote ?? "") && <p className="mt-2 text-[11px] text-ink-400">{studentNote(s.aiNote ?? "")}</p>}
                     {s.status === "Verified" ? (
                       <p className="mt-2 text-xs font-semibold text-verified-600">
                         ✓ Verified by {getUniversity(getStaff(s.verifiedBy ?? "")?.universityId ?? "")?.name ?? "the university"}

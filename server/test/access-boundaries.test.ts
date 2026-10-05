@@ -1,6 +1,7 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest"
-import { getDb } from "../db.ts"
+// helpers.ts must load first: it points WSL_DB_PATH at a throwaway database before db.ts reads it.
 import { resetDatabase, startServer } from "./helpers.ts"
+import { getDb } from "../db.ts"
 import { llmDeps } from "../ml/llm-grader.ts"
 import { notebook, png, upload } from "./fixtures.ts"
 
@@ -257,10 +258,10 @@ describe("what a company receives", () => {
     expect(byId.get("stu-ju-ahmad")).toMatchObject({ name: "Ahmad Al-Khatib" })
     expect(typeof byId.get("stu-ju-ahmad")!.gpa).toBe("number")
     expect(byId.get("stu-ju-ahmad")!.studentNumber).toBeUndefined()
-    // Everyone else is a name and a program, nothing academic or personal.
+    // Everyone else is not in the company's data at all: no directory of students without verified proof.
     const undiscovered = company.students.filter((s) => !company.skillSignals.some((g) => g.studentId === s.id && g.status === "Verified"))
-    expect(undiscovered.length).toBeGreaterThan(0)
-    for (const s of undiscovered) expectBare(s)
+    expect(undiscovered).toEqual([])
+    expect(company.students.length).toBeLessThan((await snapshot(JU)).students.length)
   })
 
   it("guests get names for the demo sign-in and nothing academic", async () => {

@@ -66,8 +66,8 @@ export function SignalReviewCard({
           <div className="mt-1"><VerificationPill status={signal.status} insufficient={signal.suggestedLevel === "Insufficient"} /></div>
         </div>
         <div className="w-36">
-          <p className="mb-1 text-right text-[11px] font-semibold text-ink-600">Evidence Strength: {evidenceStrengthFor(signal.evidenceConfidence)}</p>
-          <ConfidenceMeter value={signal.evidenceConfidence} label="Evidence confidence" />
+          <p className="mb-1 text-right text-[11px] font-semibold text-ink-600">Evidence Strength: {evidenceStrengthFor(signal.evidenceConfidence ?? 0)}</p>
+          <ConfidenceMeter value={signal.evidenceConfidence ?? 0} label="Evidence confidence" />
         </div>
       </div>
 
@@ -100,7 +100,7 @@ export function SignalReviewCard({
             </div>
           )}
           <ul className="mt-1 space-y-0.5">
-            {splitAiNote(signal.aiNote).map((line) => (
+            {splitAiNote(signal.aiNote ?? "").map((line) => (
               <li key={line} className="flex gap-1.5 text-xs text-ink-600">
                 <span className="text-teal-600">•</span>
                 {line}

@@ -235,6 +235,19 @@ university**, so one university is the verification authority for the whole team
 - **Proof.** A student's profile, a company's Talent Discovery and the project pages all read the same
   per-student signals, so a skill is only ever shown for the student whose own evidence and verification
   back it. Required skills are never treated as demonstrated skills.
+- **Verified Talent Discovery.** `GET /api/talent?skills=Python,SQL&university=<id>&industry=<exact>` (companies
+  only) returns students for whom **every** searched skill is verified *right now*; no skills means everyone
+  with at least one. A skill counts only when its signal is Verified (and not one WSL found nothing for), its
+  project was confirmed to companies, the student is on that project's team at the university that verified
+  them, the verification is current by the same freshness rule confirmation uses (`isStale` in
+  `server/api.ts`), and everything it cites is that student's own work. Skill matching is exact and
+  case-insensitive — never substring. Results are ordered by verified skills, then most recent
+  verification, then name, then id, and carry **no score**: a candidate is name, program, university,
+  year, each searched skill with the project that proves it, the university and date that verified it, and
+  the student's own contribution (a claim, not proof). A company is never sent AI scores or reasoning,
+  reviewer names or notes, student numbers, or students without eligible proof; `GET /api/talent/:id` is a
+  404 for a student with none, and saving, showing interest in or inviting a student requires the same
+  eligibility. Facets (skills, universities, industries) count eligible talent only.
 
 ## Attached files & privacy screening
 

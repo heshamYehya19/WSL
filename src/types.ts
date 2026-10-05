@@ -222,24 +222,26 @@ export interface SkillSignal {
    * Generated the moment evidence is submitted. This is NOT a measure of proficiency —
    * it only reflects how much the evidence looks like it addresses the skill. Only a
    * university mentor's decision (status/verifiedBy/verifiedAt below) means the skill
-   * is actually verified.
+   * is actually verified. Internal to WSL and the university: a company is never sent it.
    */
-  evidenceConfidence: number
+  evidenceConfidence?: number
   /** AI's starting-point read of level, shown to the mentor — never shown as a verdict on its own. */
   suggestedLevel: SuggestedLevel
-  /** Short, concrete statements behind the confidence score, e.g. "Detected Python code (92% confidence)...". */
-  aiNote: string
+  /** Short, concrete statements behind the confidence score, e.g. "Detected Python code (92% confidence)...". Never sent to a company. */
+  aiNote?: string
   /** The exact lines of the student's own work the AI relied on, each with what it shows. */
   aiQuotes: EvidenceQuote[]
   /** Named rubric criteria this signal was checked against, met ones first. */
   criteria: SkillCriterion[]
   /** "model" when a live grader produced this result; "offline" when the deterministic
    * fallback did — e.g. no key configured, or a model outage that couldn't be retried
-   * because this skill had no prior model-graded result to protect. */
-  gradedSource: "model" | "offline"
+   * because this skill had no prior model-graded result to protect. Never sent to a company. */
+  gradedSource?: "model" | "offline"
   status: SkillSignalStatus
-  /** Set once a mentor verifies/rejects/requests more evidence — resolves to a staff id. */
+  /** Set once a mentor verifies/rejects/requests more evidence — resolves to a staff id. Never sent to a company. */
   verifiedBy?: string
+  /** For a company: the university that verified this skill (never the reviewer). */
+  verifiedByUniversityId?: string
   verifiedAt?: string
   /** The mentor's own note — required for "More Evidence Requested"/"Rejected", optional for "Verified". */
   reviewerNotes?: string
@@ -313,6 +315,8 @@ export interface Project {
   organizationId: string
   /** The project's owner — the student who started it. */
   studentId: string
+  /** The owner's university (a company is told it only for its own challenges' projects). */
+  universityId?: string
   /** What the owner says they contributed ("" until they write it). Members' statements are in `members`. */
   ownerRoleNote: string
   /** The other students on the team (same university as the owner). Empty on a solo project. */
@@ -410,4 +414,47 @@ export interface DemoUserState {
   studentId?: string
   universityId?: string
   companyId?: string
+}
+
+/** One verified skill of a student, with the project that proves it — all a company is shown of the proof in a search. */
+export interface TalentProof {
+  skill: string
+  projectId: string
+  projectTitle: string
+  industry: string
+  verifiedAt: string
+  /** The university that verified it. Never an individual reviewer. */
+  verifyingUniversity: string
+  /** What the student says they contributed to that project, in their own words — a claim, never proof. */
+  contribution: string
+}
+
+/** A student a company can discover, as the company is allowed to see them. There is no score anywhere in it. */
+export interface TalentCandidate {
+  studentId: string
+  name: string
+  initials: string
+  year: string
+  program: string
+  university: string
+  /** Every skill currently verified for them — what the order of results is based on. */
+  verifiedSkillCount: number
+  latestVerifiedAt: string
+  /** The skills searched for (or all their verified skills when none were), each with its proof. */
+  matched: TalentProof[]
+  /** Names of their other verified skills. */
+  otherVerifiedSkills: string[]
+}
+
+export interface TalentFacets {
+  skills: { skill: string; count: number }[]
+  universities: { id: string; name: string; count: number }[]
+  industries: { industry: string; count: number }[]
+}
+
+export interface TalentSearchResult {
+  /** The search as the server understood it: skills canonicalized and deduplicated. */
+  query: { skills: string[]; university: string | null; industry: string | null }
+  candidates: TalentCandidate[]
+  facets: TalentFacets
 }

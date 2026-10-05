@@ -67,25 +67,30 @@ export default function CompanyDashboard() {
   const stageCounts = STAGES.map((s) => myChallenges.filter((c) => c.status === s.status).length)
   const maxStage = Math.max(...stageCounts, 1)
 
-  // Demand (how many of your challenges ask for it) vs. what students actually delivered on it.
+  // Demand (how many of your challenges ask for it) vs. how many students have it verified on your challenges. Counts only: no score.
+  const verifiedOnYours = visibleSignals.filter((s) => s.status === "Verified")
   const demand = new Map<string, number>()
   for (const c of myChallenges) for (const skill of c.requiredSkills) demand.set(skill, (demand.get(skill) ?? 0) + 1)
   const skillRows = [...demand.entries()]
-    .sort((a, b) => b[1] - a[1])
+    .sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))
     .slice(0, 6)
-    .map(([skill, count]) => {
-      const sigs = visibleSignals.filter((s) => s.skill === skill)
-      return { skill, count, delivered: sigs.length ? Math.round(sigs.reduce((sum, s) => sum + s.evidenceConfidence, 0) / sigs.length) : null }
-    })
+    .map(([skill, count]) => ({ skill, count, verifiedStudents: new Set(verifiedOnYours.filter((s) => s.skill === skill).map((s) => s.studentId)).size }))
   const maxDemand = Math.max(...skillRows.map((r) => r.count), 1)
+  const maxVerified = Math.max(...skillRows.map((r) => r.verifiedStudents), 1)
 
-  // Top talent: students whose confirmed work on your challenges scored best.
-  const byStudent = new Map<string, number[]>()
-  for (const s of visibleSignals) byStudent.set(s.studentId, [...(byStudent.get(s.studentId) ?? []), s.evidenceConfidence])
+  // Students with verified proof on your challenges, in a plain order anyone can check: most verified skills, then most
+  // recent verification, then name. No AI score is involved.
+  const byStudent = new Map<string, { skills: Set<string>; latest: string }>()
+  for (const s of verifiedOnYours) {
+    const cur = byStudent.get(s.studentId) ?? { skills: new Set<string>(), latest: "" }
+    cur.skills.add(s.skill)
+    if ((s.verifiedAt ?? "") > cur.latest) cur.latest = s.verifiedAt ?? ""
+    byStudent.set(s.studentId, cur)
+  }
   const topTalent = [...byStudent.entries()]
-    .map(([id, ratings]) => ({ student: getStudent(id), avg: Math.round(ratings.reduce((a, b) => a + b, 0) / ratings.length), skills: ratings.length }))
+    .map(([id, v]) => ({ student: getStudent(id), skills: v.skills.size, latest: v.latest }))
     .filter((t) => t.student)
-    .sort((a, b) => b.avg - a.avg)
+    .sort((a, b) => b.skills - a.skills || (a.latest < b.latest ? 1 : a.latest > b.latest ? -1 : 0) || (a.student!.name < b.student!.name ? -1 : a.student!.name > b.student!.name ? 1 : 0) || (a.student!.id < b.student!.id ? -1 : 1))
     .slice(0, 4)
 
   const listed = (stage ? myChallenges.filter((c) => c.status === stage) : myChallenges).slice(0, 6)
@@ -269,13 +274,13 @@ export default function CompanyDashboard() {
           {/* TOP TALENT */}
           <div className="rounded-2xl border border-ink-200 bg-surface p-5">
             <div className="mb-4 flex items-baseline justify-between">
-              <h2 className="font-semibold text-ink-900">Top Talent From Your Challenges</h2>
+              <h2 className="font-semibold text-ink-900">Verified Talent From Your Challenges</h2>
             </div>
             {topTalent.length === 0 ? (
               <p className="py-4 text-center text-sm text-ink-400">Students appear here once a university confirms their work to you.</p>
             ) : (
               <ul className="space-y-2">
-                {topTalent.map(({ student, avg, skills }, i) => (
+                {topTalent.map(({ student, skills }, i) => (
                   <li key={student!.id}>
                     <Link
                       to={`/company/talent/${student!.id}`}
@@ -289,10 +294,9 @@ export default function CompanyDashboard() {
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-semibold text-ink-900">{student!.name}</span>
                         <span className="block truncate text-[11px] text-ink-400">
-                          {getUniversity(student!.universityId)?.shortName} · {skills} skill{skills === 1 ? "" : "s"}
+                          {getUniversity(student!.universityId)?.shortName} · {skills} verified skill{skills === 1 ? "" : "s"}
                         </span>
                       </span>
-                      <span className="text-lg font-bold text-teal-600 tabular-nums">{avg}</span>
                     </Link>
                   </li>
                 ))}
@@ -305,10 +309,10 @@ export default function CompanyDashboard() {
 
           {/* DEMAND VS DELIVERED */}
           <div className="rounded-2xl border border-ink-200 bg-surface p-5">
-            <h2 className="font-semibold text-ink-900">Skills: Asked vs. Delivered</h2>
+            <h2 className="font-semibold text-ink-900">Skills: Asked vs. Verified</h2>
             <div className="mt-1 mb-4 flex gap-4 text-[11px] text-ink-400">
               <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-ink-300" /> How often you ask</span>
-              <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-teal-500" /> Avg. score delivered</span>
+              <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-teal-500" /> Students with it verified</span>
             </div>
             {skillRows.length === 0 ? (
               <p className="py-4 text-center text-sm text-ink-400">No challenges submitted yet.</p>
@@ -320,7 +324,7 @@ export default function CompanyDashboard() {
                       <span className="font-medium text-ink-800">{r.skill}</span>
                       <span className="text-xs text-ink-400 tabular-nums">
                         ×{r.count}
-                        {r.delivered !== null && <span className="ml-2 font-bold text-teal-600">{r.delivered}</span>}
+                        {r.verifiedStudents > 0 && <span className="ml-2 font-bold text-teal-600">{r.verifiedStudents}</span>}
                       </span>
                     </div>
                     <div className="space-y-1">
@@ -331,13 +335,13 @@ export default function CompanyDashboard() {
                         />
                       </div>
                       <div className="h-1.5 overflow-hidden rounded-full bg-ink-100">
-                        {r.delivered !== null ? (
+                        {r.verifiedStudents > 0 ? (
                           <div
                             className="h-full rounded-full bg-gradient-to-r from-teal-500 to-teal-300 transition-[width] duration-700 ease-out"
-                            style={{ width: mounted ? `${r.delivered}%` : "0%", transitionDelay: `${i * 60 + 150}ms` }}
+                            style={{ width: mounted ? `${(r.verifiedStudents / maxVerified) * 100}%` : "0%", transitionDelay: `${i * 60 + 150}ms` }}
                           />
                         ) : (
-                          <div className="h-full w-full bg-[repeating-linear-gradient(90deg,transparent_0_4px,var(--color-ink-200)_4px_8px)]" title="No confirmed work on this skill yet" />
+                          <div className="h-full w-full bg-[repeating-linear-gradient(90deg,transparent_0_4px,var(--color-ink-200)_4px_8px)]" title="No student has this skill verified on your challenges yet" />
                         )}
                       </div>
                     </div>

@@ -31,7 +31,7 @@ export default function ChallengeDiscovery() {
 
   // Skills this student has already proven anywhere, with their best score.
   const proven = new Map<string, number>()
-  for (const s of studentSignals(skillSignals, student.id).filter(isEvidenced)) proven.set(s.skill, Math.max(proven.get(s.skill) ?? 0, s.evidenceConfidence))
+  for (const s of studentSignals(skillSignals, student.id).filter(isEvidenced)) proven.set(s.skill, Math.max(proven.get(s.skill) ?? 0, s.evidenceConfidence ?? 0))
 
   const matchOf = (skills: string[]) => (skills.length ? Math.round((skills.filter((s) => proven.has(s)).length / skills.length) * 100) : 0)
 

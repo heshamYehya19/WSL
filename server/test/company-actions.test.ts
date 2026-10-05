@@ -10,18 +10,19 @@ async function actionsFor(call: Awaited<ReturnType<typeof startServer>>["call"],
 
 const server = await startServer()
 
+// Actions are for students a company can discover through verified proof — the seed has five, and Echo has already saved Leen, so the toggle test uses Tala.
 describe("company engagement actions", () => {
   afterAll(() => server.close())
   beforeEach(() => resetDatabase())
 
   it("saving a student toggles on then off", async () => {
-    const saveRes = await server.call("POST", "/students/stu-hu-dana/company-actions", "company:org-echo", { kind: "saved" })
+    const saveRes = await server.call("POST", "/students/stu-ju-tala/company-actions", "company:org-echo", { kind: "saved" })
     expect(saveRes.status).toBe(200)
-    expect((await actionsFor(server.call, "company:org-echo")).some((a) => a.studentId === "stu-hu-dana" && a.kind === "saved")).toBe(true)
+    expect((await actionsFor(server.call, "company:org-echo")).some((a) => a.studentId === "stu-ju-tala" && a.kind === "saved")).toBe(true)
 
-    const unsaveRes = await server.call("POST", "/students/stu-hu-dana/company-actions", "company:org-echo", { kind: "saved" })
+    const unsaveRes = await server.call("POST", "/students/stu-ju-tala/company-actions", "company:org-echo", { kind: "saved" })
     expect(unsaveRes.status).toBe(200)
-    expect((await actionsFor(server.call, "company:org-echo")).some((a) => a.studentId === "stu-hu-dana" && a.kind === "saved")).toBe(false)
+    expect((await actionsFor(server.call, "company:org-echo")).some((a) => a.studentId === "stu-ju-tala" && a.kind === "saved")).toBe(false)
   })
 
   it("inviting the same student to the same opportunity twice is rejected", async () => {
@@ -35,7 +36,7 @@ describe("company engagement actions", () => {
   })
 
   it("inviting requires an opportunity owned by the caller", async () => {
-    const res = await server.call("POST", "/students/stu-hu-dana/company-actions", "company:org-estarta", {
+    const res = await server.call("POST", "/students/stu-hu-leen/company-actions", "company:org-estarta", {
       kind: "invited",
       opportunityId: "opp-estarta-cx",
     })
@@ -46,7 +47,7 @@ describe("company engagement actions", () => {
   })
 
   it("inviting to an opportunity the caller doesn't own is rejected", async () => {
-    const res = await server.call("POST", "/students/stu-hu-dana/company-actions", "company:org-echo", {
+    const res = await server.call("POST", "/students/stu-hu-leen/company-actions", "company:org-echo", {
       kind: "invited",
       opportunityId: "opp-estarta-cx",
     })

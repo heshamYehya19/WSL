@@ -132,7 +132,7 @@ export default function ChallengeStatus() {
           ) : (
             <div className="space-y-2">
               {challenge.assignments.map((a) => {
-                const count = relatedProjects.filter((p) => getStudent(p.studentId)?.universityId === a.universityId).length
+                const count = relatedProjects.filter((p) => (p.universityId ?? getStudent(p.studentId)?.universityId) === a.universityId).length
                 return (
                   <div key={a.universityId} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-ink-100 px-4 py-2.5">
                     <div>
@@ -157,17 +157,17 @@ export default function ChallengeStatus() {
           <div className="space-y-2">
             {relatedProjects.map((p) => {
               const s = getStudent(p.studentId)
-              const su = s ? getUniversity(s.universityId) : undefined
+              const su = getUniversity(p.universityId ?? s?.universityId ?? "")
               const mates = teamOf(p).slice(1).map((m) => getStudent(m.studentId)?.name).filter(Boolean)
               const canReview = p.status === "Verified" || p.status === "Completed" || p.status === "Company Feedback Received"
               return (
                 <div key={p.id} className="flex items-center justify-between rounded-lg border border-ink-100 px-4 py-2.5">
                   {canReview ? (
                     <Link to={`/company/submissions/${p.id}`} className="text-sm font-medium text-ink-800 hover:text-teal-600">
-                      {s?.name} <span className="font-normal text-ink-400">· {su?.shortName}{mates.length > 0 ? ` · with ${mates.join(", ")}` : ""}</span> →
+                      {s?.name ?? "A student"} <span className="font-normal text-ink-400">· {su?.shortName}{mates.length > 0 ? ` · with ${mates.join(", ")}` : ""}</span> →
                     </Link>
                   ) : (
-                    <span className="text-sm font-medium text-ink-800">{s?.name} <span className="font-normal text-ink-400">· {su?.shortName}{mates.length > 0 ? ` · with ${mates.join(", ")}` : ""}</span></span>
+                    <span className="text-sm font-medium text-ink-800">{s?.name ?? "A student"} <span className="font-normal text-ink-400">· {su?.shortName}{mates.length > 0 ? ` · with ${mates.join(", ")}` : ""}</span></span>
                   )}
                   <StatusBadge status={p.status} />
                 </div>
