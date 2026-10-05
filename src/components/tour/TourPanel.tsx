@@ -18,7 +18,7 @@ export function TourPanel() {
     if (!c) return
     setTrying(true)
     const brief = [c.problemDescription, ...c.objectives, c.expectedOutput].map((l) => `# ${l}`).join("\n")
-    await addEvidence(TOUR_PROJECT, { type: "Code", title: "Anomaly detector (copied brief)", link: "", content: `${brief}\nprint("hello world")` })
+    await addEvidence(TOUR_PROJECT, { type: "Documentation", title: "Anomaly detector write-up (copied brief)", link: "https://example.com/my-solution", content: `${brief}\nprint("hello world")` })
     setTrying(false)
   }
 
