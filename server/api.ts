@@ -6,7 +6,8 @@ import { analyzeEvidence, canonicalSkillName, checkRelevance, currentGradingMode
 import { checkProviderHealth, configuredProvider, lastGradingOutcome } from "./ml/llm-grader.ts"
 import type { ChallengeContext, EvidenceQuote, SimulatedRating, SkillCriterion } from "./ai.ts"
 import { parseGithubLink, readGithubRepo } from "./github.ts"
-import { parseGoogleDocLink, readGoogleDoc } from "./gdocs.ts"
+import { DOC_PROBLEM_MESSAGE, parseGoogleDocLink, readGoogleDoc } from "./gdocs.ts"
+import type { DocRead } from "./gdocs.ts"
 import type { RepoSnapshot } from "./github.ts"
 import { rank } from "../src/lib/pipeline.ts"
 import { MAX_DATASET_FILES, MAX_FILE_BYTES, prepareFile, screenChallenge, summarizeFindings, UploadError } from "./screening.ts"
@@ -531,7 +532,7 @@ function projectContext(db: DatabaseSync, projectId: string) {
 /** What the evidence route reads before its transaction: a repository, a shared Google Doc, and/or an attached document. */
 interface EvidencePrep {
   repo: RepoSnapshot | null
-  doc: string | null
+  doc: DocRead | null
   file: PreparedFile | null
 }
 
@@ -881,7 +882,7 @@ const routes: { method: string; pattern: RegExp; prepare?: (actor: Actor, body: 
       const isDoc = body.type === "Documentation"
       return {
         repo: body.type === "GitHub Repository" && parseGithubLink(link) ? await readGithubRepo(link) : null,
-        doc: isDoc ? await readGoogleDoc(link) : null,
+        doc: isDoc && parseGoogleDocLink(link) ? await readGoogleDoc(link) : null,
         file: isDoc ? await prepareEvidenceUpload(body.file) : null,
       }
     },
@@ -907,8 +908,9 @@ const routes: { method: string; pattern: RegExp; prepare?: (actor: Actor, body: 
       const content = text(body.content, "Excerpt", { max: 20000, key: "content" }) || null
       // What WSL read from the work itself, beyond anything pasted: repository files, an attached
       // document's text, or a shared Google Doc's text.
-      const readText = isRepo ? repo?.text : [file?.text, doc].filter(Boolean).join("\n\n").slice(0, 20_000) || undefined
-      const readFrom = isRepo ? repo?.files : ([file && readText ? file.name : null, doc ? "Google Doc" : null].filter(Boolean) as string[])
+      const docText = doc?.ok ? doc.text : null
+      const readText = isRepo ? repo?.text : [file?.text, docText].filter(Boolean).join("\n\n").slice(0, 20_000) || undefined
+      const readFrom = isRepo ? repo?.files : ([file && file.text ? file.name : null, docText ? "Google Doc" : null].filter(Boolean) as string[])
       const readable = Boolean(content) || (readText ?? "").replace(/\s/g, "").length >= 20
 
       // A repository WSL can't read (private, misspelled, deleted, or GitHub's rate limit)
@@ -927,7 +929,7 @@ const routes: { method: string; pattern: RegExp; prepare?: (actor: Actor, body: 
         // Saved anyway — the reviewer can open the link or download the file — but say why nothing was analyzed.
         if (file) notice = `${file.unreadable ?? "WSL couldn't read any text in this file."} It's attached for your reviewer, but WSL couldn't analyze it.`
         else if (parseGoogleDocLink(link)) {
-          notice = "WSL couldn't read this Google Doc, so it's linked for your reviewer but not analyzed. Set sharing to “Anyone with the link can view”, or attach the document as a file, then submit again."
+          notice = `${DOC_PROBLEM_MESSAGE[doc && !doc.ok ? doc.problem : "not-shared"]} Meanwhile it's linked for your reviewer.`
         } else notice = "WSL can read GitHub repositories and shared Google Docs. This link is saved for your reviewer; paste an excerpt or attach the file to have it analyzed."
       } else if (file?.unreadable && !isRepo) {
         notice = file.unreadable
@@ -961,6 +963,43 @@ const routes: { method: string; pattern: RegExp; prepare?: (actor: Actor, body: 
         db.prepare("INSERT INTO evidence_files (evidence_id, name, mime, size, data) VALUES (?, ?, ?, ?, ?)").run(evidenceId, file.name, file.mime, file.data.length, file.data)
       }
       return notice ? { notice } : null
+    },
+  },
+  {
+    method: "POST",
+    pattern: /^\/projects\/([^/]+)\/evidence\/([^/]+)\/reread$/,
+    // For a Google Doc WSL couldn't open when it was added (usually because it wasn't shared yet):
+    // read it again after the student fixes the sharing, without adding the evidence a second time.
+    prepare: async (actor, _body, [id, evidenceId]): Promise<DocRead> => {
+      const db = getDb()
+      requireEvidenceAccess(db, actor, id, "re-read evidence on")
+      const row = one(db, "SELECT link, type FROM evidence WHERE id = ? AND project_id = ?", evidenceId, id)
+      if (!row) throw new ApiError(404, "That evidence item wasn't found on this project.")
+      if (row.type !== "Documentation" || !parseGoogleDocLink(String(row.link))) {
+        throw new ApiError(400, "Only a Google Docs link can be read again. For anything else, add the content as an excerpt or attach the file.")
+      }
+      return readGoogleDoc(String(row.link))
+    },
+    handler: (db, actor, [id, evidenceId], _body, doc: DocRead) => {
+      const { p } = requireEvidenceAccess(db, actor, id, "re-read evidence on")
+      const row = one(db, "SELECT title, content FROM evidence WHERE id = ? AND project_id = ?", evidenceId, id)
+      if (!row) throw new ApiError(404, "That evidence item wasn't found on this project.")
+      if (one(db, "SELECT 1 FROM evidence_files WHERE evidence_id = ?", evidenceId)) {
+        throw new ApiError(400, "This item already has an attached file, which WSL has read. Add the Google Doc as its own evidence item to have it read too.")
+      }
+      if (!doc.ok) return { read: false, notice: DOC_PROBLEM_MESSAGE[doc.problem] }
+
+      // The same gate as when evidence is first added: a document that just repeats the brief, or has
+      // nothing to do with the challenge, doesn't become evidence because it can now be read.
+      const relevance = checkRelevance(challengeContextFor(db, p.challengeId), [String(row.title), row.content, doc.text].filter(Boolean).join(". "))
+      if (!relevance.relevant && relevance.reason === "echoes-brief") {
+        throw new ApiError(400, `Most of this document repeats the “${p.challengeTitle}” brief back (${relevance.echoPct}% of its phrases come from the challenge). WSL only counts work you produced.`, "link")
+      }
+      if (!relevance.relevant) {
+        throw new ApiError(400, `This document doesn't look like it addresses “${p.challengeTitle}” — WSL found almost no overlap (${relevance.overlapPct}%) with the challenge's stated problem.`, "link")
+      }
+      exec(db, "UPDATE evidence SET fetched_content = ?, fetched_from = ? WHERE id = ?", doc.text, JSON.stringify(["Google Doc"]), evidenceId)
+      return { read: true, notice: "WSL can now read this Google Doc. Re-analyze to include it." }
     },
   },
   {

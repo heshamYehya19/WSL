@@ -51,6 +51,7 @@ interface StoreContextValue extends Snapshot {
     onFieldError?: FieldErrorHandler,
   ) => Promise<boolean>
   runAIReview: (projectId: string) => Promise<boolean>
+  rereadEvidence: (projectId: string, evidenceId: string) => Promise<boolean>
   reviewSignal: (
     projectId: string,
     signalId: string,
@@ -161,6 +162,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         run<{ notice?: string } | null>("POST", `/projects/${projectId}/evidence`, input, onFieldError).then((r) => {
           if (r.ok && r.result?.notice) setToast(r.result.notice)
           return r.ok
+        }),
+      rereadEvidence: (projectId, evidenceId) =>
+        run<{ read: boolean; notice: string }>("POST", `/projects/${projectId}/evidence/${evidenceId}/reread`, undefined, (_key, message) => setToast(message)).then((r) => {
+          if (r.ok) setToast(r.result.notice)
+          return r.ok && r.result.read
         }),
       runAIReview: (projectId) =>
         run<{ unchanged: boolean; failed?: boolean }>("POST", `/projects/${projectId}/ai-review`).then((r) => {

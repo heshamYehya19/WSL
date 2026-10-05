@@ -13,6 +13,7 @@ import { EvidenceSources } from "../../components/ui/EvidenceSources"
 import { VerificationPill } from "../../components/ui/VerificationPill"
 import { EvidenceFileLink } from "../../components/ui/EvidenceFileLink"
 import { MAX_UPLOAD_BYTES, readAsBase64 } from "../../lib/files"
+import { parseGoogleDocLink } from "../../lib/googleDocs"
 import { formatBytes } from "../../lib/format"
 
 type SubmittableType = "GitHub Repository" | "Documentation"
@@ -41,13 +42,14 @@ function FieldError({ message }: { message?: string }) {
 export default function ProjectWorkspace() {
   const { id } = useParams()
   const { student } = useDemoUser()
-  const { projects, challenges, evidence, skillSignals, addEvidence, runAIReview, toggleTask, getOrg, getStaff, getUniversity } = useStore()
+  const { projects, challenges, evidence, skillSignals, addEvidence, rereadEvidence, runAIReview, toggleTask, getOrg, getStaff, getUniversity } = useStore()
   const [searchParams] = useSearchParams()
   // ?tab=evidence opens straight on the evidence (the guided tour links there).
   const [tab, setTab] = useState<(typeof TABS)[number]>(searchParams.get("tab") === "evidence" ? "Evidence & Analysis" : "Overview")
   const [analyzing, setAnalyzing] = useState(false)
   const [form, setForm] = useState({ type: "GitHub Repository" as SubmittableType, title: "", link: "", excerpt: "" })
   const [pickedFile, setPickedFile] = useState<PickedFile | null>(null)
+  const [rereading, setRereading] = useState<string | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
   const [submitting, setSubmitting] = useState(false)
   // A rejected submission's message, shown next to the field it's about (keyed as the server keys it).
@@ -281,6 +283,7 @@ export default function ProjectWorkspace() {
                 ) : (
                   <div className="space-y-2">
                     <div>
+                      <p className="mb-2 text-[11px] font-medium text-ink-500">Add a link or attach a file — either one is enough.</p>
                       <label htmlFor="evidence-link" className="mb-1 block text-xs font-medium text-ink-500">Document link</label>
                       <input
                         id="evidence-link"
@@ -371,6 +374,26 @@ export default function ProjectWorkspace() {
                   <EvidenceFileLink evidence={e} />
                   {e.content && <pre className="mt-2 max-h-24 overflow-hidden rounded-lg whitespace-pre-wrap [overflow-wrap:anywhere] bg-ink-50 px-2.5 py-2 font-mono text-[11px] text-ink-600">{e.content}</pre>}
                   <EvidenceSources evidence={e} />
+                  {!locked && e.type === "Documentation" && !e.file && parseGoogleDocLink(e.link) && !e.analyzedFiles?.includes("Google Doc") && (
+                    <div className="mt-2 rounded-lg bg-amber-100 px-2.5 py-2">
+                      <p className="text-[11px] text-ink-800">
+                        WSL couldn't read this Google Doc. It needs sharing set to <span className="font-semibold">“Anyone with the link” (Viewer)</span>. After
+                        changing it, check again — or attach the document as a file instead.
+                      </p>
+                      <button
+                        type="button"
+                        disabled={rereading === e.id}
+                        onClick={async () => {
+                          setRereading(e.id)
+                          await rereadEvidence(project.id, e.id)
+                          setRereading(null)
+                        }}
+                        className="mt-1.5 rounded-md border border-amber-600/40 bg-surface px-2.5 py-1 text-[11px] font-semibold text-ink-800 hover:border-teal-400 disabled:opacity-50"
+                      >
+                        {rereading === e.id ? "Checking…" : "Check again"}
+                      </button>
+                    </div>
+                  )}
                   <p className="mt-2 text-[11px] text-ink-400">Submitted {formatRelative(e.submittedAt)}</p>
                 </div>
               ))}

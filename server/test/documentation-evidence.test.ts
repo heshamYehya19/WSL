@@ -1,7 +1,8 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest"
 import { deflateRawSync } from "node:zlib"
 import { resetDatabase, startServer } from "./helpers.ts"
-import { docsDeps } from "../gdocs.ts"
+import { docsDeps, readGoogleDoc } from "../gdocs.ts"
+import { llmDeps } from "../ml/llm-grader.ts"
 
 const PROJECT = "prj-iris-anomaly-yazan"
 const YAZAN = "student:stu-aau-yazan"
@@ -112,7 +113,7 @@ describe("Documentation evidence from a link", () => {
 
     const bare = await addEvidence({ type: "Documentation", title: "Evaluation report, shared later", link: "https://docs.google.com/document/d/private123/edit" })
     expect(bare.status).toBe(200)
-    expect(String((bare.json.result as { notice: string }).notice)).toMatch(/Anyone with the link can view/)
+    expect(String((bare.json.result as { notice: string }).notice)).toMatch(/Anyone with the link/)
     expect((await myEvidence()).some((e) => e.title === "Evaluation report, shared later")).toBe(true)
   })
 
@@ -217,6 +218,217 @@ describe("Documentation evidence from an attached file", () => {
     // The project isn't confirmed to the company yet, so IRIS can't read it either.
     expect((await fetchFile(id, "company:org-iris")).status).toBe(403)
     expect((await fetchFile("ev-nope", YAZAN)).status).toBe(404)
+  })
+})
+
+
+// What WSL says about a Google Doc depends on why it couldn't be read, so the student knows what to do.
+describe("reading a Google Doc", () => {
+  afterEach(() => {
+    docsDeps.fetch = stubbedDocsFetch
+  })
+  const link = "https://docs.google.com/document/d/1AbC_def-123/edit?usp=sharing"
+  const plain = (body: string, status = 200) => new Response(body, { status, headers: { "content-type": "text/plain; charset=utf-8" } })
+
+  it("returns the text of a shared document", async () => {
+    docsDeps.fetch = async () => plain(`\uFEFF  ${REPORT}  `)
+    const read = await readGoogleDoc(link)
+    expect(read).toEqual({ ok: true, text: REPORT })
+  })
+
+  it("accepts the other shapes of Google Docs link", async () => {
+    const requested: string[] = []
+    docsDeps.fetch = async (url) => {
+      requested.push(url)
+      return plain(REPORT)
+    }
+    for (const l of ["docs.google.com/document/d/AAA-bbb_1/edit", "https://docs.google.com/document/u/0/d/AAA-bbb_1/edit?tab=t.0", "  https://docs.google.com/document/d/AAA-bbb_1  "]) {
+      expect((await readGoogleDoc(l)).ok).toBe(true)
+    }
+    expect(new Set(requested)).toEqual(new Set(["https://docs.google.com/document/d/AAA-bbb_1/export?format=txt"]))
+  })
+
+  it("says a document that isn't shared is not shared (sign-in page, 403 or 404)", async () => {
+    for (const reply of [
+      () => new Response("<html>Sign in</html>", { status: 200, headers: { "content-type": "text/html" } }),
+      () => new Response("<html>Forbidden</html>", { status: 403, headers: { "content-type": "text/html" } }),
+      () => new Response("<html>Not found</html>", { status: 404, headers: { "content-type": "text/html" } }),
+    ]) {
+      docsDeps.fetch = async () => reply()
+      expect(await readGoogleDoc(link)).toEqual({ ok: false, problem: "not-shared" })
+    }
+  })
+
+  it("says when Google can't be reached, and when the document is empty", async () => {
+    docsDeps.fetch = async () => {
+      throw new Error("network down")
+    }
+    expect(await readGoogleDoc(link)).toEqual({ ok: false, problem: "unreachable" })
+    docsDeps.fetch = async () => new Response("Service unavailable", { status: 503, headers: { "content-type": "text/html" } })
+    expect(await readGoogleDoc(link)).toEqual({ ok: false, problem: "unreachable" })
+    docsDeps.fetch = async () => plain("hi")
+    expect(await readGoogleDoc(link)).toEqual({ ok: false, problem: "empty" })
+  })
+})
+
+// The point of reading a document is that its content drives the analysis. Dana's helpdesk project
+// has no code evidence of its own, so anything WSL finds there comes from what the tests add.
+describe("what the analysis does with a Google Doc's content", () => {
+  const DANA = "student:stu-hu-dana"
+  const DANA_PROJECT = "prj-echo-helpdesk-dana"
+  const API_DOC = `Helpdesk portal API reference
+
+const express = require("express")
+const app = express()
+app.use(express.json())
+
+app.post("/api/tickets", (req, res) => {
+  const ticket = { id: nextId++, requester: req.body.requester, priority: req.body.priority, status: "open" }
+  tickets.push(ticket)
+  res.status(201).json(ticket)
+})
+app.get("/api/tickets", (req, res) => res.json(tickets))
+app.patch("/api/tickets/:id", (req, res) => {
+  const ticket = tickets.find((t) => t.id === Number(req.params.id))
+  if (!ticket) return res.status(404).json({ error: "ticket not found" })
+  Object.assign(ticket, { status: req.body.status, assignee: req.body.assignee })
+  res.json(ticket)
+})
+
+Employees raise tickets through the portal, IT staff triage and resolve them, and managers see response times.`
+  const DOC_LINK = "https://docs.google.com/document/d/1HelpdeskApi_abc/edit?usp=sharing"
+  const KEYS = ["GEMINI_API_KEY", "GEMINI_MODEL", "GROQ_API_KEY", "GROQ_MODEL", "WSL_AI_PROVIDER"]
+  const realLlmFetch = llmDeps.fetch
+  const shared = () => new Response(API_DOC, { status: 200, headers: { "content-type": "text/plain" } })
+
+  const addDoc = () => server.call("POST", `/projects/${DANA_PROJECT}/evidence`, DANA, { type: "Documentation", title: "Helpdesk API reference", link: DOC_LINK })
+  const analyze = () => server.call("POST", `/projects/${DANA_PROJECT}/ai-review`, DANA)
+  async function snapshot() {
+    return (await server.call("GET", "/snapshot", DANA)).json.snapshot as {
+      evidence: { id: string; projectId: string; title: string; analyzedFiles?: string[] }[]
+      skillSignals: { projectId: string; skill: string; suggestedLevel: string; evidenceIds: string[]; criteria: { met: boolean }[] }[]
+    }
+  }
+
+  beforeEach(() => {
+    resetDatabase()
+    for (const k of KEYS) delete process.env[k]
+  })
+  afterEach(() => {
+    docsDeps.fetch = stubbedDocsFetch
+    llmDeps.fetch = realLlmFetch
+    for (const k of KEYS) delete process.env[k]
+  })
+
+  it("finds the work in a shared Google Doc and ties each skill back to that evidence", async () => {
+    docsDeps.fetch = async () => shared()
+    expect((await addDoc()).status).toBe(200)
+    const snap = await snapshot()
+    const doc = snap.evidence.find((e) => e.projectId === DANA_PROJECT && e.title === "Helpdesk API reference")!
+    expect(doc.analyzedFiles).toEqual(["Google Doc"])
+
+    expect((await analyze()).status).toBe(200)
+    const signals = (await snapshot()).skillSignals.filter((x) => x.projectId === DANA_PROJECT)
+    for (const skill of ["REST API Design", "Node.js"]) {
+      const sig = signals.find((x) => x.skill === skill)!
+      expect(sig.suggestedLevel, skill).not.toBe("Insufficient")
+      expect(sig.criteria.some((c) => c.met), skill).toBe(true)
+      expect(sig.evidenceIds, skill).toContain(doc.id)
+    }
+    // Nothing in the document touches SQL, and WSL says so rather than guessing.
+    expect(signals.find((x) => x.skill === "SQL")!.suggestedLevel).toBe("Insufficient")
+  })
+
+  it("has nothing to analyze from a Google Doc it couldn't read", async () => {
+    // Default stub: Google's sign-in page, and no excerpt, so the document contributes nothing.
+    expect((await addDoc()).status).toBe(200)
+    const doc = (await snapshot()).evidence.find((e) => e.title === "Helpdesk API reference")!
+    expect(doc.analyzedFiles).toBeUndefined()
+    await analyze()
+    for (const sig of (await snapshot()).skillSignals.filter((x) => x.projectId === DANA_PROJECT)) expect(sig.evidenceIds).not.toContain(doc.id)
+  })
+
+  it("sends the document's text to the grading model", async () => {
+    process.env.GEMINI_API_KEY = "test-key"
+    docsDeps.fetch = async () => shared()
+    await addDoc()
+    const sent: string[] = []
+    llmDeps.fetch = async (_url, init) => {
+      sent.push(String(init.body))
+      return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify({ restatesBrief: false, skills: [] }) }] } }] })
+    }
+    await analyze()
+    expect(sent).toHaveLength(1)
+    expect(sent[0]).toContain("res.status(201)")
+  })
+})
+
+// A document that wasn't shared when it was added can be read again once the student fixes that.
+describe("checking a Google Doc again", () => {
+  const DOC_LINK = "https://docs.google.com/document/d/1PrivateThenShared_x/edit"
+  beforeEach(() => resetDatabase())
+  afterEach(() => {
+    docsDeps.fetch = stubbedDocsFetch
+  })
+  const shared = (body: string) => async () => new Response(body, { status: 200, headers: { "content-type": "text/plain" } })
+  const reread = (evidenceId: string, actor = YAZAN) => server.call("POST", `/projects/${PROJECT}/evidence/${evidenceId}/reread`, actor)
+  async function addPrivateDoc(extra: Record<string, unknown> = {}) {
+    const res = await addEvidence({ type: "Documentation", title: "Evaluation report", link: DOC_LINK, ...extra })
+    expect(res.status).toBe(200)
+    return { res, id: (await myEvidence()).find((e) => e.title === "Evaluation report")!.id }
+  }
+
+  it("tells the student how to share it when it wasn't readable, then reads it once it is", async () => {
+    const { res, id } = await addPrivateDoc()
+    expect(String((res.json.result as { notice: string }).notice)).toMatch(/Anyone with the link/)
+    expect((await myEvidence()).find((e) => e.id === id)!.analyzedFiles).toBeUndefined()
+
+    const still = await reread(id)
+    expect(still.status).toBe(200)
+    expect(still.json.result).toMatchObject({ read: false })
+    expect(String((still.json.result as { notice: string }).notice)).toMatch(/Anyone with the link/)
+
+    docsDeps.fetch = shared(REPORT)
+    const now = await reread(id)
+    expect(now.status).toBe(200)
+    expect(now.json.result).toMatchObject({ read: true })
+    expect((await myEvidence()).find((e) => e.id === id)!.analyzedFiles).toEqual(["Google Doc"])
+  })
+
+  it("explains an unreachable Google differently from an unshared document", async () => {
+    const { id } = await addPrivateDoc()
+    docsDeps.fetch = async () => {
+      throw new Error("offline")
+    }
+    const res = await reread(id)
+    expect(String((res.json.result as { notice: string }).notice)).toMatch(/couldn't reach Google/)
+  })
+
+  it("won't accept a document that just repeats the challenge brief, and leaves the evidence unchanged", async () => {
+    const { id } = await addPrivateDoc()
+    const snap = (await server.call("GET", "/snapshot", YAZAN)).json.snapshot as { challenges: { id: string; problemDescription: string }[] }
+    const brief = snap.challenges.find((c) => c.id === "chal-iris-anomaly")!.problemDescription
+    docsDeps.fetch = shared(brief.repeat(2))
+    const res = await reread(id)
+    expect(res.status).toBe(400)
+    expect(res.json.field).toBe("link")
+    expect(String(res.json.error)).toMatch(/repeats/)
+    expect((await myEvidence()).find((e) => e.id === id)!.analyzedFiles).toBeUndefined()
+  })
+
+  it("only applies to your own Google Docs links without an attached file", async () => {
+    const { id } = await addPrivateDoc()
+    expect((await reread(id, "student:stu-hu-leen")).status).toBe(403)
+    expect((await reread("ev-nope")).status).toBe(404)
+
+    const repo = await addEvidence({ type: "GitHub Repository", title: "Repo", link: "https://github.com/yazan/x", content: REPORT })
+    expect(repo.status).toBe(200)
+    const repoId = (await myEvidence()).find((e) => e.title === "Repo")!.id
+    expect((await reread(repoId)).status).toBe(400)
+
+    await addEvidence({ type: "Documentation", title: "With file", link: DOC_LINK, file: upload("report.txt", Buffer.from(REPORT)) })
+    const withFile = (await myEvidence()).find((e) => e.title === "With file")!.id
+    expect((await reread(withFile)).status).toBe(400)
   })
 })
 
