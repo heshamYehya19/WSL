@@ -3,7 +3,7 @@
 // skill. checkRelevance is a separate gate run when evidence is submitted, which
 // rejects work that just repeats the challenge brief or is off-topic.
 //
-// analyzeEvidence grades with a language model, Groq or Gemini (server/ml/llm-grader.ts),
+// analyzeEvidence grades with a language model, Groq then Gemini as a backup (server/ml/llm-grader.ts),
 // and falls back to the stricter offline scorer (server/ml/analyze.ts) whenever the
 // model can't be used: no API key, or a failed call. Unlike company challenge uploads
 // (screened in server/api.ts before a challenge is posted), student evidence is not run
@@ -19,7 +19,7 @@
 import { createHash } from "node:crypto"
 import { analyzableContent, simulateAIReview } from "./ml/analyze.ts"
 import type { ChallengeContext, EvidenceLike, SimulatedRating } from "./ml/analyze.ts"
-import { configuredProvider, gradeWithModel } from "./ml/llm-grader.ts"
+import { configuredProvider, configuredProviders, gradeWithModel } from "./ml/llm-grader.ts"
 
 export { canonicalSkillName, checkRelevance, noEvidenceResults, simulateAIReview, suggestedLevelFor } from "./ml/analyze.ts"
 export type { ChallengeContext, EvidenceQuote, RelevanceCheck, SkillCriterion, SimulatedRating, SuggestedLevel } from "./ml/analyze.ts"
@@ -59,20 +59,29 @@ export async function analyzeEvidence(skills: string[], evidence: EvidenceLike[]
   if (evidence.length === 0) return { results: [], failed: false }
   const offline = () => simulateAIReview(skills, evidence, challenge)
 
-  const provider = configuredProvider()
-  if (!provider) return { results: offline(), failed: false }
+  const providers = configuredProviders()
+  if (providers.length === 0) return { results: offline(), failed: false }
 
   const readable = evidence.filter((e) => analyzableContent(e).length > 0)
   if (readable.length === 0) return { results: offline(), failed: false }
 
-  try {
-    const graded = await gradeWithModel(provider, skills, readable, challenge)
-    if (graded.length === skills.length) return { results: graded, failed: false }
-    // Fill any skill the model skipped with the offline score rather than leaving a gap.
-    const fallback = offline()
-    return { results: skills.map((skill, i) => graded.find((g) => g.skill === skill) ?? fallback[i]), failed: false }
-  } catch (err) {
-    console.warn(`[wsl-ai] ${provider.label} grading failed, using the offline check:`, err instanceof Error ? err.message : err)
-    return { results: offline(), failed: true }
+  // Providers are tried in order; each gets a second attempt unless it said it is out of quota
+  // (429), because the model's output varies and a malformed answer often succeeds on a repeat.
+  for (const provider of providers) {
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const graded = await gradeWithModel(provider, skills, readable, challenge)
+        if (graded.length === skills.length) return { results: graded, failed: false }
+        // Fill any skill the model skipped with the offline score rather than leaving a gap.
+        const fallback = offline()
+        return { results: skills.map((skill, i) => graded.find((g) => g.skill === skill) ?? fallback[i]), failed: false }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        console.warn(`[wsl-ai] ${provider.label} grading failed (attempt ${attempt}):`, message)
+        if (/HTTP 429/.test(message)) break
+      }
+    }
   }
+  console.warn("[wsl-ai] every grading provider failed, using the offline check")
+  return { results: offline(), failed: true }
 }

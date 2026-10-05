@@ -47,8 +47,12 @@ export interface Provider {
   model: string
 }
 
-/** The provider configured on this server, or null when there is no key (use the offline scorer). */
-export function configuredProvider(): Provider | null {
+/**
+ * Every provider with a key on this server, in the order to try them: the one named by
+ * WSL_AI_PROVIDER first, otherwise Groq, then Gemini. A second provider is the backup
+ * when the first is rate-limited or keeps failing.
+ */
+export function configuredProviders(): Provider[] {
   const groqKey = process.env.GROQ_API_KEY?.trim()
   const geminiKey = process.env.GEMINI_API_KEY?.trim()
   const groq = groqKey ? { id: "groq" as const, label: "Groq", apiKey: groqKey, model: process.env.GROQ_MODEL?.trim() || DEFAULT_GROQ_MODEL } : null
@@ -56,9 +60,13 @@ export function configuredProvider(): Provider | null {
     ? { id: "gemini" as const, label: "Gemini", apiKey: geminiKey, model: process.env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL }
     : null
   const wanted = process.env.WSL_AI_PROVIDER?.trim().toLowerCase()
-  if (wanted === "gemini" && gemini) return gemini
-  if (wanted === "groq" && groq) return groq
-  return groq ?? gemini
+  const ordered = wanted === "gemini" ? [gemini, groq] : [groq, gemini]
+  return ordered.filter((p): p is Provider => p !== null)
+}
+
+/** The provider tried first, or null when there is no key (use the offline scorer). */
+export function configuredProvider(): Provider | null {
+  return configuredProviders()[0] ?? null
 }
 
 const HEALTH_TIMEOUT_MS = 10_000
