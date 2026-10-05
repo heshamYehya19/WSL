@@ -1,9 +1,9 @@
 import { Link } from "react-router-dom"
 import { FlowLoop } from "../../components/ui/FlowLoop"
 import { SkillChip } from "../../components/ui/SkillChip"
-import { ConfidenceMeter } from "../../components/ui/ConfidenceMeter"
 import { StatusBadge } from "../../components/ui/StatusBadge"
 import { HeroNetwork } from "../../components/ui/HeroNetwork"
+import { GitHubVsWsl } from "../../components/ui/GitHubVsWsl"
 import { Reveal } from "../../components/ui/Reveal"
 import { useShowcase } from "../../lib/showcase"
 
@@ -26,14 +26,13 @@ export default function Landing() {
                 <span className="text-3xl font-extrabold tracking-tight text-white">WSL</span>
                 <span className="font-arabic text-3xl font-bold text-teal-300">وصل</span>
               </div>
-              <h1 className="text-4xl font-bold tracking-tight text-white sm:text-5xl">
-                Your Degree Says You Know.
-                <br />
-                Your Work Should Prove It.
+              <h1 className="text-4xl font-bold tracking-tight text-balance text-white sm:text-5xl">
+                <span className="block">Don't Just Graduate With a Degree.</span>
+                <span className="block text-teal-300">Graduate With Proof.</span>
               </h1>
               <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-ink-300 lg:mx-0">
-                WSL connects universities, students, and organizations through real-world projects and
-                evidence-backed skills.
+                WSL connects universities, students, and companies through real-world challenges, verified student
+                work, and demonstrated skills.
               </p>
               <div className="mt-9 flex flex-wrap items-center justify-center gap-3 lg:justify-start">
                 <Link
@@ -59,11 +58,10 @@ export default function Landing() {
       <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6">
         <Reveal className="mb-8 text-center">
           <div className="text-xs font-semibold tracking-wide text-teal-600 uppercase">The WSL Loop</div>
-          <h2 className="mt-2 text-2xl font-bold text-ink-950 sm:text-3xl">From Learning → Doing → Proving</h2>
+          <h2 className="mt-2 text-2xl font-bold text-ink-950 sm:text-3xl">From Learning → Doing → Proving → Opportunity</h2>
           <p className="mx-auto mt-2 max-w-2xl text-ink-500">
-            A company submits a real problem → a university assigns it → a student submits real evidence → WSL
-            surfaces AI skill signals → a university mentor verifies them → verified skills reach the student's
-            record → companies discover evidence, not claims.
+            Companies bring real needs. Students do the work. WSL organizes the evidence. Universities verify what
+            students actually demonstrated. Companies discover talent through proof, not CV claims.
           </p>
         </Reveal>
         <Reveal delay={100}>
@@ -78,7 +76,7 @@ export default function Landing() {
             <div className="mb-3 text-xs font-semibold tracking-wide text-teal-600 uppercase">For Students</div>
             <h3 className="text-lg font-bold text-ink-950">Turn your work into evidence of what you can do.</h3>
             <p className="mt-2 text-sm leading-relaxed text-ink-500">
-              Every real project you complete becomes verified, evidence-backed proof — not just another line on a CV.
+              Every real project you complete becomes evidence a university can verify — proof of what you did, not just another line on a CV.
             </p>
             <Link to="/for-students" className="mt-4 inline-block text-sm font-semibold text-teal-600 hover:underline">
               Learn more →
@@ -86,9 +84,9 @@ export default function Landing() {
           </Reveal>
           <Reveal delay={100} className="rounded-2xl border border-ink-200 p-6 transition-all duration-300 hover:-translate-y-1 hover:border-teal-300 hover:shadow-lg hover:shadow-ink-950/5">
             <div className="mb-3 text-xs font-semibold tracking-wide text-teal-600 uppercase">For Universities</div>
-            <h3 className="text-lg font-bold text-ink-950">Connect learning with authentic real-world challenges.</h3>
+            <h3 className="text-lg font-bold text-ink-950">Verify what your students can actually demonstrate.</h3>
             <p className="mt-2 text-sm leading-relaxed text-ink-500">
-              Assign real company problems to your students, and confirm their work before it ever reaches the company.
+              You are the verification authority: review student work, confirm it before it reaches a company, and connect learning to real industry needs.
             </p>
             <Link to="/for-universities" className="mt-4 inline-block text-sm font-semibold text-teal-600 hover:underline">
               Learn more →
@@ -96,9 +94,9 @@ export default function Landing() {
           </Reveal>
           <Reveal delay={200} className="rounded-2xl border border-ink-200 p-6 transition-all duration-300 hover:-translate-y-1 hover:border-teal-300 hover:shadow-lg hover:shadow-ink-950/5">
             <div className="mb-3 text-xs font-semibold tracking-wide text-teal-600 uppercase">For Companies</div>
-            <h3 className="text-lg font-bold text-ink-950">Discover talent through demonstrated capability.</h3>
+            <h3 className="text-lg font-bold text-ink-950">Shape learning. Discover talent. Get better signals.</h3>
             <p className="mt-2 text-sm leading-relaxed text-ink-500">
-              Post safe, structured challenges — no confidential data required — and find people by evidence, not claims.
+              Contribute real-world challenges and find people through university-verified work, not CV claims.
             </p>
             <Link to="/for-companies" className="mt-4 inline-block text-sm font-semibold text-teal-600 hover:underline">
               Learn more →
@@ -106,6 +104,8 @@ export default function Landing() {
           </Reveal>
         </div>
       </section>
+
+      <GitHubVsWsl />
 
       {/* GAP EXPLAINER */}
       <section className="mx-auto max-w-7xl px-4 py-20 sm:px-6">
@@ -140,13 +140,15 @@ export default function Landing() {
             <div className="space-y-3">
               {showcase.signals.slice(0, 3).map((s) => (
                 <div key={s.id}>
-                  <div className="mb-1 text-sm font-medium text-ink-800">{s.skill}</div>
-                  <ConfidenceMeter value={s.evidenceConfidence} label="Evidence confidence" />
+                  <div className="text-sm font-medium text-ink-800">{s.skill}</div>
+                  <span className={`text-xs font-semibold ${s.status === "Verified" ? "text-verified-600" : "text-ink-400"}`}>
+                    {s.status === "Verified" ? "✓ Verified by the university" : "Awaiting university verification"}
+                  </span>
                 </div>
               ))}
             </div>
             <p className="mt-4 text-xs text-ink-400">
-              WSL analyzes each skill signal automatically the moment evidence is submitted — informational only, it never blocks anything.
+              A skill counts as verified only once a university has reviewed the evidence. AI helps organize and surface relevant evidence for that review.
             </p>
           </Reveal>
           )}
@@ -156,10 +158,10 @@ export default function Landing() {
       {/* SKILLS PREVIEW / EMPLOYER TRUST */}
       <section className="border-t border-ink-100 bg-night py-20">
         <Reveal className="mx-auto max-w-5xl px-4 text-center sm:px-6">
-          <h2 className="text-2xl font-bold text-white sm:text-3xl">Don't just tell employers what you know.</h2>
-          <h2 className="text-2xl font-bold text-teal-300 sm:text-3xl">Show them what you've done.</h2>
+          <h2 className="text-2xl font-bold text-white sm:text-3xl">Your Degree Says You Know.</h2>
+          <h2 className="text-2xl font-bold text-teal-300 sm:text-3xl">Your Work Should Prove It.</h2>
           <div className="mx-auto mt-8 flex max-w-xl flex-wrap justify-center gap-2">
-            {showcase?.signals.map((s) => <SkillChip key={s.id} skill={s.skill} rating={s.evidenceConfidence} />)}
+            {showcase?.signals.map((s) => <SkillChip key={s.id} skill={s.skill} state={s.status === "Verified" ? "verified" : "pending"} />)}
           </div>
           <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
             <Link

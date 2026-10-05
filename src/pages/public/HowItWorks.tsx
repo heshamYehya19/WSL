@@ -27,23 +27,23 @@ const STAGES = [
   },
   {
     who: "WSL",
-    title: "Surfaces AI evidence signals",
-    body: "The moment evidence is submitted, WSL analyzes it for each required skill and shows an evidence-confidence signal — informational only, never a verdict, and it never blocks anything.",
+    title: "Organizes the evidence",
+    body: "WSL organizes what was submitted against each required skill. AI helps surface the relevant evidence and any gaps for the reviewer — it assists, it never decides, and it never blocks anything.",
   },
   {
     who: "University",
     title: "Verifies each skill individually",
-    body: "A mentor inspects every skill signal on its own merits — the evidence, the AI's reasoning — and verifies it, asks for more evidence, or rejects it.",
+    body: "A university reviewer inspects every skill against the student's own evidence and verifies it, asks for more evidence, or declines to verify it. The verification belongs to the university.",
   },
   {
     who: "University",
     title: "Confirms evidence to the company",
-    body: "Once every required skill has a decision, the mentor confirms the evidence is ready for the company to see — approval to share, not a claim that everything was verified.",
+    body: "Once every required skill has a decision, the university confirms the evidence is ready for the company to see — approval to share, not a claim that everything was verified.",
   },
   {
     who: "Company",
     title: "Reviews evidence and gives feedback",
-    body: "The company opens the verified evidence and may leave structured feedback — it can never change what a university has already verified.",
+    body: "The company opens the verified proof and may leave structured feedback — it can never change what a university has already verified.",
   },
 ]
 

@@ -47,8 +47,8 @@ export const TOUR_STEPS: TourStep[] = [
     accountId: "uni-aau",
     path: `/university/projects/${TOUR_PROJECT}`,
     view: "University mentor",
-    title: "AI evidence, human verification",
-    body: "Every skill signal quotes the exact lines of Yazan's work that prove it. The AI never certifies: as his mentor, verify each skill, then confirm the work to IRIS.",
+    title: "University verification",
+    body: "WSL organizes Yazan's evidence and quotes the exact lines of his work behind each skill. AI only assists: as his university's reviewer, you verify each skill, then confirm the work to IRIS.",
   },
   {
     role: "company",

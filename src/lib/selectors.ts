@@ -12,6 +12,15 @@ export function studentSignals(signals: SkillSignal[], studentId: string) {
   return signals.filter((s) => s.studentId === studentId)
 }
 
+/**
+ * A signal that actually points at evidence. An "Insufficient" signal means WSL found nothing
+ * in the submitted evidence for that skill, so it must never count as something demonstrated —
+ * a challenge requiring a skill is not evidence that the student has it.
+ */
+export function isEvidenced(signal: SkillSignal) {
+  return signal.suggestedLevel !== "Insufficient" || signal.status === "Verified"
+}
+
 export function projectEvidence(evidence: Evidence[], projectId: string) {
   return evidence.filter((e) => e.projectId === projectId)
 }

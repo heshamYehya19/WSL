@@ -12,6 +12,9 @@ import type { ChallengeFileKind, ScreeningFinding, ScreeningKind } from "../src/
 export const MAX_FILE_BYTES = 10 * 1024 * 1024
 export const MAX_DATASET_FILES = 3
 
+/** What a file is for: a challenge's description or datasets, or a student's documentation evidence. */
+export type UploadKind = ChallengeFileKind | "evidence"
+
 interface FileFormat {
   mime: string
   /** First bytes the file must start with, so a renamed file can't slip through. */
@@ -19,11 +22,18 @@ interface FileFormat {
   tabular?: boolean
 }
 
-const FORMATS: Record<ChallengeFileKind, Record<string, FileFormat>> = {
+const FORMATS: Record<UploadKind, Record<string, FileFormat>> = {
   description: {
     ".pdf": { mime: "application/pdf", magic: [0x25, 0x50, 0x44, 0x46] },
     ".docx": { mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", magic: [0x50, 0x4b] },
     ".doc": { mime: "application/msword", magic: [0xd0, 0xcf, 0x11, 0xe0] },
+  },
+  evidence: {
+    ".pdf": { mime: "application/pdf", magic: [0x25, 0x50, 0x44, 0x46] },
+    ".docx": { mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", magic: [0x50, 0x4b] },
+    ".doc": { mime: "application/msword", magic: [0xd0, 0xcf, 0x11, 0xe0] },
+    ".txt": { mime: "text/plain" },
+    ".md": { mime: "text/markdown" },
   },
   dataset: {
     ".csv": { mime: "text/csv", tabular: true },
@@ -34,13 +44,14 @@ const FORMATS: Record<ChallengeFileKind, Record<string, FileFormat>> = {
   },
 }
 
-export const ACCEPTED_EXTENSIONS: Record<ChallengeFileKind, string[]> = {
+export const ACCEPTED_EXTENSIONS: Record<UploadKind, string[]> = {
   description: Object.keys(FORMATS.description),
   dataset: Object.keys(FORMATS.dataset),
+  evidence: Object.keys(FORMATS.evidence),
 }
 
 export interface PreparedFile {
-  kind: ChallengeFileKind
+  kind: UploadKind
   name: string
   mime: string
   data: Buffer
@@ -54,14 +65,14 @@ export interface PreparedFile {
 export class UploadError extends Error {}
 
 /** Validates an uploaded file and extracts its text. Throws UploadError on anything malformed. */
-export async function prepareFile(kind: ChallengeFileKind, rawName: string, data: Buffer): Promise<PreparedFile> {
+export async function prepareFile(kind: UploadKind, rawName: string, data: Buffer): Promise<PreparedFile> {
   // oxlint-disable-next-line no-control-regex -- stripping control characters from file names is the point
   const name = rawName.replace(/[\\/]/g, "_").replace(/[\u0000-\u001f]/g, "").trim().slice(0, 200)
   if (!name) throw new UploadError("Every file needs a name.")
   const ext = name.slice(name.lastIndexOf(".")).toLowerCase()
   const format = FORMATS[kind][ext]
   if (!format) {
-    const what = kind === "description" ? "Challenge description" : "Dataset"
+    const what = kind === "description" ? "Challenge description" : kind === "evidence" ? "Documents" : "Dataset"
     throw new UploadError(`${what} files must be ${ACCEPTED_EXTENSIONS[kind].join(", ")} — “${name}” isn't.`)
   }
   if (data.length === 0) throw new UploadError(`“${name}” is empty.`)

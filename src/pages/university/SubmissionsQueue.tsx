@@ -42,7 +42,7 @@ export default function SubmissionsQueue() {
       <PageHero
         eyebrow="Submissions"
         title="Review student submissions"
-        subtitle="WSL surfaces an evidence signal for each submission. Your job is to verify each skill individually, then confirm it to the company — oldest submissions first."
+        subtitle="WSL organizes the evidence for each submission. Your job is to verify each skill individually, then confirm it to the company — oldest submissions first."
         stats={[
           { label: "awaiting your review", value: count("awaiting"), accent: count("awaiting") > 0 },
           { label: "confirmed to companies", value: count("confirmed") },

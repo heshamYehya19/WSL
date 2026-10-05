@@ -10,19 +10,19 @@ const POINTS = [
   },
   {
     title: "Every submission becomes evidence",
-    body: "Reports, repositories, presentations, and datasets aren't just graded — they're analyzed for skill signals.",
+    body: "Reports, repositories, presentations, and datasets are organized as evidence of what you did — with AI helping surface the relevant parts for university review.",
   },
   {
-    title: "Every project is entirely your own",
-    body: "You work solo — no team grade, no shared credit. What lands on your profile is what you actually built.",
+    title: "Your contribution is recorded as yours",
+    body: "On a team project, WSL records what each student specifically contributed, so your profile shows what you built — not just the team's repository.",
   },
   {
-    title: "AI feedback never blocks you",
-    body: "WSL analyzes your evidence automatically and shows the signal on your dashboard right away — it's informational, not a gate.",
+    title: "GitHub shows the work. WSL shows what it proves.",
+    body: "Link your repository as evidence. WSL adds your contribution, the project context, the skills the work demonstrates, and your university's verification. GitHub stays where your code lives.",
   },
   {
-    title: "A living record that grows with you",
-    body: "Every verified project adds to a permanent, evidence-backed skill profile employers can actually inspect.",
+    title: "A verified proof profile that grows with you",
+    body: "Every verified project adds to a permanent record of what you demonstrated, verified by your university, that employers can actually inspect.",
   },
 ]
 
@@ -35,10 +35,10 @@ export default function ForStudents() {
         <div className="mx-auto max-w-4xl px-4 text-center sm:px-6">
           <div className="text-xs font-semibold tracking-wide text-teal-600 uppercase">For Students</div>
           <h1 className="mt-2 text-3xl font-bold tracking-tight text-ink-950 sm:text-4xl">
-            Your work, not your word.
+            Graduate with proof, not just a degree.
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-ink-500">
-            Stop describing your skills. Start proving them — with real projects, real evidence, and real feedback.
+            Stop describing your skills. Start proving them — real projects, real evidence, and your university's verification.
           </p>
         </div>
       </section>
@@ -59,15 +59,15 @@ export default function ForStudents() {
 
         {showcase && (
         <Reveal className="mt-10 rounded-2xl border border-ink-200 bg-night p-8">
-          <p className="text-xs font-semibold tracking-wide text-teal-300 uppercase">Example: living skill record</p>
+          <p className="text-xs font-semibold tracking-wide text-teal-300 uppercase">Example: verified proof profile</p>
           <h3 className="mt-1 text-lg font-bold text-white">
             {showcase.student?.name} — {showcase.program?.name ?? showcase.student?.field}, {showcase.university?.name}
           </h3>
           <div className="mt-4 flex flex-wrap gap-2">
-            {showcase.signals.map((s) => <SkillChip key={s.id} skill={s.skill} rating={s.evidenceConfidence} />)}
+            {showcase.signals.map((s) => <SkillChip key={s.id} skill={s.skill} state={s.status === "Verified" ? "verified" : "pending"} />)}
           </div>
           <p className="mt-4 text-sm text-ink-300">
-            This is not what a student claims they know. This is what their work has demonstrated.
+            This is not what a student claims they know. This is what their work has demonstrated, and what their university has verified.
           </p>
         </Reveal>
         )}

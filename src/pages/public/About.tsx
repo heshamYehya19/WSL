@@ -8,15 +8,16 @@ const NOT_LIST = [
   "a generic portfolio website",
   "simply a project marketplace",
   "an AI tutor",
+  "a replacement for GitHub — a repository is one source of evidence inside WSL",
 ]
 
 const PRINCIPLES = [
   "Real-world problems become learning opportunities.",
-  "Students produce actual evidence of capability, working individually.",
+  "Students produce actual evidence of capability, with each student's own contribution recorded.",
   "WSL screens every challenge automatically for private data — nobody watches it happen.",
-  "AI rates evidence automatically and informationally — it never blocks or gates anything.",
-  "A university reviews each submission before it reaches the company.",
-  "The company rates the confirmed submission independently, the same way WSL did.",
+  "AI helps organize and surface relevant evidence for university review — it assists, and never decides.",
+  "A university verifies each skill, and confirms the submission before it reaches the company.",
+  "A company can leave its own feedback on the confirmed submission, but can never change what the university verified.",
   "Companies do not need to expose confidential information.",
   "Universities remain central to assigning work and reviewing it.",
   "WSL does not replace universities.",
@@ -35,10 +36,10 @@ export default function About() {
 
       <div className="prose-ink space-y-5 text-ink-700">
         <p className="leading-relaxed">
-          WSL connects real-world problems to university-assigned projects, turns individual student work
-          into evidence, has WSL's AI rate that evidence automatically the moment it's submitted, and has
-          the university confirm each submission before the company reviews and rates it too — building a
-          living, evidence-backed skill record.
+          WSL connects real-world challenges to university coursework, turns student work into organized
+          evidence, and has the university verify what each student actually demonstrated before a company
+          sees it. AI helps organize and surface relevant evidence for that review; the verification is
+          the university's. The result is a verified proof profile, not another CV.
         </p>
       </div>
 

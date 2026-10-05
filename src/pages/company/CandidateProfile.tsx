@@ -91,9 +91,10 @@ export default function CandidateProfile() {
       )}
 
       <div className="mb-8 rounded-xl border border-ink-200 bg-ink-50 px-5 py-4 text-sm text-ink-600">
-        Skills marked <span className="font-semibold text-verified-600">University Verified</span> were analyzed by WSL's AI from the student's real work
-        and then verified by a university mentor. Unverified AI signals are hidden unless you choose to include them, and are labeled when you do. Open a
-        project to see the exact lines of work behind each skill — this is not a self-reported CV, and your feedback can never change what's verified.
+        Skills marked <span className="font-semibold text-verified-600">Verified</span> come from the student's real project work, which a university
+        reviewed and verified. WSL organizes the evidence; AI helps surface the relevant parts for that review. Skills still awaiting verification are hidden
+        unless you choose to include them, and are labeled when you do. Open a project to see the exact work behind each skill — this is not a
+        self-reported CV, and your feedback can never change what's verified.
       </div>
 
       <SkillRecordBody studentId={student.id} projectHref={(pid) => `/company/submissions/${pid}`} verifiedOnlyByDefault />

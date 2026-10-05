@@ -38,7 +38,7 @@ export default function Opportunities() {
       <PageHero
         eyebrow="Opportunities"
         title="Opportunities matched to your verified skills"
-        subtitle="Matching uses skills a university mentor has verified — never a hidden compatibility score. Verify more skills, unlock more matches."
+        subtitle="Matching uses skills a university has verified — never a hidden compatibility score. Verify more skills, unlock more matches."
         stats={[
           { label: "matched to you", value: matchedCount, accent: matchedCount > 0 },
           { label: "open roles", value: opportunities.length },

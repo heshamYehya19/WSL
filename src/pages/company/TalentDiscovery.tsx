@@ -3,12 +3,12 @@ import { Link } from "react-router-dom"
 import { useStore } from "../../state/store"
 import { useDemoUser } from "../../state/demoUser"
 import { EmptyState } from "../../components/ui/EmptyState"
-import { MatchRing, PageHero, Pills, SearchInput } from "../../components/ui/ListKit"
+import { PageHero, Pills, SearchInput } from "../../components/ui/ListKit"
 import type { SkillSignal } from "../../types"
 
 const CONFIRMED_STATUSES = ["Verified", "Completed", "Company Feedback Received"]
 
-type Sort = "score" | "skills" | "verified"
+type Sort = "verified" | "skills"
 
 const selectClass =
   "rounded-2xl border border-ink-200 bg-surface px-4 py-2.5 text-sm shadow-sm outline-none transition-all focus:border-teal-400 focus:ring-4 focus:ring-teal-400/15"
@@ -19,7 +19,7 @@ export default function TalentDiscovery() {
   const [query, setQuery] = useState("")
   const [field, setField] = useState("All")
   const [uniFilter, setUniFilter] = useState("All")
-  const [sort, setSort] = useState<Sort>("score")
+  const [sort, setSort] = useState<Sort>("verified")
 
   const fields = ["All", ...Array.from(new Set(students.map((s) => s.field))).sort()]
   const unis = useMemo(() => [{ id: "All", name: "All universities" }, ...universities.map((u) => ({ id: u.id, name: u.name }))], [universities])
@@ -45,17 +45,16 @@ export default function TalentDiscovery() {
     .map((s) => {
       const signals = discoverable.filter((sig) => sig.studentId === s.id) as SkillSignal[]
       const best = new Map<string, SkillSignal>()
-      for (const sig of signals) if (!best.has(sig.skill) || sig.evidenceConfidence > best.get(sig.skill)!.evidenceConfidence) best.set(sig.skill, sig)
-      const top = [...best.values()].sort((a, b) => b.evidenceConfidence - a.evidenceConfidence)
-      const avg = top.length ? Math.round(top.reduce((sum, v) => sum + v.evidenceConfidence, 0) / top.length) : 0
+      for (const sig of signals) if (!best.has(sig.skill)) best.set(sig.skill, sig)
+      const top = [...best.values()].sort((a, b) => a.skill.localeCompare(b.skill))
       const verified = top.filter((v) => v.status === "Verified").length
-      return { student: s, top, avg, verified }
+      return { student: s, top, verified }
     })
     .filter(({ top }) => top.length > 0)
     .filter(({ student }) => field === "All" || student.field === field)
     .filter(({ student }) => uniFilter === "All" || student.universityId === uniFilter)
     .filter(({ top }) => queryTerms.length === 0 || queryTerms.every((t) => top.some((v) => v.skill.toLowerCase().includes(t))))
-    .sort((a, b) => (sort === "skills" ? b.top.length - a.top.length : sort === "verified" ? b.verified - a.verified : 0) || b.avg - a.avg)
+    .sort((a, b) => (sort === "skills" ? b.top.length - a.top.length : b.verified - a.verified) || b.top.length - a.top.length || a.student.name.localeCompare(b.student.name))
 
   const totalCandidates = new Set(discoverable.map((s) => s.studentId)).size
 
@@ -63,18 +62,18 @@ export default function TalentDiscovery() {
     <div>
       <PageHero
         eyebrow="Talent Discovery"
-        title="Find talent through demonstrated capability"
-        subtitle="No opaque matching score — every candidate is backed by evidence-based skill signals, verified by a university."
+        title="Find talent through verified proof"
+        subtitle="No opaque matching score — every skill shown was verified by a university from the student's own work, and you can open the evidence behind it."
         stats={[
           { label: "discoverable candidates", value: totalCandidates, accent: true },
-          { label: "skills signaled", value: skillFreq.size },
+          { label: "verified skills", value: skillFreq.size },
           { label: "universities", value: universities.length },
         ]}
       />
 
       <div className="mb-6 space-y-3">
         <div className="flex flex-wrap items-center gap-3">
-          <SearchInput value={query} onChange={setQuery} placeholder="Search skill signals, e.g. Python + Machine Learning" />
+          <SearchInput value={query} onChange={setQuery} placeholder="Search verified skills, e.g. Python + Machine Learning" />
           <select value={field} onChange={(e) => setField(e.target.value)} className={selectClass} aria-label="Major">
             {fields.map((f) => <option key={f} value={f}>{f === "All" ? "All majors" : f}</option>)}
           </select>
@@ -110,9 +109,8 @@ export default function TalentDiscovery() {
             value={sort}
             onChange={setSort}
             options={[
-              { value: "score", label: "Top score" },
+              { value: "verified", label: "Most verified" },
               { value: "skills", label: "Most skills" },
-              { value: "verified", label: "Verified" },
             ]}
           />
         </div>
@@ -127,7 +125,7 @@ export default function TalentDiscovery() {
             {queryTerms.length > 0 && " with every searched skill"}
           </p>
           <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-            {results.map(({ student, top, avg, verified }, i) => {
+            {results.map(({ student, top, verified }, i) => {
               const uni = getUniversity(student.universityId)
               const project = projects.find((p) => confirmedProjectIds.has(p.id) && p.studentId === student.id)
               const open = student.availability !== "Not Available"
@@ -157,10 +155,8 @@ export default function TalentDiscovery() {
                         <p className="truncate text-xs text-ink-400">
                           {student.field} · {uni?.shortName} · {student.year}
                         </p>
-                        {verified > 0 && <p className="mt-0.5 text-[11px] font-semibold text-verified-600">✓ {verified} university-verified skill{verified === 1 ? "" : "s"}</p>}
                       </div>
                     </div>
-                    <MatchRing pct={avg} label={`Average evidence confidence: ${avg}`} />
                   </div>
 
                   <div className="relative mt-4 flex items-center gap-2">
@@ -190,35 +186,29 @@ export default function TalentDiscovery() {
                     </button>
                   </div>
 
-                  <div className="relative mt-4 space-y-2">
-                    {top.slice(0, 3).map((v) => {
+                  <div className="relative mt-4 flex flex-wrap gap-1.5">
+                    {top.slice(0, 4).map((v) => {
                       const hit = queryTerms.some((t) => v.skill.toLowerCase().includes(t))
                       return (
-                        <div key={v.id}>
-                          <div className="mb-0.5 flex items-center justify-between text-[11px]">
-                            <span className={`font-medium ${hit ? "text-teal-600" : "text-ink-700"}`}>
-                              {v.skill}
-                              {v.status === "Verified" && <span className="ml-1 text-verified-600" title="University Verified">✓</span>}
-                            </span>
-                            <span className="font-bold text-ink-900 tabular-nums">{v.evidenceConfidence}</span>
-                          </div>
-                          <div className="h-1.5 overflow-hidden rounded-full bg-ink-100">
-                            <div
-                              className={`h-full rounded-full transition-[width] duration-700 ${hit ? "bg-teal-500" : "bg-gradient-to-r from-teal-500 to-teal-300"}`}
-                              style={{ width: `${v.evidenceConfidence}%` }}
-                            />
-                          </div>
-                        </div>
+                        <span
+                          key={v.id}
+                          className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-xs font-medium ${
+                            hit ? "border-teal-400 bg-teal-50 text-teal-700" : "border-ink-200 bg-surface text-ink-700"
+                          }`}
+                        >
+                          {v.skill}
+                          <span className="font-bold text-verified-600" title="Verified by the university">✓</span>
+                        </span>
                       )
                     })}
-                    {top.length > 3 && <p className="text-[11px] text-ink-400">+{top.length - 3} more skill signal{top.length - 3 === 1 ? "" : "s"}</p>}
+                    {top.length > 4 && <span className="self-center text-[11px] text-ink-400">+{top.length - 4} more verified</span>}
                   </div>
 
                   <div className="relative mt-auto pt-4">
                     {project && <p className="truncate text-[11px] text-ink-400">Latest: {project.title}</p>}
                     <div className="mt-3 flex items-center justify-between border-t border-ink-100 pt-3">
                       <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-verified-600">
-                        {verified > 0 ? `✓ ${verified} university verified` : <span className="font-medium text-ink-400">AI evidence signal, university confirmed</span>}
+                        ✓ {verified} university-verified skill{verified === 1 ? "" : "s"}
                       </span>
                       <span className="text-xs font-semibold text-teal-600 transition-transform duration-200 group-hover:translate-x-1">View evidence →</span>
                     </div>

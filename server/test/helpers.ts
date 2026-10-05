@@ -18,6 +18,11 @@ process.env.WSL_SEED_GRADES_PATH = join(testDir, "no-seed-grades.json")
 export const { resetDatabase } = await import("../db.ts")
 export const { handleApi } = await import("../api.ts")
 
+// Documentation links to Google Docs are fetched to read them. Tests never reach the network:
+// every document is "private" (Google's sign-in page) unless a test says otherwise.
+const { docsDeps } = await import("../gdocs.ts")
+docsDeps.fetch = async () => new Response("<html>Sign in</html>", { status: 200, headers: { "content-type": "text/html" } })
+
 // llm-grader.ts loads a developer's real .env on import. Tests must never reach a
 // live model (slow, flaky, and it spends the real daily quota), so drop any keys it
 // loaded — a test that needs a provider sets a fake key and mocks llmDeps.fetch.
@@ -33,6 +38,8 @@ export interface TestServer {
   /** Calls `/api{path}` against a real ephemeral http server — the exact same
    * handleApi contract server/index.ts and vite.config.ts use in production/dev. */
   call: (method: string, path: string, actor?: string, body?: unknown) => Promise<TestResponse>
+  /** A raw GET of `/api{path}`, for responses that aren't JSON (file downloads). */
+  fetch: (path: string, actor?: string) => Promise<Response>
 }
 
 export async function startServer(): Promise<TestServer> {
@@ -50,6 +57,7 @@ export async function startServer(): Promise<TestServer> {
 
   return {
     close: () => new Promise<void>((resolve) => server.close(() => resolve())),
+    fetch: (path, actor) => fetch(`http://localhost:${port}/api${path}`, { headers: actor ? { "X-WSL-Actor": actor } : {} }),
     call: async (method, path, actor, body) => {
       const res = await fetch(`http://localhost:${port}/api${path}`, {
         method,

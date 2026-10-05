@@ -6,6 +6,7 @@ import { analyzeEvidence, canonicalSkillName, checkRelevance, currentGradingMode
 import { checkProviderHealth, configuredProvider, lastGradingOutcome } from "./ml/llm-grader.ts"
 import type { ChallengeContext, EvidenceQuote, SimulatedRating, SkillCriterion } from "./ai.ts"
 import { parseGithubLink, readGithubRepo } from "./github.ts"
+import { parseGoogleDocLink, readGoogleDoc } from "./gdocs.ts"
 import type { RepoSnapshot } from "./github.ts"
 import { rank } from "../src/lib/pipeline.ts"
 import { MAX_DATASET_FILES, MAX_FILE_BYTES, prepareFile, screenChallenge, summarizeFindings, UploadError } from "./screening.ts"
@@ -46,9 +47,9 @@ function screenNote(sharedSensitiveData: unknown, companyName: string): string {
 }
 
 // The full EvidenceType union (src/types.ts) still covers older evidence types
-// still on record (Project Report, Presentation, ...) so historical data keeps
-// rendering; only these four are offered for new submissions.
-const SUBMITTABLE_EVIDENCE_TYPES: EvidenceType[] = ["GitHub Repository", "Code", "Documentation", "Dataset / Model"]
+// still on record (Project Report, Code, ...) so historical data keeps
+// rendering; only these two are offered for new submissions.
+const SUBMITTABLE_EVIDENCE_TYPES: EvidenceType[] = ["GitHub Repository", "Documentation"]
 const DIFFICULTIES = ["Foundational", "Intermediate", "Advanced"]
 const SENSITIVITIES = ["None (Public Dataset)", "Low", "Moderate", "High (NDA Required)"]
 const VISIBILITIES = ["Public", "University Only", "Restricted"]
@@ -337,6 +338,8 @@ function buildSnapshot(db: DatabaseSync, actor: Actor): Snapshot {
     }
   })
 
+  // Metadata only — a file's bytes are served one at a time by GET /evidence/:id/file.
+  const evidenceFiles = new Map(all(db, "SELECT evidence_id, name, size FROM evidence_files").map((f) => [String(f.evidence_id), { name: String(f.name), size: Number(f.size) }]))
   const evidence: Evidence[] = all(db, "SELECT * FROM evidence ORDER BY submitted_at DESC")
     .filter((r) => visible.has(String(r.project_id)))
     .map((r) => ({
@@ -349,6 +352,7 @@ function buildSnapshot(db: DatabaseSync, actor: Actor): Snapshot {
       link: String(r.link),
       ...(r.content ? { content: String(r.content) } : {}),
       ...(r.fetched_from ? { analyzedFiles: parseList(r.fetched_from) } : {}),
+      ...(evidenceFiles.has(String(r.id)) ? { file: evidenceFiles.get(String(r.id)) } : {}),
       submittedAt: String(r.submitted_at),
     }))
 
@@ -521,6 +525,28 @@ function projectContext(db: DatabaseSync, projectId: string) {
     companyId: String(row.company_id),
     companyName: String(row.company_name),
     contactId: String(row.contact_id),
+  }
+}
+
+/** What the evidence route reads before its transaction: a repository, a shared Google Doc, and/or an attached document. */
+interface EvidencePrep {
+  repo: RepoSnapshot | null
+  doc: string | null
+  file: PreparedFile | null
+}
+
+/** Validates an attached document (sent as { name, data: base64 }) and extracts its text. */
+async function prepareEvidenceUpload(raw: unknown): Promise<PreparedFile | null> {
+  if (raw === undefined || raw === null) return null
+  const f = raw as { name?: unknown; data?: unknown }
+  if (typeof f !== "object" || typeof f.name !== "string" || typeof f.data !== "string") {
+    throw new ApiError(400, "The attached file couldn't be read. Choose it again and try again.", "file")
+  }
+  try {
+    return await prepareFile("evidence", f.name, Buffer.from(f.data, "base64"))
+  } catch (err) {
+    if (err instanceof UploadError) throw new ApiError(400, err.message, "file")
+    throw err
   }
 }
 
@@ -847,30 +873,44 @@ const routes: { method: string; pattern: RegExp; prepare?: (actor: Actor, body: 
   {
     method: "POST",
     pattern: /^\/projects\/([^/]+)\/evidence$/,
-    // A GitHub link is read (README and top source files) before the transaction, so it can be analyzed.
-    prepare: async (actor, body, [id]) => {
+    // Everything slow or async happens before the transaction: a GitHub repository or a shared
+    // Google Doc is read, and an attached document has its text extracted, so it can be analyzed.
+    prepare: async (actor, body, [id]): Promise<EvidencePrep> => {
       requireEvidenceAccess(getDb(), actor, id, "add evidence to")
-      if (body.type === "Code" || typeof body.link !== "string" || !parseGithubLink(body.link)) return null
-      return readGithubRepo(body.link)
+      const link = typeof body.link === "string" ? body.link : ""
+      const isDoc = body.type === "Documentation"
+      return {
+        repo: body.type === "GitHub Repository" && parseGithubLink(link) ? await readGithubRepo(link) : null,
+        doc: isDoc ? await readGoogleDoc(link) : null,
+        file: isDoc ? await prepareEvidenceUpload(body.file) : null,
+      }
     },
-    handler: (db, actor, [id], body, repo: RepoSnapshot | null) => {
+    handler: (db, actor, [id], body, prep: EvidencePrep) => {
+      const { repo, doc, file } = prep
       const { p, student } = requireEvidenceAccess(db, actor, id, "add evidence to")
-      const evType = oneOf(body.type, SUBMITTABLE_EVIDENCE_TYPES, "evidence type", "")
-      if (!evType) throw new ApiError(400, `Choose an evidence type (${SUBMITTABLE_EVIDENCE_TYPES.join(", ")}) and try again.`, "type")
+      const evType = SUBMITTABLE_EVIDENCE_TYPES.find((t) => t === body.type)
+      if (!evType) throw new ApiError(400, `Choose an evidence type (${SUBMITTABLE_EVIDENCE_TYPES.join(" or ")}) and try again.`, "type")
       const title = text(body.title, "Title", { required: true, max: 200, key: "title" })
-      // "Code" evidence is pasted directly and always analyzed. Everything else is a
-      // link to where the work lives, with an optional excerpt a mentor can paste in
-      // to also have it analyzed — otherwise it's just linked for mentor review.
-      const isCode = evType === "Code"
+      // A repository or a document is linked (and read where WSL can); a document may instead be
+      // attached as a file. Either way a pasted excerpt is optional extra text to analyze.
       const isRepo = evType === "GitHub Repository"
-      const link = isCode ? "" : text(body.link, isRepo ? "Repository link" : "Link", { required: true, max: 500, key: "link" })
+      const link = text(body.link, isRepo ? "Repository link" : "Document link", { required: isRepo, max: 500, key: "link" })
+      if (!isRepo && !link && !file) {
+        throw new ApiError(400, "Add a link to your document (like a Google Docs link) or attach the file itself, then submit again.", "link")
+      }
       if (isRepo && !parseGithubLink(link)) {
         throw new ApiError(400, "That isn't a GitHub repository link. Use the repository's address, like https://github.com/owner/repo, and try again.", "link")
       }
-      if (!isCode && !isRepo && (/\s/.test(link) || !/\.[a-z]{2,}/i.test(link))) {
+      if (!isRepo && link && (/\s/.test(link) || !/\.[a-z]{2,}/i.test(link))) {
         throw new ApiError(400, "Link must be a web address your mentor can open, like https://docs.google.com/document/… — check it and try again.", "link")
       }
-      const content = isCode ? text(body.content, "Code", { required: true, max: 20000, key: "content" }) : text(body.content, "Excerpt", { max: 20000, key: "content" }) || null
+      const content = text(body.content, "Excerpt", { max: 20000, key: "content" }) || null
+      // What WSL read from the work itself, beyond anything pasted: repository files, an attached
+      // document's text, or a shared Google Doc's text.
+      const readText = isRepo ? repo?.text : [file?.text, doc].filter(Boolean).join("\n\n").slice(0, 20_000) || undefined
+      const readFrom = isRepo ? repo?.files : ([file && readText ? file.name : null, doc ? "Google Doc" : null].filter(Boolean) as string[])
+      const readable = Boolean(content) || (readText ?? "").replace(/\s/g, "").length >= 20
+
       // A repository WSL can't read (private, misspelled, deleted, or GitHub's rate limit)
       // would otherwise be accepted as "evidence" with nothing in it to analyze.
       let notice: string | undefined
@@ -883,30 +923,43 @@ const routes: { method: string; pattern: RegExp; prepare?: (actor: Actor, body: 
           )
         }
         notice = "WSL could not read this repository, so only your pasted excerpt will be analyzed."
+      } else if (!isRepo && !readable) {
+        // Saved anyway — the reviewer can open the link or download the file — but say why nothing was analyzed.
+        if (file) notice = `${file.unreadable ?? "WSL couldn't read any text in this file."} It's attached for your reviewer, but WSL couldn't analyze it.`
+        else if (parseGoogleDocLink(link)) {
+          notice = "WSL couldn't read this Google Doc, so it's linked for your reviewer but not analyzed. Set sharing to “Anyone with the link can view”, or attach the document as a file, then submit again."
+        } else notice = "WSL can read GitHub repositories and shared Google Docs. This link is saved for your reviewer; paste an excerpt or attach the file to have it analyzed."
+      } else if (file?.unreadable && !isRepo) {
+        notice = file.unreadable
       }
 
-      const checkText = [title, content, repo?.text].filter(Boolean).join(". ")
+      const checkText = [title, content, readText].filter(Boolean).join(". ")
       const relevance = checkRelevance(challengeContextFor(db, p.challengeId), checkText)
+      const where = content ? "content" : file ? "file" : "link"
       if (!relevance.relevant && relevance.reason === "echoes-brief") {
         throw new ApiError(
           400,
           `Most of this submission repeats the “${p.challengeTitle}” brief back (${relevance.echoPct}% of its phrases come from the challenge). WSL only counts work you produced, so submit your own code, analysis or write-up.`,
-          content ? "content" : "link",
+          where,
         )
       }
       if (!relevance.relevant) {
         throw new ApiError(
           400,
           `This doesn't look like it addresses “${p.challengeTitle}” — WSL found almost no overlap (${relevance.overlapPct}%) between what you submitted and the challenge's stated problem. Check you picked the right project, then submit the code or write-up you made for this challenge.`,
-          content ? "content" : "link",
+          where,
         )
       }
 
+      const evidenceId = newId("ev")
       exec(
         db,
         "INSERT INTO evidence (id, project_id, student_id, type, title, description, link, content, fetched_content, fetched_from, submitted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        newId("ev"), id, student.id, evType, title, "", link, content, repo?.text ?? null, repo ? JSON.stringify(repo.files) : null, nowIso(),
+        evidenceId, id, student.id, evType, title, "", link, content, readText ?? null, readFrom && readFrom.length > 0 ? JSON.stringify(readFrom) : null, nowIso(),
       )
+      if (file) {
+        db.prepare("INSERT INTO evidence_files (evidence_id, name, mime, size, data) VALUES (?, ?, ?, ?, ?)").run(evidenceId, file.name, file.mime, file.data.length, file.data)
+      }
       return notice ? { notice } : null
     },
   },
@@ -1223,6 +1276,16 @@ async function readBody(req: IncomingMessage): Promise<Body> {
   }
 }
 
+function sendAttachment(res: ServerResponse, file: Record<string, unknown>) {
+  const name = String(file.name)
+  res.statusCode = 200
+  res.setHeader("Content-Type", String(file.mime))
+  res.setHeader("Content-Disposition", `attachment; filename="${name.replace(/[^\x20-\x7e]|"/g, "_")}"; filename*=UTF-8''${encodeURIComponent(name)}`)
+  res.setHeader("X-Content-Type-Options", "nosniff")
+  res.setHeader("Cache-Control", "no-store")
+  res.end(Buffer.from(file.data as Uint8Array))
+}
+
 function send(res: ServerResponse, status: number, payload: unknown) {
   res.statusCode = status
   res.setHeader("Content-Type", "application/json; charset=utf-8")
@@ -1260,13 +1323,21 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
       if (!canAccessChallengeFiles(db, actor, challengeId)) throw new ApiError(403, "You don't have access to this challenge's files.")
       const file = one(db, "SELECT name, mime, data FROM challenge_files WHERE id = ? AND challenge_id = ?", fileId, challengeId)
       if (!file) throw new ApiError(404, "File not found.")
-      const name = String(file.name)
-      res.statusCode = 200
-      res.setHeader("Content-Type", String(file.mime))
-      res.setHeader("Content-Disposition", `attachment; filename="${name.replace(/[^\x20-\x7e]|"/g, "_")}"; filename*=UTF-8''${encodeURIComponent(name)}`)
-      res.setHeader("X-Content-Type-Options", "nosniff")
-      res.setHeader("Cache-Control", "no-store")
-      res.end(Buffer.from(file.data as Uint8Array))
+      sendAttachment(res, file)
+      return true
+    }
+
+    // A student's attached document: readable by whoever can read that project's evidence.
+    const evidenceFileMatch = req.method === "GET" ? /^\/evidence\/([^/]+)\/file$/.exec(path) : null
+    if (evidenceFileMatch) {
+      const file = one(
+        db,
+        "SELECT e.project_id, f.name, f.mime, f.data FROM evidence_files f JOIN evidence e ON e.id = f.evidence_id WHERE f.evidence_id = ?",
+        decodeURIComponent(evidenceFileMatch[1]),
+      )
+      if (!file) throw new ApiError(404, "File not found.")
+      if (!visibleProjectIds(db, actor).has(String(file.project_id))) throw new ApiError(403, "You don't have access to this file.")
+      sendAttachment(res, file)
       return true
     }
 

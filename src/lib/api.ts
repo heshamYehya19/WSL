@@ -39,11 +39,11 @@ export function mutate<R = null>(method: "POST" | "PATCH", path: string, session
   return request<{ result: R; snapshot: Snapshot }>(method, path, session, body ?? {})
 }
 
-/** Downloads a challenge's attached file. A plain link can't carry the actor header, so fetch it and hand the browser a blob. */
-export async function downloadChallengeFile(session: DemoUserState, challengeId: string, fileId: string, name: string) {
+/** Downloads an attached file. A plain link can't carry the actor header, so fetch it and hand the browser a blob. */
+async function downloadBlob(session: DemoUserState, path: string, name: string) {
   let res: Response
   try {
-    res = await fetch(`/api/challenges/${encodeURIComponent(challengeId)}/files/${encodeURIComponent(fileId)}`, { headers: actorHeader(session) })
+    res = await fetch(path, { headers: actorHeader(session) })
   } catch {
     throw new ApiRequestError("Can't reach the WSL server. Is it running?")
   }
@@ -56,3 +56,9 @@ export async function downloadChallengeFile(session: DemoUserState, challengeId:
   a.click()
   setTimeout(() => URL.revokeObjectURL(url), 10_000)
 }
+
+export const downloadChallengeFile = (session: DemoUserState, challengeId: string, fileId: string, name: string) =>
+  downloadBlob(session, `/api/challenges/${encodeURIComponent(challengeId)}/files/${encodeURIComponent(fileId)}`, name)
+
+export const downloadEvidenceFile = (session: DemoUserState, evidenceId: string, name: string) =>
+  downloadBlob(session, `/api/evidence/${encodeURIComponent(evidenceId)}/file`, name)

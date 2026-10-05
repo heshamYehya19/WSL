@@ -30,8 +30,8 @@ function StartHere({ onSignIn }: { onSignIn: () => void }) {
               {student.field} · {student.year} · {uni?.name}
             </p>
             <p className="mt-3 max-w-xl text-sm leading-relaxed text-white/80">
-              Follow one student through the whole loop: IRIS posts a challenge, his university assigns it, he submits real code, WSL's AI quotes the
-              lines that prove each skill, a mentor verifies them, and IRIS finds him by evidence instead of a CV. About three minutes.
+              Follow one student through the whole loop: IRIS posts a challenge, his university assigns it, he submits real code, WSL organizes the evidence and quotes
+              the lines behind each skill, his university verifies them, and IRIS finds him by proof instead of a CV. About three minutes.
             </p>
           </div>
         </div>

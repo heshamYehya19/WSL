@@ -10,8 +10,9 @@ describe("ownership checks", () => {
   it("a student cannot submit evidence to another student's project", async () => {
     // prj-estarta-intent-omar belongs to stu-ju-omar — stu-hu-leen tries to add evidence to it.
     const res = await server.call("POST", "/projects/prj-estarta-intent-omar/evidence", "student:stu-hu-leen", {
-      type: "Code",
+      type: "Documentation",
       title: "intrusion.py",
+      link: "https://docs.example.com/intrusion",
       content: "x".repeat(40),
     })
     expect(res.status).toBe(403)

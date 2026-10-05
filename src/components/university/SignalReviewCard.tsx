@@ -3,7 +3,8 @@ import { ConfidenceMeter } from "../ui/ConfidenceMeter"
 import { StatusBadge } from "../ui/StatusBadge"
 import { EvidenceQuotes } from "../ui/EvidenceQuotes"
 import { CriteriaChecklist } from "../ui/CriteriaChecklist"
-import { assessmentLabel, evidenceAnalysisLabel, evidenceStrengthFor, splitAiNote } from "../../lib/aiNote"
+import { assessmentLabel, evidenceStrengthFor, splitAiNote } from "../../lib/aiNote"
+import { EvidenceSources } from "../ui/EvidenceSources"
 import { formatDate } from "../../lib/format"
 import type { Evidence, SkillSignal } from "../../types"
 
@@ -63,6 +64,8 @@ export function SignalReviewCard({
         </div>
       </div>
 
+      <p className="mt-2 text-[11px] text-ink-400">AI analysis is supporting information. University verification is final.</p>
+
       {signal.gradedSource === "offline" && (
         <p className="mt-2 rounded-lg bg-amber-100 px-2.5 py-1.5 text-[11px] font-medium text-amber-600">
           Estimated offline, not graded by the AI model — ask the student to re-analyze once the model is available.
@@ -101,9 +104,7 @@ export function SignalReviewCard({
           {supportingEvidence.map((e) => (
             <div key={e.id} className="rounded-lg border border-ink-100 px-2.5 py-1.5 text-xs">
               <span className="font-semibold text-ink-800">{e.type}</span> <span className="text-ink-600">{e.title}</span>
-              <p className="mt-0.5 text-[11px] text-ink-400">
-                {evidenceAnalysisLabel(e)}
-              </p>
+              <EvidenceSources evidence={e} />
             </div>
           ))}
         </div>
@@ -116,7 +117,7 @@ export function SignalReviewCard({
       )}
       {decided && (
         <p className="mt-2 text-[11px] text-ink-400">
-          {signal.status} by {verifierName ?? "a mentor"}
+          {signal.status} · Reviewed by {verifierName ?? "a university reviewer"}
           {signal.verifiedAt ? ` · ${formatDate(signal.verifiedAt)}` : ""}
         </p>
       )}

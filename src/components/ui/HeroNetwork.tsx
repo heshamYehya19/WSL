@@ -94,25 +94,25 @@ export function HeroNetwork() {
       <ConstellationField className="absolute inset-0 h-full w-full" />
 
       <div className="relative flex flex-col items-center gap-3 px-1 py-8 sm:flex-row sm:items-start sm:justify-center sm:gap-3 sm:py-14">
-        <AudienceCard to="/for-students" icon={<UserIcon />} title="Students" subtitle="Interactive skill cards" className="sm:mt-8">
+        <AudienceCard to="/for-students" icon={<UserIcon />} title="Students" subtitle="Work becomes evidence" className="sm:mt-8">
           <div className="grid grid-cols-2 gap-1.5">
-            <MiniThumb label="Proof of Project" />
-            <MiniThumb label="Certificate" />
+            <MiniThumb label="Project evidence" />
+            <MiniThumb label="Contribution" />
           </div>
         </AudienceCard>
 
-        <AudienceCard to="/for-universities" highlighted icon={<CapIcon />} title="Universities" subtitle="Expand through skill cards">
+        <AudienceCard to="/for-universities" highlighted icon={<CapIcon />} title="Universities" subtitle="The verification layer">
           <div className="rounded-lg bg-white/5 p-2">
-            <div className="text-[10px] font-medium text-teal-200">Skill Alignment Tool</div>
+            <div className="text-[10px] font-medium text-teal-200">Verifies student work</div>
             <div className="mt-1.5 h-10 rounded bg-gradient-to-r from-teal-500/30 via-teal-400/20 to-transparent" />
           </div>
         </AudienceCard>
 
-        <AudienceCard to="/for-companies" icon={<BuildingIcon />} title="Organizations" subtitle="Expand their skill cards" className="sm:mt-8">
+        <AudienceCard to="/for-companies" icon={<BuildingIcon />} title="Organizations" subtitle="Real needs, real talent" className="sm:mt-8">
           <div className="rounded-lg bg-white/5 p-2">
-            <div className="text-[10px] font-medium text-teal-200">AI Talent Matcher</div>
+            <div className="text-[10px] font-medium text-teal-200">Discovers talent by proof</div>
             <div className="mt-1 text-[9px] leading-tight text-ink-400">
-              Matches candidates by rated skill evidence.
+              Finds candidates through university-verified work.
             </div>
           </div>
         </AudienceCard>

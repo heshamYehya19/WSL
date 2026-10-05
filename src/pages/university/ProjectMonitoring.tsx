@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { EvidenceFileLink } from "../../components/ui/EvidenceFileLink"
 import { Link, useParams } from "react-router-dom"
 import { useDemoUser } from "../../state/demoUser"
 import { useStore } from "../../state/store"
@@ -6,7 +7,7 @@ import { StatusBadge } from "../../components/ui/StatusBadge"
 import { SignalReviewCard } from "../../components/university/SignalReviewCard"
 import { challengeFor, skillsForProject } from "../../lib/selectors"
 import { formatDate } from "../../lib/format"
-import { evidenceAnalysisLabel } from "../../lib/aiNote"
+import { EvidenceSources } from "../../components/ui/EvidenceSources"
 
 export default function ProjectMonitoring() {
   const { id } = useParams()
@@ -102,7 +103,7 @@ export default function ProjectMonitoring() {
           ))}
           {projectSignals.length === 0 && (
             <p className="rounded-2xl border border-dashed border-ink-200 bg-surface p-6 text-center text-sm text-ink-400">
-              No skill signals yet — waiting on the student's evidence and AI evidence analysis.
+              No skills identified yet — waiting on the student's evidence and its analysis.
             </p>
           )}
         </div>
@@ -119,8 +120,9 @@ export default function ProjectMonitoring() {
                   <p className="mt-1.5 text-sm font-medium text-ink-900">{e.title}</p>
                   <p className="text-xs text-ink-500">{e.description}</p>
                   {e.link && <p className="mt-1 text-[11px] break-all text-ink-400">{e.link}</p>}
+                  <EvidenceFileLink evidence={e} />
                   {e.content && <pre className="mt-2 max-h-24 overflow-hidden rounded-lg whitespace-pre-wrap [overflow-wrap:anywhere] bg-ink-50 px-2.5 py-2 font-mono text-[11px] text-ink-600">{e.content}</pre>}
-                  <p className="mt-1.5 text-[11px] text-ink-400">{evidenceAnalysisLabel(e)}</p>
+                  <EvidenceSources evidence={e} />
                 </div>
               ))}
               {projectEvidence.length === 0 && <p className="text-sm text-ink-400">No evidence submitted yet.</p>}

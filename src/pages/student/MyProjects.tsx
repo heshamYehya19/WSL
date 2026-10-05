@@ -6,7 +6,7 @@ import { StatusBadge } from "../../components/ui/StatusBadge"
 import { EmptyState } from "../../components/ui/EmptyState"
 import { SkillChip } from "../../components/ui/SkillChip"
 import { PageHero, Pills, StageTrack } from "../../components/ui/ListKit"
-import { challengeFor, skillsForProject } from "../../lib/selectors"
+import { challengeFor, isEvidenced, skillsForProject } from "../../lib/selectors"
 import { formatDate } from "../../lib/format"
 import type { Project } from "../../types"
 
@@ -27,14 +27,14 @@ function nextStep(p: Project, evidenceCount: number) {
       if (left > 0) return { text: `${left} task${left === 1 ? "" : "s"} left — keep going`, tone: "teal" as const }
       return evidenceCount === 0
         ? { text: "All tasks done — submit your evidence", tone: "teal" as const }
-        : { text: "Ready to submit for AI evidence analysis", tone: "teal" as const }
+        : { text: "Ready to run the evidence analysis", tone: "teal" as const }
     case "Evidence Under Review":
-      return { text: "Your university mentor is reviewing each skill signal", tone: "amber" as const }
+      return { text: "Your university is reviewing each skill", tone: "amber" as const }
     case "Skills Pending Verification":
-      return { text: "Some skill signals are still awaiting a mentor decision", tone: "amber" as const }
+      return { text: "Some skills are still awaiting university verification", tone: "amber" as const }
     case "Verified":
     case "Completed":
-      return { text: "Confirmed — waiting on the company's feedback", tone: "amber" as const }
+      return { text: "Verified by your university — waiting on the company's feedback", tone: "amber" as const }
     case "Company Feedback Received":
       return { text: "Complete — the company left feedback on your work", tone: "verified" as const }
     default:
@@ -90,15 +90,14 @@ export default function MyProjects() {
   const count = (t: Tab) => (t === "all" ? myProjects.length : myProjects.filter((p) => TAB_OF(p) === t).length)
   const shown = myProjects.filter((p) => tab === "all" || TAB_OF(p) === tab)
 
-  const ratings = skillSignals.filter((s) => s.studentId === student.id).map((s) => s.evidenceConfidence)
-  const avg = ratings.length ? Math.round(ratings.reduce((a, b) => a + b, 0) / ratings.length) : 0
+  const verifiedSkills = new Set(skillSignals.filter((s) => s.studentId === student.id && s.status === "Verified").map((s) => s.skill)).size
 
   return (
     <div>
       <PageHero
         eyebrow="My Projects"
         title="Your project workspaces"
-        subtitle="Everything you've built through WSL, from kickoff to verified evidence."
+        subtitle="Everything you've built through WSL, from kickoff to verified proof."
         action={
           <Link
             to="/student/challenges"
@@ -111,7 +110,7 @@ export default function MyProjects() {
           { label: "in progress", value: count("active"), accent: count("active") > 0 },
           { label: "in review", value: count("review") },
           { label: "completed", value: count("done") },
-          { label: "avg. confidence", value: avg },
+          { label: "verified skills", value: verifiedSkills },
         ]}
       />
 
@@ -144,7 +143,7 @@ export default function MyProjects() {
                 const org = getOrg(p.organizationId)
                 const challenge = challengeFor(challenges, p)
                 const myEv = evidence.filter((e) => e.projectId === p.id)
-                const signals = skillsForProject(skillSignals, p.id)
+                const signals = skillsForProject(skillSignals, p.id).filter(isEvidenced)
                 const ratedSkills = new Set(signals.map((s) => s.skill))
                 const pending = (challenge?.requiredSkills ?? []).filter((s) => !ratedSkills.has(s))
                 const step = nextStep(p, myEv.length)
@@ -179,10 +178,10 @@ export default function MyProjects() {
 
                     <div className="mt-4 flex flex-wrap gap-1.5 sm:pl-16">
                       {signals.map((s) => (
-                        <SkillChip key={s.id} skill={s.skill} rating={s.evidenceConfidence} size="sm" />
+                        <SkillChip key={s.id} skill={s.skill} state={s.status === "Verified" ? "verified" : "pending"} size="sm" />
                       ))}
                       {pending.map((s) => (
-                        <span key={s} className="rounded-lg border border-dashed border-ink-200 px-2 py-1 text-xs text-ink-400" title="No signal yet">
+                        <span key={s} className="rounded-lg border border-dashed border-ink-200 px-2 py-1 text-xs text-ink-400" title="No evidence identified yet">
                           {s}
                         </span>
                       ))}

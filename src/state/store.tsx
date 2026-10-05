@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react"
 import type { ReactNode } from "react"
-import { ApiRequestError, downloadChallengeFile, fetchSnapshot, mutate } from "../lib/api"
+import { ApiRequestError, downloadChallengeFile, downloadEvidenceFile, fetchSnapshot, mutate } from "../lib/api"
 import { useSession } from "./session"
 import type { Availability, ChallengeFileKind, ChallengeVisibility, CompanyActionKind, DataSensitivity, Difficulty, EvidenceType, ScreeningFinding, SuggestedLevel, Snapshot } from "../types"
 
@@ -45,7 +45,11 @@ interface StoreContextValue extends Snapshot {
   submitDraft: (id: string) => Promise<boolean>
   assignChallenge: (id: string, programId: string) => Promise<boolean>
   startProject: (challengeId: string) => Promise<string | undefined>
-  addEvidence: (projectId: string, input: { type: EvidenceType; title: string; link: string; content: string }, onFieldError?: FieldErrorHandler) => Promise<boolean>
+  addEvidence: (
+    projectId: string,
+    input: { type: EvidenceType; title: string; link: string; content: string; file?: { name: string; data: string } },
+    onFieldError?: FieldErrorHandler,
+  ) => Promise<boolean>
   runAIReview: (projectId: string) => Promise<boolean>
   reviewSignal: (
     projectId: string,
@@ -67,6 +71,7 @@ interface StoreContextValue extends Snapshot {
   markNotificationsRead: () => Promise<boolean>
   resetDemo: () => Promise<boolean>
   downloadFile: (challengeId: string, fileId: string, name: string) => Promise<void>
+  downloadEvidenceFile: (evidenceId: string, name: string) => Promise<void>
 }
 
 const StoreContext = createContext<StoreContextValue | null>(null)
@@ -158,8 +163,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           return r.ok
         }),
       runAIReview: (projectId) =>
-        run<{ unchanged: boolean }>("POST", `/projects/${projectId}/ai-review`).then((r) => {
+        run<{ unchanged: boolean; failed?: boolean }>("POST", `/projects/${projectId}/ai-review`).then((r) => {
           if (r.ok && r.result.unchanged) setToast("No new evidence since the last analysis.")
+          else if (r.ok && r.result.failed) setToast("Analysis unavailable right now. Any earlier results are unchanged — try again in a moment.")
           return r.ok
         }),
       reviewSignal: (projectId, signalId, decision, options) =>
@@ -177,6 +183,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       resetDemo: () => ok(run("POST", "/reset")),
       downloadFile: (challengeId, fileId, name) =>
         downloadChallengeFile(session, challengeId, fileId, name).catch((err: Error) => setToast(err.message)),
+      downloadEvidenceFile: (evidenceId, name) => downloadEvidenceFile(session, evidenceId, name).catch((err: Error) => setToast(err.message)),
     }
   }, [snapshot, session, run])
 

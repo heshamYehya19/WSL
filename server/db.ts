@@ -221,6 +221,16 @@ CREATE TABLE IF NOT EXISTS evidence (
   submitted_at TEXT NOT NULL
 );
 
+-- A document a student attached as Documentation evidence. Kept apart from the evidence table so
+-- loading the snapshot never drags every file's bytes along; served by GET /evidence/:id/file.
+CREATE TABLE IF NOT EXISTS evidence_files (
+  evidence_id TEXT PRIMARY KEY REFERENCES evidence(id) ON DELETE CASCADE,
+  name        TEXT NOT NULL,
+  mime        TEXT NOT NULL,
+  size        INTEGER NOT NULL,
+  data        BLOB NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS skill_signals (
 ${SKILL_SIGNALS_COLUMNS}
 );
@@ -307,6 +317,7 @@ const TABLES_IN_DROP_ORDER = [
   "skill_signals",
   "project_members",
   "company_feedback",
+  "evidence_files",
   "evidence",
   "feedback",
   "project_tasks",

@@ -57,7 +57,7 @@ export default function OpportunityDetail() {
                 const sig = verified.find((s) => s.skill === skillName)
                 return (
                   <Link key={skillName} to={`/student/projects/${sig?.projectId}`} className="flex items-center gap-2 rounded-lg border border-ink-200 px-3 py-2 text-sm hover:border-teal-400">
-                    <SkillChip skill={skillName} rating={sig?.evidenceConfidence} size="sm" />
+                    <SkillChip skill={skillName} state="verified" size="sm" />
                     <span className="text-xs text-teal-600">View Evidence →</span>
                   </Link>
                 )

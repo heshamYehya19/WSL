@@ -4,23 +4,14 @@ import { useStore } from "../../state/store"
 import { SkillChip } from "../ui/SkillChip"
 import { StatusBadge } from "../ui/StatusBadge"
 import { formatDate } from "../../lib/format"
-import { assessmentLabel } from "../../lib/aiNote"
-import { challengeFor, skillsForProject, studentProjects, studentSignals } from "../../lib/selectors"
-import type { SkillSignal, SuggestedLevel } from "../../types"
+import { challengeFor, isEvidenced, skillsForProject, studentProjects, studentSignals } from "../../lib/selectors"
+import type { Project, SkillSignal } from "../../types"
 
 interface SkillSummary {
   skill: string
   signal: SkillSignal
   projectId: string
   projects: number
-}
-
-const LEVEL_STYLE: Record<SuggestedLevel, { bar: string; text: string }> = {
-  Demonstrated: { bar: "from-teal-500 to-teal-300", text: "text-teal-600" },
-  Advanced: { bar: "from-teal-400 to-teal-300/70", text: "text-teal-500" },
-  Intermediate: { bar: "from-amber-500 to-amber-400", text: "text-amber-500" },
-  Foundational: { bar: "from-ink-400 to-ink-300", text: "text-ink-500" },
-  Insufficient: { bar: "from-ink-300 to-ink-200", text: "text-ink-400" },
 }
 
 function ShieldIcon({ className = "h-3.5 w-3.5" }: { className?: string }) {
@@ -32,66 +23,104 @@ function ShieldIcon({ className = "h-3.5 w-3.5" }: { className?: string }) {
   )
 }
 
+function ContributionLine({ project, studentId, nameOf }: { project: Project; studentId: string; nameOf: (id: string) => string | undefined }) {
+  const mine = project.members.find((m) => m.studentId === studentId)
+  const others = project.members.filter((m) => m.studentId !== studentId)
+  const owner = project.studentId === studentId ? undefined : (nameOf(project.studentId) ?? "a teammate")
+  return (
+    <div className="mt-0.5 space-y-0.5 text-xs text-ink-400">
+      {mine && (
+        <p>
+          <span className="font-semibold text-ink-600">Your contribution:</span> {mine.roleNote}
+        </p>
+      )}
+      <p>
+        Team project{owner ? ` — owned by ${owner}` : ""}
+        {others.length > 0 ? ` · ${others.map((m) => `${nameOf(m.studentId) ?? "a teammate"}: ${m.roleNote}`).join(" · ")}` : ""}
+      </p>
+    </div>
+  )
+}
+
+/** The project-level answer to "who checked this?": the university that verified it, or that it is still pending. */
+function VerificationLine({
+  signals,
+  getStaff,
+  universityOf,
+}: {
+  signals: SkillSignal[]
+  getStaff: (id: string) => { name: string; universityId: string } | undefined
+  universityOf: (universityId: string) => string | undefined
+}) {
+  if (signals.length === 0) return null
+  const verified = signals.filter((s) => s.status === "Verified")
+  const reviewer = verified.length > 0 && verified[0].verifiedBy ? getStaff(verified[0].verifiedBy) : undefined
+  return (
+    <p className="mt-4 border-t border-ink-100 pt-3 text-xs">
+      {verified.length > 0 ? (
+        <span className="text-ink-500">
+          <span className="font-semibold text-verified-600">✓ Verified by {(reviewer && universityOf(reviewer.universityId)) ?? "the university"}</span>
+          {reviewer ? ` · Reviewed by ${reviewer.name}` : ""}
+          {verified.length < signals.length ? ` · ${signals.length - verified.length} skill${signals.length - verified.length === 1 ? "" : "s"} still pending` : ""}
+        </span>
+      ) : (
+        <span className="font-medium text-ink-400">Pending university verification</span>
+      )}
+    </p>
+  )
+}
+
 function SkillCard({
   s,
   index,
-  mounted,
   projectHref,
   getStaff,
+  universityOf,
 }: {
   s: SkillSummary
   index: number
-  mounted: boolean
   projectHref: (projectId: string) => string
-  getStaff: (id: string) => { name: string } | undefined
+  getStaff: (id: string) => { name: string; universityId: string } | undefined
+  universityOf: (universityId: string) => string | undefined
 }) {
-  const level = LEVEL_STYLE[s.signal.suggestedLevel]
   const verified = s.signal.status === "Verified"
   const verifier = s.signal.verifiedBy ? getStaff(s.signal.verifiedBy) : undefined
+  const metCount = s.signal.criteria.filter((c) => c.met).length
   return (
     <div
       style={{ animationDelay: `${index * 40}ms` }}
-      className="animate-fade-in-up group rounded-2xl border border-ink-200 bg-surface p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-teal-400 hover:shadow-lg hover:shadow-teal-500/5"
+      className={`animate-fade-in-up group rounded-2xl border bg-surface p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-teal-400 hover:shadow-lg hover:shadow-teal-500/5 ${
+        verified ? "border-verified-500/40" : "border-ink-200"
+      }`}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="truncate text-sm font-semibold text-ink-900">
-            {s.skill}
-            {verified && <span className="ml-1 text-verified-600">✓</span>}
-          </div>
-          <div className={`mt-0.5 text-sm font-bold ${level.text}`}>{assessmentLabel(s.signal.suggestedLevel)}</div>
-          <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-ink-400">
-            <span>
-              {s.projects} project{s.projects === 1 ? "" : "s"}
-            </span>
-            {s.signal.criteria.length > 0 && (
-              <>
-                <span>·</span>
-                <span>
-                  {s.signal.criteria.filter((c) => c.met).length} concrete sign{s.signal.criteria.filter((c) => c.met).length === 1 ? "" : "s"} found
-                </span>
-              </>
-            )}
-          </div>
+      <div className="min-w-0">
+        <div className="truncate text-sm font-semibold text-ink-900">
+          {s.skill}
+          {verified && <span className="ml-1 text-verified-600">✓</span>}
         </div>
-        {/* Evidence confidence stays secondary to the assessment above — see item 1. */}
-        <span className="text-xs font-semibold text-ink-400 tabular-nums">{s.signal.evidenceConfidence}%</span>
-      </div>
-      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-ink-100">
-        <div
-          className={`h-full rounded-full bg-gradient-to-r ${level.bar} transition-[width] duration-700 ease-out`}
-          style={{ width: mounted ? `${s.signal.evidenceConfidence}%` : "0%", transitionDelay: `${index * 40}ms` }}
-        />
+        <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-ink-400">
+          <span>
+            {s.projects} project{s.projects === 1 ? "" : "s"}
+          </span>
+          {metCount > 0 && (
+            <>
+              <span>·</span>
+              <span>
+                {metCount} concrete sign{metCount === 1 ? "" : "s"} in the work
+              </span>
+            </>
+          )}
+        </div>
       </div>
       {verified ? (
         <div className="mt-2.5 space-y-0.5 text-[11px] text-ink-500">
           <div className="inline-flex items-center gap-1 rounded-full bg-verified-100 px-2 py-0.5 text-[10px] font-semibold text-verified-600">
             <ShieldIcon className="h-3 w-3" />
-            University Verified
+            Verified by {(verifier && universityOf(verifier.universityId)) ?? "the university"}
           </div>
           {verifier && (
             <p className="pt-1">
-              Verified by {verifier.name}
+              Reviewed by {verifier.name}
               {s.signal.verifiedAt ? ` · ${formatDate(s.signal.verifiedAt)}` : ""}
             </p>
           )}
@@ -101,13 +130,15 @@ function SkillCard({
         </div>
       ) : (
         <div className="mt-2.5 space-y-1 text-[11px] text-ink-400">
-          <div className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">Unverified · AI signal only</div>
+          <div className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+            {s.signal.status === "Rejected" ? "Not verified" : "Awaiting university verification"}
+          </div>
           <p>
             {s.signal.status === "Rejected"
-              ? "A university mentor reviewed this and did not verify it."
+              ? "A university reviewer looked at this and did not verify it."
               : s.signal.suggestedLevel === "Insufficient"
-                ? "Not enough evidence yet — add more evidence and ask for analysis again."
-                : "Not yet checked by a university mentor."}
+                ? "Not enough evidence yet — add more evidence and run the analysis again."
+                : "Evidence identified; a university reviewer has not checked it yet."}
           </p>
         </div>
       )}
@@ -122,10 +153,11 @@ export function SkillRecordBody({
 }: {
   studentId: string
   projectHref: (projectId: string) => string
-  /** For companies: open on verified skills only, so an AI signal is never mistaken for a verified skill. */
+  /** For companies: open on verified skills only, so an unverified skill is never mistaken for a verified one. */
   verifiedOnlyByDefault?: boolean
 }) {
-  const { projects, challenges, evidence, skillSignals, getOrg, getStaff, getStudent } = useStore()
+  const { projects, challenges, evidence, skillSignals, getOrg, getStaff, getStudent, getUniversity } = useStore()
+  const universityOf = (id: string) => getUniversity(id)?.name
   const [filter, setFilter] = useState<"all" | "verified">(verifiedOnlyByDefault ? "verified" : "all")
   const [mounted, setMounted] = useState(false)
   useEffect(() => {
@@ -133,7 +165,7 @@ export function SkillRecordBody({
     return () => cancelAnimationFrame(id)
   }, [])
 
-  const mySignals = studentSignals(skillSignals, studentId)
+  const mySignals = studentSignals(skillSignals, studentId).filter(isEvidenced)
   const myProjects = studentProjects(projects, studentId).sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
 
   const bySkill = new Map<string, SkillSummary>()
@@ -145,29 +177,29 @@ export function SkillRecordBody({
     if (better) bySkill.set(s.skill, { skill: s.skill, signal: s, projectId: s.projectId, projects: (cur?.projects ?? 0) + 1 })
     else if (cur) cur.projects += 1
   }
-  const allSkills = [...bySkill.values()].sort((a, b) => b.signal.evidenceConfidence - a.signal.evidenceConfidence)
+  const allSkills = [...bySkill.values()].sort((a, b) => Number(b.signal.status === "Verified") - Number(a.signal.status === "Verified") || a.skill.localeCompare(b.skill))
   const shownSkills = filter === "verified" ? allSkills.filter((s) => s.signal.status === "Verified") : allSkills
   const verifiedCount = allSkills.filter((s) => s.signal.status === "Verified").length
 
   return (
     <div>
       <p className="mb-6 max-w-2xl text-sm text-ink-500">
-        Evidence confidence indicates how strongly submitted work supports a skill signal. It does not represent proficiency — only a university
-        mentor's verification does.
+        Each skill below is tied to real project work. A skill counts as proven only once a university has verified it; AI helps organize the
+        evidence for that review.
       </p>
       <div>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h3 className="text-lg font-semibold text-ink-900">Skill Signals</h3>
+          <h3 className="text-lg font-semibold text-ink-900">Demonstrated Skills</h3>
           {allSkills.length > 0 && (
             <div className="inline-flex rounded-full border border-ink-200 bg-surface p-1 text-xs font-semibold">
               {(
                 (verifiedOnlyByDefault
                   ? [
                       ["verified", `Verified skills · ${verifiedCount}`],
-                      ["all", `Include unverified AI signals · ${allSkills.length - verifiedCount}`],
+                      ["all", `Include skills awaiting verification · ${allSkills.length - verifiedCount}`],
                     ]
                   : [
-                      ["all", `All signals · ${allSkills.length}`],
+                      ["all", `All skills · ${allSkills.length}`],
                       ["verified", `Verified skills · ${verifiedCount}`],
                     ]) as readonly (readonly ["all" | "verified", string])[]
               ).map(([key, label]) => (
@@ -186,16 +218,16 @@ export function SkillRecordBody({
         </div>
         {allSkills.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-ink-200 bg-surface p-6 text-center text-sm text-ink-400">
-            No skill signals yet — submit evidence on a project to get WSL's AI evidence analysis.
+            No skills identified yet — submit evidence on a project and run the analysis.
           </p>
         ) : shownSkills.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-ink-200 bg-surface p-6 text-center text-sm text-ink-400">
-            No university-verified skills yet — they appear once a mentor verifies a skill signal.
+            No university-verified skills yet — they appear once a university verifies a skill.
           </p>
         ) : (
           <div key={filter} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {shownSkills.map((s, i) => (
-              <SkillCard key={s.skill} s={s} index={i} mounted={mounted} projectHref={projectHref} getStaff={getStaff} />
+              <SkillCard key={s.skill} s={s} index={i} projectHref={projectHref} getStaff={getStaff} universityOf={universityOf} />
             ))}
           </div>
         )}
@@ -208,7 +240,7 @@ export function SkillRecordBody({
           {myProjects.map((p, idx) => {
             const org = getOrg(p.organizationId)
             const challenge = challengeFor(challenges, p)
-            const signals = skillsForProject(skillSignals, p.id).filter((s) => s.studentId === studentId && (filter === "all" || s.status === "Verified"))
+            const signals = skillsForProject(skillSignals, p.id).filter((s) => isEvidenced(s) && s.studentId === studentId && (filter === "all" || s.status === "Verified"))
             const myEv = evidence.filter((e) => e.projectId === p.id && e.studentId === studentId)
             const started = new Date(p.startedAt)
             const live = p.status === "In Progress" || p.status === "Evidence Under Review" || p.status === "Skills Pending Verification"
@@ -238,12 +270,7 @@ export function SkillRecordBody({
                         <p className="text-xs text-ink-400">
                           {org?.name} · {challenge?.industry} · {started.toLocaleDateString(undefined, { month: "short", year: "numeric" })}
                         </p>
-                        {p.members.length > 0 && (
-                          <p className="mt-0.5 text-xs text-ink-400">
-                            Team project — {p.studentId === studentId ? "you" : getStudent(p.studentId)?.name ?? "a teammate"}
-                            {p.members.map((m) => `, ${m.studentId === studentId ? "you" : (getStudent(m.studentId)?.name ?? "a teammate")}: ${m.roleNote}`).join("")}
-                          </p>
-                        )}
+                        {p.members.length > 0 && <ContributionLine project={p} studentId={studentId} nameOf={(id) => getStudent(id)?.name} />}
                       </div>
                     </div>
                     <StatusBadge status={p.status} />
@@ -265,17 +292,15 @@ export function SkillRecordBody({
 
                   <div className="mt-4 grid gap-4 sm:grid-cols-2">
                     <div>
-                      <p className="text-[11px] font-semibold tracking-wide text-ink-400 uppercase">Skill signals</p>
+                      <p className="text-[11px] font-semibold tracking-wide text-ink-400 uppercase">Demonstrated skills</p>
                       <div className="mt-2 flex flex-wrap gap-1.5">
-                        {signals.length === 0 && <span className="text-xs text-ink-400">No signals yet.</span>}
+                        {signals.length === 0 && <span className="text-xs text-ink-400">No skills identified yet.</span>}
                         {signals.map((s) => (
                           <span
                             key={s.id}
-                            title={`Evidence confidence ${s.evidenceConfidence}% · ${s.status}`}
                             className="inline-flex items-center gap-1"
                           >
-                            <SkillChip skill={s.skill} rating={s.evidenceConfidence} size="sm" />
-                            {s.status === "Verified" && <ShieldIcon className="h-3.5 w-3.5 text-verified-600" />}
+                            <SkillChip skill={s.skill} state={s.status === "Verified" ? "verified" : "pending"} size="sm" />
                           </span>
                         ))}
                       </div>
@@ -297,6 +322,7 @@ export function SkillRecordBody({
                       </div>
                     </div>
                   </div>
+                  <VerificationLine signals={signals} getStaff={getStaff} universityOf={universityOf} />
                 </div>
               </div>
             )

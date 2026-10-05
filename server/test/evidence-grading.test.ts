@@ -136,7 +136,7 @@ describe("evidence grading through the API", () => {
   })
 
   it("rejects the brief pasted back with print('hello world') at submission", async () => {
-    const res = await server.call("POST", `/projects/${PROJECT}/evidence`, YAZAN, { type: "Code", title: "Detector", content: BRIEF_AS_COMMENTS })
+    const res = await server.call("POST", `/projects/${PROJECT}/evidence`, YAZAN, { type: "Documentation", title: "Detector", link: "https://docs.example.com/detector", content: BRIEF_AS_COMMENTS })
     expect(res.status).toBe(400)
     expect(String(res.json.error)).toMatch(/repeats/)
   })
@@ -311,8 +311,9 @@ describe("evidence grading through the API", () => {
     const calls: { url: string; init: RequestInit }[] = []
     geminiReply({ restatesBrief: false, skills: [] }, calls)
     const add = await server.call("POST", `/projects/${PROJECT}/evidence`, YAZAN, {
-      type: "Code",
+      type: "Documentation",
       title: "Alert mailer",
+      link: "https://docs.example.com/alert-mailer",
       content: `import smtplib\n\ndef send_alert(flow_count: int) -> None:\n    # notify the on-call analyst\n    server = smtplib.SMTP("mail.local")\n    server.sendmail("soc@iris.example", "yazan.almasri.soc@gmail.com", f"{flow_count} anomalous flows flagged")`,
     })
     expect(add.status).toBe(200)

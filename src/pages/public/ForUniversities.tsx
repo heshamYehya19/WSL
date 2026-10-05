@@ -5,20 +5,20 @@ import { usePlatformTotals } from "../../lib/showcase"
 
 const POINTS = [
   {
-    title: "Real challenges, assigned college-wide",
-    body: "Accept pre-screened company challenges and assign each one to a whole college or program — not locked to a single course.",
+    title: "Verify student work",
+    body: "You are the verification authority. Your reviewers check each skill against the student's own evidence, and nothing reaches a company until you confirm it.",
   },
   {
-    title: "You decide what reaches the company",
-    body: "WSL rates each submission automatically and informationally — your reviewers decide what actually gets confirmed onward.",
+    title: "See what students can actually demonstrate",
+    body: "Every student builds a proof profile from real work: the project, what they contributed, the evidence, and what you verified.",
   },
   {
-    title: "Full visibility into student work",
-    body: "Monitor every individual submission, see WSL's AI evidence analysis, and verify each skill signal yourself before confirming the work.",
+    title: "Connect learning with real industry needs",
+    body: "Accept pre-screened company challenges and assign each one to a whole college or program, so coursework meets real problems.",
   },
   {
-    title: "WSL doesn't replace you",
-    body: "It connects real-world problems to the assignment and review process your institution already provides.",
+    title: "Strengthen graduate employability",
+    body: "Graduates leave with university-verified proof companies can inspect, not just a degree and a CV. Over time, the same record shows where curriculum and industry demand diverge.",
   },
 ]
 
@@ -31,10 +31,10 @@ export default function ForUniversities() {
         <div className="mx-auto max-w-4xl px-4 text-center sm:px-6">
           <div className="text-xs font-semibold tracking-wide text-teal-600 uppercase">For Universities</div>
           <h1 className="mt-2 text-3xl font-bold tracking-tight text-ink-950 sm:text-4xl">
-            Real industry problems, assigned to your programs.
+            Verify what your students can actually demonstrate.
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-ink-500">
-            WSL routes safe, automatically-screened industry problems to your students, college-wide — and keeps the final review exactly where it belongs.
+            See what your students can actually demonstrate, verify their work, and understand how learning aligns with industry needs. WSL organizes the evidence; the verification stays with you.
           </p>
         </div>
       </section>
@@ -61,7 +61,7 @@ export default function ForUniversities() {
             <StatTile label="Active Challenges" value={totals.activeChallenges} />
             <StatTile label="Student Projects" value={totals.projects} />
             <StatTile label="Evidence Items" value={totals.evidence} />
-            <StatTile label="Skill Signals" value={totals.skillSignals} />
+            <StatTile label="Skills Identified" value={totals.skillSignals} />
           </div>
           <p className="mt-2 text-xs text-ink-400">Counted live from the WSL platform.</p>
         </Reveal>

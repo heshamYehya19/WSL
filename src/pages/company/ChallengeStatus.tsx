@@ -74,7 +74,7 @@ export default function ChallengeStatus() {
             </p>
           )}
           {(challenge.status === "Evidence Under Review" || challenge.status === "Skills Pending Verification") && (
-            <p className="text-sm text-ink-500">WSL surfaced AI evidence signals for the submission. The university is verifying each skill next.</p>
+            <p className="text-sm text-ink-500">WSL has organized the submitted evidence. The university is verifying each skill next.</p>
           )}
           {awaitingYou ? (
             <div>

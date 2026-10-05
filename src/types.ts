@@ -174,8 +174,10 @@ export interface Evidence {
   link: string
   /** Optional pasted content (code, write-up, etc.) — what WSL's AI model actually analyzes. */
   content?: string
-  /** Files WSL read from the evidence's GitHub link and analyzed (README and top source files). */
+  /** What WSL read and analyzed: a GitHub link's files (README and top source files), an attached document, or a shared Google Doc. */
   analyzedFiles?: string[]
+  /** A document the student attached (Documentation evidence); download it with downloadEvidenceFile. */
+  file?: { name: string; size: number }
   submittedAt: string
 }
 

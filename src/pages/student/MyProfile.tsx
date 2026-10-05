@@ -3,7 +3,7 @@ import { useDemoUser } from "../../state/demoUser"
 import { useStore } from "../../state/store"
 import { SkillRecordBody } from "../../components/profile/SkillRecordBody"
 import { CountUp } from "../../hooks/useCountUp"
-import { studentProjects, studentSignals } from "../../lib/selectors"
+import { isEvidenced, studentProjects, studentSignals } from "../../lib/selectors"
 import type { Availability } from "../../types"
 
 const AVAILABILITIES: { value: Availability; hint: string }[] = [
@@ -23,14 +23,12 @@ export default function MyProfile() {
   const uni = getUniversity(student.universityId)
   const program = getProgram(student.programId)
 
-  const mySignals = studentSignals(skillSignals, student.id)
-  const uniqueSkills = new Map<string, number>()
-  for (const s of mySignals) uniqueSkills.set(s.skill, Math.max(uniqueSkills.get(s.skill) ?? 0, s.evidenceConfidence))
-  const avgScore = uniqueSkills.size ? Math.round([...uniqueSkills.values()].reduce((a, b) => a + b, 0) / uniqueSkills.size) : 0
+  const mySignals = studentSignals(skillSignals, student.id).filter(isEvidenced)
+  const uniqueSkills = new Set(mySignals.map((s) => s.skill))
   const verifiedCount = new Set(mySignals.filter((s) => s.status === "Verified").map((s) => s.skill)).size
   const stats = [
     { label: "Projects", value: studentProjects(projects, student.id).length },
-    { label: "Skill signals", value: uniqueSkills.size },
+    { label: "Skills identified", value: uniqueSkills.size },
     { label: "University verified", value: verifiedCount },
     { label: "Evidence items", value: evidence.filter((e) => e.studentId === student.id).length },
   ]
@@ -53,7 +51,7 @@ export default function MyProfile() {
     <div className="mx-auto max-w-5xl">
       <div className="mb-6">
         <div className="mb-1.5 text-xs font-semibold tracking-wide text-teal-600 uppercase">My Profile</div>
-        <h1 className="text-2xl font-bold tracking-tight text-ink-950 sm:text-3xl">Living Skill Record</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-ink-950 sm:text-3xl">Verified Proof Profile</h1>
       </div>
 
       {/* HERO CARD */}
@@ -64,20 +62,17 @@ export default function MyProfile() {
 
         <div className="relative p-6 sm:p-8">
           <div className="flex flex-wrap items-start gap-5">
-            {/* Avatar with a ring that fills to the student's average score */}
-            <div className="group relative h-20 w-20 shrink-0" title={`Average evidence confidence: ${avgScore}`}>
-              <div
-                className="absolute inset-0 rounded-full transition-transform duration-500 group-hover:rotate-180"
-                style={{ background: `conic-gradient(var(--color-teal-400) ${avgScore * 3.6}deg, rgba(255,255,255,0.08) 0deg)` }}
-              />
+            {/* Avatar; the badge counts university-verified skills, never a score */}
+            <div className="group relative h-20 w-20 shrink-0" title={`${verifiedCount} university-verified skill${verifiedCount === 1 ? "" : "s"}`}>
+              <div className="absolute inset-0 rounded-full bg-white/10" />
               <div className="absolute inset-[4px] flex items-center justify-center rounded-full bg-night">
-                <span className="flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br from-teal-400 to-teal-600 text-xl font-bold text-ink-950 transition-transform duration-300 group-hover:scale-95">
+                <span className="flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br from-teal-400 to-teal-600 text-xl font-bold text-ink-950 transition-transform duration-300 group-hover:scale-105">
                   {student.initials}
                 </span>
               </div>
-              {avgScore > 0 && (
+              {verifiedCount > 0 && (
                 <span className="absolute -right-1 -bottom-1 rounded-full border-2 border-night bg-teal-300 px-1.5 text-[10px] font-bold text-ink-950">
-                  {avgScore}
+                  ✓ {verifiedCount}
                 </span>
               )}
             </div>
@@ -181,7 +176,7 @@ export default function MyProfile() {
             maxLength={600}
             className="w-full rounded-xl border border-ink-200 bg-surface px-3 py-2 text-sm outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20"
           />
-          <p className="mt-1 text-xs text-ink-400">Companies see this on your candidate profile. Your skill signals can't be edited — they come from your evidence.</p>
+          <p className="mt-1 text-xs text-ink-400">Companies see this on your candidate profile. Your skills can't be edited — they come from your evidence and your university's verification.</p>
           <div className="mt-4 flex gap-3">
             <button onClick={save} disabled={saving} className="rounded-full bg-night px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-teal-600 disabled:opacity-50">
               {saving ? "Saving…" : "Save changes"}

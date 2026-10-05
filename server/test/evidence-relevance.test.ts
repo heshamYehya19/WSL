@@ -11,8 +11,9 @@ describe("evidence relevance gate", () => {
     // prj-skytech-forecast-mais is about forecasting spare-parts demand for an ERP —
     // submitting a recipe has no meaningful vocabulary overlap with that problem.
     const res = await server.call("POST", "/projects/prj-skytech-forecast-mais/evidence", "student:stu-asu-mais", {
-      type: "Code",
+      type: "Documentation",
       title: "Grandmother's knafeh recipe",
+      link: "https://docs.example.com/knafeh",
       content:
         "Melt the butter slowly over low heat, then layer the kataifi dough evenly across the tray before adding the sweetened cheese filling and baking until golden, finishing with the rosewater sugar syrup poured on top while still hot.",
     })

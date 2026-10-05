@@ -4,7 +4,7 @@ import { useDemoUser } from "../../state/demoUser"
 import { useStore } from "../../state/store"
 import { EmptyState } from "../../components/ui/EmptyState"
 import { DeadlinePill, DifficultyBars, PageHero, Pills, SearchInput } from "../../components/ui/ListKit"
-import { assignmentFor, canStudentSee, studentProjects, studentSignals } from "../../lib/selectors"
+import { assignmentFor, canStudentSee, isEvidenced, studentProjects, studentSignals } from "../../lib/selectors"
 import { daysUntil } from "../../lib/format"
 
 type Sort = "match" | "deadline"
@@ -31,7 +31,7 @@ export default function ChallengeDiscovery() {
 
   // Skills this student has already proven anywhere, with their best score.
   const proven = new Map<string, number>()
-  for (const s of studentSignals(skillSignals, student.id)) proven.set(s.skill, Math.max(proven.get(s.skill) ?? 0, s.evidenceConfidence))
+  for (const s of studentSignals(skillSignals, student.id).filter(isEvidenced)) proven.set(s.skill, Math.max(proven.get(s.skill) ?? 0, s.evidenceConfidence))
 
   const matchOf = (skills: string[]) => (skills.length ? Math.round((skills.filter((s) => proven.has(s)).length / skills.length) * 100) : 0)
 
