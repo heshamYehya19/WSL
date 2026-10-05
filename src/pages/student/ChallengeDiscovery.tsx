@@ -29,7 +29,7 @@ export default function ChallengeDiscovery() {
   )
   if (!student) return null
 
-  // Skills this student has already proven anywhere, with their best score.
+  // Skills WSL has already found evidence of in this student's work (not a score, and not yet verified).
   const proven = new Map<string, number>()
   for (const s of studentSignals(skillSignals, student.id).filter(isEvidenced)) proven.set(s.skill, Math.max(proven.get(s.skill) ?? 0, s.evidenceConfidence ?? 0))
 
@@ -150,7 +150,7 @@ export default function ChallengeDiscovery() {
                     return (
                       <span
                         key={s}
-                        title={has ? `You've practised this — best score ${proven.get(s)}%` : "New for you — this challenge could add it"}
+                        title={has ? "You've practised this — WSL found evidence of it in your earlier work" : "New for you — this challenge could add it"}
                         className={`rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
                           has ? "bg-teal-100 text-teal-700 ring-1 ring-teal-400/40" : "bg-ink-50 text-ink-500"
                         }`}

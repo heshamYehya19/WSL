@@ -60,7 +60,7 @@ export default function SkillsOverview() {
         stats={[
           { label: "enrolled", value: roster.length },
           { label: "active on WSL", value: active.length, accent: true },
-          { label: "cohort avg. confidence", value: cohortAvg },
+          { label: "cohort avg. evidence strength", value: cohortAvg },
           { label: "university-verified skills", value: roster.reduce((a, r) => a + r.verified, 0) },
         ]}
       />
@@ -93,7 +93,7 @@ export default function SkillsOverview() {
             value={sort}
             onChange={setSort}
             options={[
-              { value: "score", label: "Top score" },
+              { value: "score", label: "Strongest evidence" },
               { value: "projects", label: "Most projects" },
               { value: "name", label: "Name" },
             ]}
