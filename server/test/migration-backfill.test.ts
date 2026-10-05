@@ -30,6 +30,6 @@ describe("v13 and v14 migrations", () => {
     const source = (id: string) => (reopened.prepare("SELECT graded_source FROM skill_signals WHERE id = ?").get(id) as { graded_source: string }).graded_source
     expect(source(modelRow.id)).toBe("model")
     expect(source(offlineRow.id)).toBe("offline")
-    expect((reopened.prepare("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(14)
+    expect((reopened.prepare("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(15)
   })
 })

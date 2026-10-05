@@ -206,18 +206,21 @@ describe("Smart Campus Energy Optimization, start to finish", () => {
     const mid = await snapshot(AHMAD)
     expect(signalsOf(mid, "stu-ju-ahmad").find((s) => s.skill === "SQL")!.status).toBe("Verified")
     expect(signalsOf(mid, "stu-ju-ahmad").find((s) => s.skill === "Python")!.status).toBe("More Evidence Requested")
-    expect(signalsOf(mid, "stu-ju-sara").find((s) => s.skill === "SQL")!.status).toBe("Pending Verification")
+    // Sara's signals are hers alone: Ahmad's own snapshot carries none of them, and hers shows the review of her skills untouched.
+    expect(signalsOf(mid, "stu-ju-sara")).toHaveLength(0)
+    expect(signalsOf(await snapshot(SARA), "stu-ju-sara").find((s) => s.skill === "SQL")!.status).toBe("Pending Verification")
 
     // 8. Ahmad answers the request with the code, is re-analyzed, and the rest of the team is untouched.
     await evidence(AHMAD, { type: "Project Report", title: "Cleaning notes", link: "https://docs.example.com/ahmad/cleaning", content: PIPELINE + "\n# The cleaning step drops rows without a kWh reading and adds an hour column." })
     await ok(server.call("POST", `/projects/${project}/ai-review`, AHMAD))
     expect(signalsOf(await snapshot(AHMAD), "stu-ju-ahmad").find((s) => s.skill === "SQL")!.status).toBe("Verified")
 
-    // 9. Everything with evidence gets a final decision, then the university confirms to the company.
+    // 9. Every student x every required skill gets a current, explicit decision — verified where the work shows it,
+    // acknowledged as insufficient where it doesn't — and only then does the university confirm to the company.
+    expect((await server.call("POST", `/projects/${project}/confirm`, JU, {})).status).toBe(409)
     const latest = await snapshot(JU)
     for (const sig of signalsOf(latest, "stu-ju-ahmad").concat(signalsOf(latest, "stu-ju-sara"), signalsOf(latest, "stu-ju-omar"))) {
-      if (sig.status === "Verified" || sig.suggestedLevel === "Insufficient") continue
-      await ok(server.call("POST", `/projects/${project}/signals/${sig.id}/review`, JU, { decision: "verify" }))
+      await ok(server.call("POST", `/projects/${project}/signals/${sig.id}/review`, JU, { decision: sig.suggestedLevel === "Insufficient" ? "insufficient" : "verify" }))
     }
     await ok(server.call("POST", `/projects/${project}/confirm`, JU, { note: "Reviewed each student's evidence against their own contribution." }))
 

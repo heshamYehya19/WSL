@@ -27,7 +27,7 @@ export default function UniversityStudentDetail() {
   return (
     <div className="mx-auto max-w-4xl">
       <Link to="/university/students" className="text-sm text-ink-400 hover:text-teal-600">← Back to Students</Link>
-      <PageHeader eyebrow={uni?.name} title={student.name} subtitle={`${program?.name ?? student.field} · ${student.year} · Student no. ${student.studentNumber} · GPA ${student.gpa.toFixed(2)}`} />
+      <PageHeader eyebrow={uni?.name} title={student.name} subtitle={[program?.name ?? student.field, student.year, student.studentNumber ? `Student no. ${student.studentNumber}` : "", student.gpa !== undefined ? `GPA ${student.gpa.toFixed(2)}` : ""].filter(Boolean).join(" · ")} />
       {student.bio && <p className="mb-6 max-w-2xl text-sm leading-relaxed text-ink-600">{student.bio}</p>}
       <SkillRecordBody studentId={student.id} projectHref={(pid) => `/university/projects/${pid}`} />
     </div>

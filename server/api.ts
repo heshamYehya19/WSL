@@ -159,8 +159,11 @@ function verifiedEvidenceIds(db: DatabaseSync): Set<string> {
  * university. A university reads the evidence of its own students' projects. A company, once a
  * project is confirmed to it, reads only evidence that a university-verified skill is built on.
  */
-function evidenceReadableBy(actor: Actor, visible: Set<string>, e: { id: string; projectId: string; studentId: string }, cited: Set<string>): boolean {
+function evidenceReadableBy(actor: Actor, visible: Set<string>, e: { id: string; projectId: string; studentId: string }, cited: Set<string>, onTeam: boolean): boolean {
   if (!visible.has(e.projectId)) return false
+  // Work by someone no longer on the project's team (a legacy cross-university member who was detached) is kept
+  // on record, but it is not part of the project: nobody reads it through the project.
+  if (!onTeam) return false
   if (actor.role === "student") return e.studentId === actor.id
   if (actor.role === "company") return cited.has(e.id)
   return actor.role === "university"
@@ -234,6 +237,18 @@ function buildSnapshot(db: DatabaseSync, actor: Actor): Snapshot {
     isPrimary: Number(r.is_primary) === 1,
   }))
 
+  // A company learns who contributed to a project only through verified skills: for a student with none
+  // on a project, their own account of their contribution is not shared either.
+  const verifiedPairs = new Set(all(db, "SELECT DISTINCT project_id, student_id FROM skill_signals WHERE status = 'Verified'").map((r) => `${r.project_id}|${r.student_id}`))
+  // Students a company may discover: verified proof on a project a university confirmed to it.
+  const discoverable = new Set([...verifiedPairs].filter((k) => visible.has(k.split("|")[0])).map((k) => k.split("|")[1]))
+  // Who is on which team (owner and members), so work by someone who is no longer on it is never read as the team's.
+  const memberRows = all(db, "SELECT * FROM project_members")
+  const teamOfProject = new Map<string, Set<string>>()
+  for (const pr of all(db, "SELECT id, student_id FROM projects")) teamOfProject.set(String(pr.id), new Set([String(pr.student_id)]))
+  for (const m of memberRows) teamOfProject.get(String(m.project_id))?.add(String(m.student_id))
+  const onTeam = (projectId: unknown, studentId: unknown) => teamOfProject.get(String(projectId))?.has(String(studentId)) ?? false
+
   const students: Student[] = all(
     db,
     // Students with the most verified skills first, so lists (and the sign-in page) open on a full record.
@@ -242,18 +257,30 @@ function buildSnapshot(db: DatabaseSync, actor: Actor): Snapshot {
               (SELECT COUNT(*) FROM projects pr WHERE pr.student_id = s.id) DESC, s.name`,
   ).map((r) => {
     const name = String(r.name)
+    // Who may read a student's academic and personal details: the student, their own university, and a company only
+    // once the student has verified proof it can discover (and then never the university's student number). Everyone
+    // else — other students, other universities, guests, a company that has seen no proof — gets a name and a program.
+    const id = String(r.id)
+    const full =
+      (actor.role === "student" && actor.id === id) ||
+      (actor.role === "university" && actor.id === r.university_id) ||
+      (actor.role === "company" && discoverable.has(id))
     return {
-      id: String(r.id),
+      id,
       name,
       field: r.major as Student["field"],
       universityId: String(r.university_id),
       programId: String(r.program_id),
-      studentNumber: String(r.student_number),
       year: String(r.year),
-      gpa: Number(r.gpa),
-      city: String(r.city),
-      bio: String(r.bio),
-      availability: r.availability as Student["availability"],
+      ...(full
+        ? {
+            ...(actor.role === "company" ? {} : { studentNumber: String(r.student_number) }),
+            gpa: Number(r.gpa),
+            city: String(r.city),
+            bio: String(r.bio),
+            availability: r.availability as Student["availability"],
+          }
+        : {}),
       initials: name
         .split(/\s+/)
         .filter((w) => !/^(al|abu|bani)-?$/i.test(w))
@@ -277,7 +304,10 @@ function buildSnapshot(db: DatabaseSync, actor: Actor): Snapshot {
      FROM challenges c
      JOIN company_contacts cc ON cc.id = c.contact_id
      ORDER BY c.created_at DESC`,
-  ).map((r) => ({
+  )
+    // A draft is the company's own working copy: no one else — another company, a university, a student — reads it.
+    .filter((r) => r.status !== "Draft" || (actor.role === "company" && actor.id === r.company_id))
+    .map((r) => ({
     id: String(r.id),
     title: String(r.title),
     organizationId: String(r.company_id),
@@ -337,15 +367,16 @@ function buildSnapshot(db: DatabaseSync, actor: Actor): Snapshot {
      LEFT JOIN companies co ON co.id = cc.company_id
      ORDER BY f.at`,
   )
-  const memberRows = all(db, "SELECT * FROM project_members")
   const analysisRows = all(db, "SELECT project_id, student_id, model, graded_at FROM analysis_runs")
   const companyFeedbackRows = all(db, "SELECT * FROM company_feedback")
   const evidenceCountRows = all(db, "SELECT project_id, student_id, COUNT(*) AS n FROM evidence GROUP BY project_id, student_id")
-  // A company learns who contributed to a project only through verified skills: for a student with none
-  // on a project, their own account of their contribution is not shared either.
-  const verifiedPairs = new Set(all(db, "SELECT DISTINCT project_id, student_id FROM skill_signals WHERE status = 'Verified'").map((r) => `${r.project_id}|${r.student_id}`))
-  const shareNote = (projectId: unknown, studentId: unknown, note: unknown) =>
-    actor.role === "company" && !verifiedPairs.has(`${projectId}|${studentId}`) ? "" : String(note ?? "")
+  // What someone says they contributed is private to the team and the university that verifies it. A company reads it
+  // only once the project was confirmed to it, and only for a student with verified skills on it. Nobody else does.
+  const shareNote = (projectId: unknown, studentId: unknown, note: unknown) => {
+    if (!visible.has(String(projectId))) return ""
+    if (actor.role === "company" && !verifiedPairs.has(`${projectId}|${studentId}`)) return ""
+    return String(note ?? "")
+  }
   // The confirmation check, for a project not yet confirmed: all of it for the university that decides, only
   // the student's own skills for a student, nothing for a company.
   const reviewFor = (r: Row): ProjectReview | null => {
@@ -368,10 +399,11 @@ function buildSnapshot(db: DatabaseSync, actor: Actor): Snapshot {
       organizationId: String(r.company_id),
       studentId: String(r.student_id),
       ownerRoleNote: shareNote(r.id, r.student_id, r.owner_role_note),
+      // The team is for those who can see the project; a company is told of the members its verified proof comes from.
       members: memberRows
-        .filter((m) => m.project_id === r.id)
+        .filter((m) => m.project_id === r.id && visible.has(String(r.id)) && (actor.role !== "company" || verifiedPairs.has(`${r.id}|${m.student_id}`)))
         .map((m): ProjectMember => ({ studentId: String(m.student_id), roleNote: shareNote(r.id, m.student_id, m.role_note) })),
-      analysis: analysisRows.filter((a) => a.project_id === r.id).map((a) => ({ studentId: String(a.student_id), model: String(a.model), gradedAt: String(a.graded_at) })),
+      analysis: analysisRows.filter((a) => a.project_id === r.id && visible.has(String(r.id)) && actor.role !== "company").map((a) => ({ studentId: String(a.student_id), model: String(a.model), gradedAt: String(a.graded_at) })),
       // Counts only, so a student sees how far their teammates are without seeing their work. A company needs neither.
       evidenceCounts:
         actor.role === "company" || !visible.has(String(r.id))
@@ -384,8 +416,10 @@ function buildSnapshot(db: DatabaseSync, actor: Actor): Snapshot {
       status: r.status as ChallengeStatus,
       startedAt: String(r.started_at),
       tasks: taskRows.filter((t) => t.project_id === r.id).map((t) => ({ id: String(t.id), title: String(t.title), done: Number(t.done) === 1 })),
+      // The university's and the company's notes on a project are for the people involved: the team, its university, and
+      // the company whose challenge it is. Another company viewing the proof is not shown them.
       feedback: feedbackRows
-        .filter((f) => f.project_id === r.id && visible.has(String(r.id)))
+        .filter((f) => f.project_id === r.id && visible.has(String(r.id)) && (actor.role !== "company" || actor.id === r.company_id))
         .map(
           (f): FeedbackEntry => ({
             id: String(f.id),
@@ -396,7 +430,7 @@ function buildSnapshot(db: DatabaseSync, actor: Actor): Snapshot {
             at: String(f.at),
           }),
         ),
-      ...(cf
+      ...(cf && visible.has(String(r.id)) && (actor.role !== "company" || actor.id === r.company_id)
         ? {
             companyFeedback: {
               strongTechnicalExecution: Number(cf.strong_technical_execution) === 1,
@@ -414,7 +448,9 @@ function buildSnapshot(db: DatabaseSync, actor: Actor): Snapshot {
   const evidenceFiles = new Map(all(db, "SELECT evidence_id, name, size FROM evidence_files").map((f) => [String(f.evidence_id), { name: String(f.name), size: Number(f.size) }]))
   const citedByVerified = actor.role === "company" ? verifiedEvidenceIds(db) : new Set<string>()
   const evidence: Evidence[] = all(db, "SELECT * FROM evidence ORDER BY submitted_at DESC")
-    .filter((r) => evidenceReadableBy(actor, visible, { id: String(r.id), projectId: String(r.project_id), studentId: String(r.student_id) }, citedByVerified))
+    .filter((r) =>
+      evidenceReadableBy(actor, visible, { id: String(r.id), projectId: String(r.project_id), studentId: String(r.student_id) }, citedByVerified, onTeam(r.project_id, r.student_id)),
+    )
     .map((r) => ({
       id: String(r.id),
       projectId: String(r.project_id),
@@ -436,6 +472,7 @@ function buildSnapshot(db: DatabaseSync, actor: Actor): Snapshot {
     .filter(
       (r) =>
         visible.has(String(r.project_id)) &&
+        onTeam(r.project_id, r.student_id) &&
         (actor.role === "student" ? r.student_id === actor.id : actor.role === "company" ? r.status === "Verified" : true),
     )
     .map((r) => ({
@@ -452,7 +489,6 @@ function buildSnapshot(db: DatabaseSync, actor: Actor): Snapshot {
       status: r.status as SkillSignalStatus,
       ...(r.verified_by ? { verifiedBy: String(r.verified_by), verifiedAt: String(r.verified_at) } : {}),
       ...(r.reviewer_notes && actor.role !== "company" ? { reviewerNotes: String(r.reviewer_notes) } : {}),
-      ...(r.company_rating !== null ? { companyRating: Number(r.company_rating), companyRatedAt: String(r.company_rated_at) } : {}),
       evidenceIds: signalEvidence.filter((se) => se.signal_id === r.id).map((se) => String(se.evidence_id)),
       analyzedAt: String(r.analyzed_at),
     }))
@@ -559,8 +595,8 @@ const DECIDED_STATUSES: SkillSignalStatus[] = ["Verified", "Rejected", "Insuffic
  * university decision — Verified, Not Verified, or Insufficient Evidence the university acknowledged.
  * Not decisions: Pending Verification, More Evidence Requested, a skill nobody has reviewed (no signal
  * at all, or WSL's "found nothing" with no acknowledgement), and anything stale. A decision is stale
- * when the student added evidence after it, WSL re-analyzed after it, or the student's current
- * evidence hasn't been analyzed yet. Absence of evidence is never silently treated as a decision.
+ * when the student added evidence after it, WSL re-analyzed that skill after it, or the student's
+ * current evidence hasn't been analyzed yet. Absence of evidence is never silently treated as a decision.
  */
 function reviewReadiness(db: DatabaseSync, projectId: string): ProjectReview {
   const p = projectContext(db, projectId)
@@ -572,7 +608,7 @@ function reviewReadiness(db: DatabaseSync, projectId: string): ProjectReview {
   for (const studentId of teamIds(db, projectId)) {
     const who = studentRow(db, studentId)
     if (who.universityId !== p.universityId) {
-      problems.push(`${who.name} studies at a different university than the rest of the team, so ${p.universityName} cannot review ${who.name}'s work. Remove them from the team before confirming.`)
+      problems.push(`${who.name} studies at a different university than the rest of the team, so ${p.universityName} cannot review ${who.name}'s work. Remove ${who.name} from the team (the project owner or ${p.universityName} can) before confirming.`)
     }
     const latestEvidenceAt = String(one(db, "SELECT MAX(submitted_at) AS at FROM evidence WHERE project_id = ? AND student_id = ?", projectId, studentId)?.at ?? "")
     const run = one(db, "SELECT evidence_hash, model, graded_at FROM analysis_runs WHERE project_id = ? AND student_id = ?", projectId, studentId)
@@ -592,7 +628,9 @@ function reviewReadiness(db: DatabaseSync, projectId: string): ProjectReview {
 
       const decided = !!s && DECIDED_STATUSES.includes(s.status as SkillSignalStatus)
       const decidedAt = decided ? String(s!.verified_at ?? s!.analyzed_at) : ""
-      const stale = !analysisCurrent || (decided && (latestEvidenceAt > decidedAt || (!!run && String(run.graded_at) > decidedAt)))
+      // Stale: the student's current evidence was never analyzed, they added evidence after the decision, or this very
+      // signal was re-analyzed after it. (A re-analysis that left a verified signal as it was does not count.)
+      const stale = !analysisCurrent || (decided && (latestEvidenceAt > decidedAt || String(s!.analyzed_at) > decidedAt))
       items.push({ studentId, skill, state, stale, resolved: decided && !stale })
     }
   }
@@ -622,9 +660,10 @@ function reviewBlockers(db: DatabaseSync, review: ProjectReview): string {
 /**
  * One reviewer decision on one student's one skill — the only way a skill is verified, declined, or
  * acknowledged as insufficient. It is made by the student's own university, notifies only that student,
- * and (for a skill with no signal yet) can only ask for more evidence or acknowledge insufficient evidence:
- * there is no analysis to verify. Acknowledging "Insufficient Evidence" is only for a skill WSL found
- * nothing for; where WSL found evidence the reviewer verifies it, asks for more, or declines to verify it.
+ * and (for a skill with no signal yet, or one where WSL found nothing) can only ask for more evidence or
+ * acknowledge insufficient evidence: there is no evidence to verify. Acknowledging "Insufficient Evidence" is
+ * only for a skill WSL found nothing for; where WSL found evidence the reviewer verifies it, asks for more,
+ * or declines to verify it.
  */
 function decideSkill(db: DatabaseSync, universityId: string, p: ReturnType<typeof projectContext>, studentId: string, skill: string, body: Record<string, unknown>) {
   const subject = studentRow(db, studentId)
@@ -652,6 +691,11 @@ function decideSkill(db: DatabaseSync, universityId: string, p: ReturnType<typeo
     signalId = String(existing.id)
     if (decision === "insufficient" && existing.suggested_level !== "Insufficient") {
       throw new ApiError(409, `WSL found ${skill} evidence in ${subject.name}'s work, so decide on that evidence: verify it, ask for more, or decline to verify it.`)
+    }
+    // A skill is verified because evidence demonstrates it. Where WSL found none there is nothing to verify, whatever the
+    // reviewer would like to say: the honest decisions are to acknowledge Insufficient Evidence or to ask for more.
+    if (decision === "verify" && existing.suggested_level === "Insufficient") {
+      throw new ApiError(409, `WSL found no ${skill} evidence in ${subject.name}'s work, so there is nothing to verify. Acknowledge Insufficient Evidence, or ask for more.`)
     }
   }
 
@@ -1142,18 +1186,35 @@ const routes: { method: string; pattern: RegExp; prepare?: (actor: Actor, body: 
     pattern: /^\/projects\/([^/]+)\/members\/([^/]+)\/remove$/,
     // The owner removes a teammate, or a teammate leaves. Someone who has already submitted evidence
     // stays: their work and any review of it belong to the project's record.
+    //
+    // One exception: a teammate from a different university — possible before teams were same-university only —
+    // can be detached by the project owner or by the owner's university even with work on the project, because
+    // no one on this project can verify them and the team could never be confirmed. Nothing of theirs is deleted:
+    // their evidence and signals stay on record, they just stop being part of this team's project and review.
     handler: (db, actor, [id, mateId]) => {
-      const student = requireRole(actor, "student")
+      if (actor.role !== "student" && actor.role !== "university") throw new ApiError(403, "Only a signed-in student or university account can do this.")
       const p = projectContext(db, id)
       if (mateId === p.studentId) throw new ApiError(400, "The student who started the project can't be removed from it.")
-      if (student.id !== p.studentId && student.id !== mateId) throw new ApiError(403, "Only the project owner, or the teammate themselves, can remove a teammate.")
-      if (!isProjectMember(db, id, mateId)) throw new ApiError(404, "That student isn't a teammate on this project.")
+      const member = isProjectMember(db, id, mateId)
+      const foreign = member && studentRow(db, mateId).universityId !== p.universityId
+      if (actor.role === "university") {
+        if (actor.id !== p.universityId || !foreign) throw new ApiError(403, "A university can only remove a teammate from another university who can't be reviewed on this project.")
+      } else if (actor.id !== p.studentId && actor.id !== mateId) {
+        throw new ApiError(403, "Only the project owner, or the teammate themselves, can remove a teammate.")
+      }
+      if (!member) throw new ApiError(404, "That student isn't a teammate on this project.")
       if (rank(p.status) >= rank("Verified")) throw new ApiError(409, "This project was already confirmed to the company, so its team is closed.")
-      if (one(db, "SELECT 1 FROM evidence WHERE project_id = ? AND student_id = ?", id, mateId) || one(db, "SELECT 1 FROM skill_signals WHERE project_id = ? AND student_id = ?", id, mateId)) {
+      if (!foreign && (one(db, "SELECT 1 FROM evidence WHERE project_id = ? AND student_id = ?", id, mateId) || one(db, "SELECT 1 FROM skill_signals WHERE project_id = ? AND student_id = ?", id, mateId))) {
         throw new ApiError(409, "This teammate has already submitted evidence on the project, so they can't be removed.")
       }
       exec(db, "DELETE FROM project_members WHERE project_id = ? AND student_id = ?", id, mateId)
-      if (student.id !== mateId) notify(db, "student", mateId, "You were removed from a team project", `${p.studentName} removed you from “${p.challengeTitle}”.`, null)
+      const mate = studentRow(db, mateId)
+      if (actor.role === "university") {
+        notify(db, "student", mateId, "You were removed from a team project", `${p.universityName} removed you from “${p.challengeTitle}” because you study at a different university than the rest of the team. Your work is kept on record.`, null)
+        notify(db, "student", p.studentId, "A teammate was removed", `${p.universityName} removed ${mate.name} from “${p.challengeTitle}”: teams stay within one university so it can verify everyone's work.`, `/student/projects/${id}`)
+      } else if (actor.id !== mateId) {
+        notify(db, "student", mateId, "You were removed from a team project", `${p.studentName} removed you from “${p.challengeTitle}”.${foreign ? " Your work is kept on record." : ""}`, null)
+      }
     },
   },
   {
@@ -1368,19 +1429,35 @@ const routes: { method: string; pattern: RegExp; prepare?: (actor: Actor, body: 
       if (prepared.unchanged) return { unchanged: true, model: prepared.model, gradedAt: prepared.gradedAt }
 
       const now = nowIso()
+      // Only this student's own evidence can back this student's signal, whatever a model says it cited.
+      const ownEvidence = new Set(all(db, "SELECT id FROM evidence WHERE project_id = ? AND student_id = ?", id, student.id).map((e) => String(e.id)))
+      const reopened: string[] = []
       for (const r of prepared.results) {
-        const existing = one(db, "SELECT id, status, graded_source FROM skill_signals WHERE project_id = ? AND student_id = ? AND skill = ?", id, student.id, r.skill)
-        // A mentor's decision is durable — new evidence never silently re-scores a
-        // skill the mentor already verified out from under them.
-        if (existing && existing.status === "Verified") continue
+        const existing = one(db, "SELECT id, status, graded_source, suggested_level, ai_quotes FROM skill_signals WHERE project_id = ? AND student_id = ? AND skill = ?", id, student.id, r.skill)
+        const evidenceIds = [...new Set(r.evidenceIds)].filter((evId) => ownEvidence.has(evId))
         // The model failing this run must never downgrade a skill it already graded
         // before — keep that result untouched rather than overwrite it with a weaker
         // offline estimate. A skill with no prior model-graded result still gets the
         // offline estimate, clearly labeled by graded_source for the UI.
         if (existing && existing.graded_source === "model" && r.source === "offline" && prepared.failed) continue
+        // A verification is a decision about a particular body of evidence. When new evidence changes what WSL found
+        // for a verified skill (another level, other quotes, other evidence behind it), the new result is taken in and
+        // the verification stops standing: the reviewer decides again on what is there now. A verified skill the new
+        // evidence does not change keeps its verification.
+        if (existing && existing.status === "Verified") {
+          const before = all(db, "SELECT evidence_id FROM skill_signal_evidence WHERE signal_id = ?", String(existing.id)).map((e) => String(e.evidence_id)).sort()
+          const unchanged =
+            existing.suggested_level === r.suggestedLevel &&
+            JSON.stringify(before) === JSON.stringify([...evidenceIds].sort()) &&
+            String(existing.ai_quotes) === JSON.stringify(r.quotes)
+          if (unchanged) continue
+          reopened.push(r.skill)
+        }
         const sigId = existing ? String(existing.id) : newId("sig")
         if (existing) {
           exec(db, "DELETE FROM skill_signal_evidence WHERE signal_id = ?", sigId)
+          // The previous decision's reviewer, time and notes stay on the row as the last decision made; only the
+          // status goes back to awaiting one.
           exec(
             db,
             "UPDATE skill_signals SET evidence_confidence = ?, ai_note = ?, ai_quotes = ?, ai_criteria = ?, suggested_level = ?, graded_source = ?, status = 'Pending Verification', analyzed_at = ? WHERE id = ?",
@@ -1393,7 +1470,13 @@ const routes: { method: string; pattern: RegExp; prepare?: (actor: Actor, body: 
             sigId, id, student.id, r.skill, r.rating, r.note, JSON.stringify(r.quotes), JSON.stringify(r.criteria), r.suggestedLevel, r.source, now,
           )
         }
-        for (const evId of r.evidenceIds) exec(db, "INSERT INTO skill_signal_evidence (signal_id, evidence_id) VALUES (?, ?)", sigId, evId)
+        for (const evId of evidenceIds) exec(db, "INSERT INTO skill_signal_evidence (signal_id, evidence_id) VALUES (?, ?)", sigId, evId)
+      }
+      if (reopened.length > 0) {
+        const list = reopened.join(", ")
+        const them = reopened.length === 1 ? "it" : "them"
+        notify(db, "university", p.universityId, "Verified skill needs a new review", `${studentRow(db, student.id).name}'s new evidence for “${p.challengeTitle}” changed what WSL found for ${list}. The earlier verification no longer applies — review ${them} again.`, `/university/projects/${id}`)
+        notify(db, "student", student.id, "A verified skill will be reviewed again", `Your new evidence changed the analysis of ${list} for “${p.challengeTitle}”, so your university will review ${them} again.`, `/student/projects/${id}`)
       }
       // A failed model call is not a stable, cacheable outcome — leave the cache alone so the
       // next re-analysis attempt can reach the model again instead of being short-circuited.
@@ -1696,6 +1779,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
         visibleProjectIds(db, actor),
         { id: evidenceId, projectId: String(file.project_id), studentId: String(owner?.student_id ?? "") },
         actor.role === "company" ? verifiedEvidenceIds(db) : new Set<string>(),
+        isOnTeam(db, String(file.project_id), String(owner?.student_id ?? "")),
       )
       if (!readable) throw new ApiError(403, "You don't have access to this file.")
       sendAttachment(res, file)

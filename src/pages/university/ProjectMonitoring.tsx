@@ -17,7 +17,7 @@ import { formatDate } from "../../lib/format"
 export default function ProjectMonitoring() {
   const { id } = useParams()
   const { university } = useDemoUser()
-  const { projects, challenges, evidence, skillSignals, addFeedback, confirmToCompany, reviewSignal, reviewSkill, getOrg, getStudent, getProgram, getStaff, isUniversityStudent } = useStore()
+  const { projects, challenges, evidence, skillSignals, addFeedback, confirmToCompany, reviewSignal, reviewSkill, removeTeammate, getOrg, getStudent, getProgram, getStaff, isUniversityStudent } = useStore()
   const [note, setNote] = useState("")
   const [confirmNote, setConfirmNote] = useState("")
   const [saving, setSaving] = useState(false)
@@ -112,8 +112,23 @@ export default function ProjectMonitoring() {
                   <div>
                     <Link to={`/university/students/${member.studentId}`} className="text-base font-semibold text-ink-900 hover:text-teal-600">{person?.name}</Link>
                     <p className="text-xs text-ink-400">
-                      {member.isOwner ? "Started the project" : "Teammate"} · {program?.name ?? person?.field} · {person?.year} · No. {person?.studentNumber}
+                      {member.isOwner ? "Started the project" : "Teammate"} · {program?.name ?? person?.field} · {person?.year}
+                      {person?.studentNumber ? ` · No. ${person.studentNumber}` : ""}
                     </p>
+                    {person && person.universityId !== university.id && (
+                      <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                        <p className="text-[11px] font-medium text-amber-700">Studies at another university — you cannot verify their work, so this project cannot be confirmed while they are on the team.</p>
+                        {readyToConfirm && (
+                          <button
+                            type="button"
+                            onClick={() => void removeTeammate(project.id, member.studentId)}
+                            className="rounded-lg border border-danger-600/40 px-2.5 py-1 text-[11px] font-semibold text-danger-600 transition-colors hover:bg-danger-600/10"
+                          >
+                            Remove from team
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <p className="text-xs text-ink-500">

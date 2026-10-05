@@ -243,9 +243,6 @@ export interface SkillSignal {
   verifiedAt?: string
   /** The mentor's own note — required for "More Evidence Requested"/"Rejected", optional for "Verified". */
   reviewerNotes?: string
-  /** Deprecated — a per-skill company number from before this rework. Never written or read by new code; kept only so historical seed rows still read back. */
-  companyRating?: number
-  companyRatedAt?: string
   evidenceIds: string[]
   analyzedAt: string
 }
@@ -342,13 +339,18 @@ export interface Student {
   field: StudentMajor
   universityId: string
   programId: string
-  studentNumber: string
   year: string
-  gpa: number
-  city: string
-  bio: string
-  availability: Availability
   initials: string
+  /**
+   * Academic and personal details, sent only to whoever may read them: the student, their own university, and a
+   * company that can discover them through verified proof (which never receives the student number). Everyone
+   * else — other students, other universities, a signed-out visitor — gets a name and a program.
+   */
+  studentNumber?: string
+  gpa?: number
+  city?: string
+  bio?: string
+  availability?: Availability
 }
 
 export interface Opportunity {

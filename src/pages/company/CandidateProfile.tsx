@@ -40,7 +40,7 @@ export default function CandidateProfile() {
     <div className="mx-auto max-w-4xl">
       <Link to="/company/talent" className="text-sm text-ink-400 hover:text-teal-600">← Back to Talent Discovery</Link>
       <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
-        <PageHeader eyebrow={uni?.name} title={student.name} subtitle={`${program?.name ?? student.field} · ${student.year} · GPA ${student.gpa.toFixed(2)} · ${student.availability}`} />
+        <PageHeader eyebrow={uni?.name} title={student.name} subtitle={[program?.name ?? student.field, student.year, student.gpa !== undefined ? `GPA ${student.gpa.toFixed(2)}` : "", student.availability ?? ""].filter(Boolean).join(" · ")} />
         <div className="flex flex-wrap gap-2">
           <button
             type="button"

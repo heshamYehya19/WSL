@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { allClaimedResolved, isClaimed, proofCounts, PROOF_STATE_LABEL, PROOF_STATE_MEANING, skillProofState } from "../../src/lib/proof.ts"
-import type { SkillSignalStatus, SuggestedLevel } from "../../src/types.ts"
+import { proofCounts, PROOF_STATE_LABEL, PROOF_STATE_MEANING, reviewItemFor, reviewItemReason, skillProofState } from "../../src/lib/proof.ts"
+import type { ReviewItem, SkillSignalStatus, SuggestedLevel } from "../../src/types.ts"
 import { EVIDENCE_INPUT, SUBMITTABLE_EVIDENCE_TYPES, evidenceTypeLabel } from "../../src/lib/evidenceTypes.ts"
 
 const signal = (status: SkillSignalStatus, suggestedLevel: SuggestedLevel = "Foundational") => ({ status, suggestedLevel })
@@ -47,18 +47,44 @@ describe("the state of a skill, derived from the data", () => {
       { skill: "Machine Learning", ...signal("Pending Verification", "Insufficient") },
     ])
     // Data Analysis has no signal at all, and the required list is never treated as evidence.
-    expect(counts).toEqual({ verified: 1, pending: 1, insufficient: 2, "more-evidence": 0, "not-verified": 0 })
+    expect(counts).toEqual({ verified: 1, pending: 1, insufficient: 2, acknowledged: 0, "more-evidence": 0, "not-verified": 0 })
+  })
+})
+
+describe("insufficient evidence the university acknowledged", () => {
+  it("H. is a state of its own: reviewed and agreed, not merely 'WSL found nothing'", () => {
+    expect(skillProofState(signal("Insufficient Evidence", "Insufficient"))).toBe("acknowledged")
+    expect(skillProofState(signal("Pending Verification", "Insufficient"))).toBe("insufficient")
+    expect(PROOF_STATE_LABEL.acknowledged).toBe("Insufficient evidence · reviewed")
+    expect(PROOF_STATE_MEANING.acknowledged).toMatch(/reviewed this and agreed/)
+  })
+
+  it("counts an acknowledged skill apart from an unreviewed one, and never as verified", () => {
+    const counts = proofCounts(["SQL", "Python"], [
+      { skill: "SQL", ...signal("Insufficient Evidence", "Insufficient") },
+      { skill: "Python", ...signal("Pending Verification", "Insufficient") },
+    ])
+    expect(counts).toEqual({ verified: 0, pending: 0, insufficient: 1, acknowledged: 1, "more-evidence": 0, "not-verified": 0 })
   })
 })
 
 describe("what the reviewer has to decide", () => {
-  it("leaves skills nobody showed evidence for out of the decision", () => {
-    expect(isClaimed(signal("Pending Verification", "Insufficient"))).toBe(false)
-    expect(isClaimed(signal("Pending Verification"))).toBe(true)
-    expect(allClaimedResolved([signal("Verified"), signal("Pending Verification", "Insufficient")])).toBe(true)
-    expect(allClaimedResolved([signal("Verified"), signal("Pending Verification")])).toBe(false)
-    expect(allClaimedResolved([signal("Pending Verification", "Insufficient")])).toBe(false)
-    expect(allClaimedResolved([signal("Verified"), signal("Rejected")])).toBe(true)
+  const item = (over: Partial<ReviewItem>): ReviewItem => ({ studentId: "stu-1", skill: "SQL", state: "pending", stale: false, resolved: false, ...over })
+
+  it("finds the confirmation check's verdict on exactly one student's one skill", () => {
+    const review = { items: [item({ skill: "SQL", state: "verified", resolved: true }), item({ skill: "Python" }), item({ studentId: "stu-2", skill: "SQL", state: "unreviewed" })] }
+    expect(reviewItemFor(review, "stu-1", "SQL")?.state).toBe("verified")
+    expect(reviewItemFor(review, "stu-2", "SQL")?.state).toBe("unreviewed")
+    expect(reviewItemFor(review, "stu-3", "SQL")).toBeUndefined()
+    expect(reviewItemFor(null, "stu-1", "SQL")).toBeUndefined()
+  })
+
+  it("says why a skill still blocks confirmation: never reviewed, awaiting, more evidence, or stale", () => {
+    expect(reviewItemReason(item({ state: "unreviewed" }))).toBe("not reviewed yet")
+    expect(reviewItemReason(item({ state: "pending" }))).toBe("awaiting a decision")
+    expect(reviewItemReason(item({ state: "more-evidence" }))).toBe("more evidence requested")
+    // A decision that predates new evidence no longer counts, whatever it was.
+    expect(reviewItemReason(item({ state: "verified", stale: true }))).toBe("new evidence since the last review or analysis")
   })
 })
 

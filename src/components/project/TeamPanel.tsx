@@ -62,6 +62,9 @@ export function TeamPanel({ project, challenge, me, locked }: { project: Project
           // A teammate's evidence and skills never reach this browser — only how many items they've submitted.
           const evidenceCount = project.evidenceCounts.find((c) => c.studentId === m.studentId)?.count ?? 0
           const isMe = m.studentId === me.id
+          // Someone from another university (a team made before teams stayed within one university) can always be removed,
+          // even with work on the project: no one here can verify them. Their work is kept on record.
+          const elsewhere = !!person && person.universityId !== me.universityId
           const counts = proofCounts(requiredSkills, isMe ? signalsBy(skillSignals, project.id, m.studentId) : [])
           return (
             <li key={m.studentId} className="rounded-xl border border-ink-100 p-3">
@@ -72,13 +75,14 @@ export function TeamPanel({ project, challenge, me, locked }: { project: Project
                     {person?.name ?? "A teammate"} {isMe && <span className="font-normal text-ink-400">(you)</span>}
                   </p>
                   <p className="text-[11px] text-ink-400">{m.isOwner ? "Started the project" : "Teammate"} · {person?.field}</p>
+                  {elsewhere && <p className="text-[11px] font-medium text-amber-700">Studies at another university, so your university cannot verify their work. Remove them to confirm the project.</p>}
                 </div>
-                {!locked && iOwn && !m.isOwner && evidenceCount === 0 && (
+                {!locked && iOwn && !m.isOwner && (evidenceCount === 0 || elsewhere) && (
                   <button type="button" onClick={() => void removeTeammate(project.id, m.studentId)} className="shrink-0 text-[11px] font-semibold text-ink-400 hover:text-danger-600">
                     Remove
                   </button>
                 )}
-                {!locked && isMe && !m.isOwner && evidenceCount === 0 && (
+                {!locked && isMe && !m.isOwner && (evidenceCount === 0 || elsewhere) && (
                   <button type="button" onClick={() => void removeTeammate(project.id, m.studentId)} className="shrink-0 text-[11px] font-semibold text-ink-400 hover:text-danger-600">
                     Leave
                   </button>

@@ -43,7 +43,10 @@ describe("every piece of evidence belongs to one student", () => {
     await add({ type: "Contribution Statement", title: "Ahmad's statement", content: "I designed the database and wrote the SQL reports for the energy data." })
     await add({ type: "Contribution Statement", title: "Sara's statement", content: "I trained and evaluated the anomaly detection model on the meter readings." }, SARA)
     expect((await mine("Ahmad's statement")).studentId).toBe("stu-ju-ahmad")
-    expect((await mine("Sara's statement")).studentId).toBe("stu-ju-sara")
+    expect((await mine("Sara's statement", SARA)).studentId).toBe("stu-ju-sara")
+    // A teammate's evidence is private to its author and the university: it is not in Ahmad's snapshot.
+    expect(await mine("Sara's statement")).toBeUndefined()
+    expect(await mine("Ahmad's statement", SARA)).toBeUndefined()
   })
 })
 

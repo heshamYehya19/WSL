@@ -35,8 +35,8 @@ export default function MyProfile() {
   const isOpen = student.availability !== "Not Available"
 
   const startEditing = () => {
-    setBio(student.bio)
-    setAvailability(student.availability)
+    setBio(student.bio ?? "")
+    setAvailability(student.availability ?? "Open to Opportunities")
     setEditing(true)
   }
 
@@ -83,7 +83,7 @@ export default function MyProfile() {
                 {program?.name ?? student.field} · {uni?.name}
               </p>
               <div className="mt-3 flex flex-wrap gap-1.5">
-                {[student.year, `GPA ${student.gpa.toFixed(2)}`, student.city, `#${student.studentNumber}`].map((t) => (
+                {[student.year, student.gpa !== undefined ? `GPA ${student.gpa.toFixed(2)}` : "", student.city ?? "", student.studentNumber ? `#${student.studentNumber}` : ""].filter(Boolean).map((t) => (
                   <span key={t} className="rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-[11px] font-medium text-white/70">
                     {t}
                   </span>

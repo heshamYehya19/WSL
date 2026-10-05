@@ -180,13 +180,18 @@ describe("a contribution statement without supporting work", () => {
     expect(evidence.map((e) => e.type)).toEqual(["Contribution Statement"])
   })
 
-  it("does not stop the team's confirmation: a skill nobody has evidence for needs no decision", async () => {
+  it("still has to be decided: a skill nobody has evidence for needs an explicit acknowledgement before confirmation", async () => {
     await addTalaWithOnlyAStatement()
     await server.call("POST", `/projects/${PROJECT}/ai-review`, TALA)
     const snap = await snapshot(JU)
+    const withId = (s: unknown) => s as { id: string; suggestedLevel: string; studentId: string }
     for (const sig of snap.skillSignals.filter((s) => s.projectId === PROJECT && s.suggestedLevel !== "Insufficient")) {
-      const res = await server.call("POST", `/projects/${PROJECT}/signals/${(sig as unknown as { id: string }).id}/review`, JU, { decision: "verify" })
-      expect(res.status).toBe(200)
+      expect((await server.call("POST", `/projects/${PROJECT}/signals/${withId(sig).id}/review`, JU, { decision: "verify" })).status).toBe(200)
+    }
+    // Everything WSL found is verified, but Tala's five skills (and the team's other gaps) were never decided.
+    expect((await server.call("POST", `/projects/${PROJECT}/confirm`, JU, {})).status).toBe(409)
+    for (const sig of snap.skillSignals.filter((s) => s.projectId === PROJECT && s.suggestedLevel === "Insufficient")) {
+      expect((await server.call("POST", `/projects/${PROJECT}/signals/${withId(sig).id}/review`, JU, { decision: "insufficient" })).status).toBe(200)
     }
     expect((await server.call("POST", `/projects/${PROJECT}/confirm`, JU, {})).status).toBe(200)
     const company = await snapshot("company:org-jes")

@@ -178,9 +178,10 @@ describe("university review is per student and per skill", () => {
     expect(signal(await snapshot(JU), ids.ahmad, "SQL").status).toBe("Pending Verification")
   })
 
-  it("keeps a verified skill verified when its student adds more evidence later", async () => {
+  it("never lets one student's new evidence touch a teammate's verification", async () => {
+    // How a verification behaves when its own student adds evidence is covered in review-confirmation.test.ts.
     const before = await snapshot(JU)
-    await review(signal(before, ids.ahmad, "SQL").id, { decision: "verify" })
+    await review(signal(before, ids.sara, "Machine Learning").id, { decision: "verify" })
     await server.call("POST", `/projects/${PROJECT}/evidence`, AHMAD, {
       type: "Documentation",
       title: "More energy reports",
@@ -188,7 +189,7 @@ describe("university review is per student and per skill", () => {
       content: "SELECT building_id, AVG(energy_kwh) AS average_kwh FROM energy_usage GROUP BY building_id ORDER BY average_kwh DESC; The meter readings show which campus buildings use the most energy.",
     })
     expect((await server.call("POST", `/projects/${PROJECT}/ai-review`, AHMAD)).status).toBe(200)
-    expect(signal(await snapshot(JU), ids.ahmad, "SQL").status).toBe("Verified")
+    expect(signal(await snapshot(JU), ids.sara, "Machine Learning").status).toBe("Verified")
   })
 })
 
@@ -196,7 +197,8 @@ describe("confirming a team project to the company", () => {
   async function decideEverything(decision: "verify" | "reject") {
     const snap = await snapshot(JU)
     for (const sig of snap.skillSignals.filter((s) => s.projectId === PROJECT)) {
-      const res = await review(sig.id, { decision, reviewerNotes: "Reviewed against the submitted evidence." })
+      // Where WSL found nothing there is nothing to verify or decline: the reviewer acknowledges that instead.
+      const res = await review(sig.id, sig.suggestedLevel === "Insufficient" ? { decision: "insufficient" } : { decision, reviewerNotes: "Reviewed against the submitted evidence." })
       expect(res.status).toBe(200)
     }
   }

@@ -39,7 +39,8 @@ Omar — and nothing is verified yet. To walk the loop (open `/login` and pick t
 2. **Reviewer** (University of Jordan): the project page has one section per student — their
    contribution, their evidence, and one card per required skill showing what the evidence demonstrates,
    the lines behind it, and the gaps. Verify Ahmad's SQL; ask Omar for more evidence on Python; leave
-   the rest. Skills the evidence doesn't show read *Insufficient evidence* and need no decision.
+   the rest. Skills the evidence doesn't show read *Insufficient evidence* — and still need an explicit
+   decision: *Acknowledge Insufficient Evidence*, or ask for more.
 3. **Students** — sign in as Ahmad, Sara or Omar: each sees the shared project but only their own
    evidence and skills, records their contribution, and sees *Verified by University of Jordan* only
    for what the reviewer verified for them. The owner (Ahmad) can add classmates from his university.
@@ -211,9 +212,26 @@ university**, so one university is the verification authority for the whole team
   that student's signals (`skill_signals` is unique per project **and student** and skill). The analysis
   cache is per student (`analysis_runs`).
 - **Verification.** A reviewer decides one student's one skill at a time; only that student is told, and the
-  reviewer is the coordinator of that student's program. Skills the evidence doesn't show
-  (*Insufficient evidence*) need no decision and are never shared. Confirming the project to the company
-  needs every skill that has evidence decided, for every student.
+  reviewer is the coordinator of that student's program. Confirming the project to the company needs
+  **every team member × every required skill** to hold a *current, explicit* university decision: Verified,
+  Not Verified, or Insufficient Evidence the reviewer acknowledged. Pending, More Evidence Requested, a skill
+  never reviewed (including one with no evidence at all) and anything *stale* all block it. Insufficient
+  Evidence can only be acknowledged where WSL found nothing, and a skill WSL found nothing for can never be
+  verified (the server refuses, not just the UI); acknowledged skills are never shared with a company.
+- **Stale evidence.** A decision stops counting when its student adds any evidence after it (a video
+  included), when that skill is re-analyzed after it, or when the student's current evidence has not been
+  analyzed yet. Re-analysis takes new evidence into a verified skill: if it changes what WSL found
+  (level, quotes, evidence behind it) the skill goes back to *Pending* and the reviewer and the student
+  are told; if not, it keeps its verification until the reviewer looks at the new evidence.
+- **What each account receives.** Enforced in the snapshot, not the UI: a student gets only their own
+  evidence and signals; contribution notes go to the team, the owning university, and (after
+  confirmation, for students with verified skills) a company; academic and personal details go to the
+  student, their university, and a company that can discover them through verified proof (never the
+  student number); company feedback goes to the project's own company, team and university; drafts to the
+  company that wrote them.
+- **Teams.** Members must study at the owner's university. A legacy member from another university can
+  be detached by the owner or the owner's university even with work on the project: their evidence stays
+  on record but is no longer part of the team's project or review.
 - **Proof.** A student's profile, a company's Talent Discovery and the project pages all read the same
   per-student signals, so a skill is only ever shown for the student whose own evidence and verification
   back it. Required skills are never treated as demonstrated skills.
@@ -264,6 +282,9 @@ model or GitHub response a test needs is mocked. It covers, among others:
   Arabic evidence (normalized, accepted when relevant, rejected when copied or unrelated);
 - `/api/health`, the pre-graded seed cache, and upgrading an older database (v13 → v14 keeps every
   signal and makes them per student);
+- the confirmation invariant (every student × every required skill needs a current, explicit decision),
+  stale evidence, re-analysis of verified skills, and what each kind of account can read
+  (`review-confirmation.test.ts`, `access-boundaries.test.ts`);
 - teams and individual proof: same-university teams, per-member contributions, one student's evidence
   never reaching another's analysis or skills, per-student review and notifications, a contribution
   statement never becoming proof, and the whole *EnergyWise* loop from a company's new challenge to each

@@ -37,3 +37,6 @@ data/wsl.db
 
 # Local secrets (GROQ_API_KEY / GEMINI_API_KEY etc.) — never committed.
 .env
+# Playwright CLI page snapshots and review screenshots — local debugging output, never part of the app.
+.playwright-cli/
+review2-*.png

@@ -34,7 +34,7 @@ describe("v14 migration (individual proof for team projects)", () => {
 
     vi.resetModules()
     const reopened = (await import("../db.ts")).getDb()
-    expect((reopened.prepare("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(14)
+    expect((reopened.prepare("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(15)
 
     // Nothing was lost, and a signal is now unique per (project, student, skill).
     expect((reopened.prepare("SELECT COUNT(*) AS n FROM skill_signals").get() as { n: number }).n).toBe(signalCount)
