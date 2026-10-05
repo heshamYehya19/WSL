@@ -1,335 +1,180 @@
 # WSL | وصل
+Don't Just Graduate With a Degree. Graduate With Proof.
 
-**Don't Just Graduate With a Degree. Graduate With Proof.**
+Short product description
 
-WSL is an education-to-employment evidence infrastructure, built for the Jordan 2076 Hackathon
-(Amman track — Innovation in Education & Learning Systems).
+[Demo / Repository / Architecture links]
 
-Industry need → real-world challenge → student work → evidence → university verification →
-verified proof → talent. A company's real problem becomes a university project. Students — alone or
-in a team from one university — each record what they contributed and submit their own evidence. AI
-helps organize that evidence for review; a human university reviewer decides, skill by skill and
-student by student, what is verified. Verified proof joins each student's profile, discoverable by
-companies looking for demonstrated capability, not claimed skills.
+## The Problem
 
-> The project isn't the product. The evidence infrastructure is.
+Students graduate with degrees, projects, CVs and claimed skills —
+but companies still struggle to know what a student can actually demonstrate.
 
-**Live demo:** _not deployed yet — add the URL here once it's live (see [Deploying on Replit](#deploying-on-replit))._
+Universities see coursework and projects, but industry evidence is often
+unstructured.
 
-## The EnergyWise walkthrough (one project, three students, three bodies of proof)
+WSL connects the two.
 
-The seed contains a complete team scenario you can follow in about five minutes. **Jordan Energy
-Solutions** posted *Smart Campus Energy Optimization* (Energy & Technology · Intermediate · 4–6
-weeks; required skills Python, Data Analysis, SQL, Machine Learning, Data Visualization). The
-University of Jordan assigned it to its Computer Science students, and three of them work on one
-project, *EnergyWise*:
+## What WSL Does
 
-| Student | Contribution (their own words) | Their evidence |
-|---|---|---|
-| Ahmad Al-Khatib | Database design, SQL analysis, the data-processing pipeline | SQL schema and reports (Documentation), data pipeline (GitHub), contribution statement |
-| Sara Al-Najjar | Feature engineering, the machine-learning model, model evaluation | Anomaly-detection notebook, model evaluation report, contribution statement |
-| Omar Al-Fayez | Dashboard, visualizations, the presentation | Dashboard (GitHub), walkthrough (Presentation), demo video, contribution statement |
+Company
+→ Real-world challenge
+→ University assignment
+→ Student work
+→ Individual evidence
+→ AI-assisted evidence analysis
+→ University verification
+→ Verified proof
+→ Company talent discovery
 
-WSL has analyzed each student's **own** evidence separately — Ahmad's SQL is never credited to Sara or
-Omar — and nothing is verified yet. To walk the loop (open `/login` and pick the accounts):
+AI assists the review process.
+The university makes the verification decision.
 
-1. **Company** — *Jordan Energy Solutions*: the challenge brief (deliverables, duration, constraints)
-   and the lifecycle stepper. **University** — *University of Jordan* → *Submissions* → the EnergyWise
-   card.
-2. **Reviewer** (University of Jordan): the project page has one section per student — their
-   contribution, their evidence, and one card per required skill showing what the evidence demonstrates,
-   the lines behind it, and the gaps. Verify Ahmad's SQL; ask Omar for more evidence on Python; leave
-   the rest. Skills the evidence doesn't show read *Insufficient evidence* — and still need an explicit
-   decision: *Acknowledge Insufficient Evidence*, or ask for more.
-3. **Students** — sign in as Ahmad, Sara or Omar: each sees the shared project but only their own
-   evidence and skills, records their contribution, and sees *Verified by University of Jordan* only
-   for what the reviewer verified for them. The owner (Ahmad) can add classmates from his university.
-4. **Reviewer** — decide the rest, then **Confirm to Company**. **Company** — *Talent Discovery* now
-   finds each student through their own verified skills; open one to follow *skill → project → their
-   contribution → evidence → university verification*.
+## Core Product
 
-The demo database only reseeds when it is empty: after pulling this version, run `npm run db:reset`
-(or the reset in the account menu) to get the scenario.
+### Companies
+- Create real-world challenges
+- Define required skills and deliverables
+- Discover students through verified proof
 
-## Running locally
+### Universities
+- Assign industry challenges
+- Review student contributions and evidence
+- Verify demonstrated skills
 
-Requires **Node.js 22.18+** (uses the built-in `node:sqlite` module — no database server to install).
+### Students
+- Work individually or in university teams
+- Record their individual contribution
+- Submit evidence of their work
+- Build a verified proof profile
 
-```bash
-npm install
-npm run dev          # app + API on the Vite dev server
-npm run db:reset     # wipe the database and restore the demo data
-npm test             # API test suite (never calls a live model or GitHub)
-npm run lint
-npm run build && npm start   # production: serves dist/ + API on http://localhost:3000
-```
+## Individual Proof
 
-Before a demo, open `/api/health` to check which model is configured and whether its key works.
+A team project does not automatically prove that every team member
+demonstrated every skill.
 
-The SQLite database lives at `data/wsl.db` (git-ignored). It is created and seeded automatically
-on first run; set `WSL_DB_PATH` to use a different file. Use **Demo Access** (or `/login`) to
-pick an account — no passwords are required in this MVP.
+WSL tracks:
 
-## Deploying on Replit
+Project × Student × Skill
 
-The repository includes a [`.replit`](.replit) file, so it can be imported and deployed as is.
+Each student has:
+- their own contribution
+- their own evidence
+- their own skill signals
+- their own university verification
 
-1. **Import** the GitHub repository into Replit (*Create Repl → Import from GitHub*).
-2. **Node.js 22.18 or newer.** WSL runs its TypeScript server directly and uses the built-in
-   `node:sqlite`, both of which need 22.18+. `.replit` asks for the `nodejs-22` module; run
-   `node --version` in the Shell, and if it's older than 22.18, switch `.replit` to a newer Node module.
-3. **API key as a Secret.** Add `GROQ_API_KEY` in Replit's *Secrets* tool; it reaches the server as
-   an environment variable. Never put a key in a file in the repository — `.env` is git-ignored and
-   is only for local development.
-4. **A persistent disk for the database.** All data lives in one SQLite file (`WSL_DB_PATH`, default
-   `data/wsl.db`). Deploy as a **Reserved VM** — a single always-on instance (already set in `.replit`)
-   — not Autoscale, where each instance would get its own copy of the database. Point `WSL_DB_PATH` at
-   storage that survives restarts and redeploys. If the file is ever lost, WSL recreates and re-seeds
-   the demo database on the next start, so the demo keeps working, but anything created since is gone;
-   don't redeploy during judging.
-5. **Demo mode.** `WSL_DEMO_MODE` is on unless set to `false`. In demo mode anyone can reset the
-   database from the account menu — useful between judges. Turning it off only disables the reset; it
-   doesn't add authentication (see the limitations below).
-6. **Build and start.** Build with `npm ci && npm run build`, start with `npm start`, which serves the
-   built app and the API on `$PORT` (default 3000, mapped to port 80 in `.replit`).
-7. **Before judging:** open `/api/health` and check `keyWorks` is `true`; run `npm run db:grade-seed`
-   with your key and commit `server/ml/seed-grades.json` so the tour shows model-graded results
-   without spending quota; then reset the demo.
-8. **Once it's live:** put the URL at the top of this README, and add a `VITE_PUBLIC_URL` Secret with
-   the same URL before building — the site footer then shows a QR code that opens the live demo.
+## EnergyWise Demo
 
-| Environment variable | Purpose |
-|---|---|
-| `GROQ_API_KEY` | The grading model's key (Secret). See the AI section for the other model settings. |
-| `WSL_DB_PATH` | Path of the SQLite file; put it on persistent storage. Default `data/wsl.db`. |
-| `WSL_DEMO_MODE` | `false` disables the database reset. On by default. |
-| `PORT` | Port the server listens on. Default `3000`. |
-| `VITE_PUBLIC_URL` | The live URL, at build time; shows a QR code for it in the footer. |
+Smart Campus Energy Optimization
 
-## Data
+Jordan Energy Solutions
+→ University of Jordan
+→ Three Computer Science students
+→ Individual evidence
+→ University verification
+→ Company talent discovery
 
-Everything the app shows is read from the database — no names, counts, or ratings are hard-coded
-in the UI. The seed contains:
+[table]
 
-- **5 universities** (real): Amman Arab University, The Hashemite University, University of Jordan,
-  Jordan University of Science and Technology, Applied Science Private University — each with its
-  IT faculty, programs, and faculty mentors.
-- **16 students** (fictional), 3–4 per university, majoring in AI, Software Engineering, Cyber Security,
-  Computer Science, or Business Information Technology.
-- **6 companies** (real): Estarta HQ, Echo Technology, IRIS Technology Jordan, SkyTech Enterprise
-  Systems, Jordan Energy Solutions, Advanced Business Solutions — each with fictional contact people,
-  challenges, and job opportunities.
-- Challenges at every pipeline stage, plus projects, evidence, AI evidence signals, university
-  verification decisions, company feedback, and per-account notifications that are all consistent
-  with each other.
+## Evidence
 
-Seed timestamps are relative to when the database was seeded, so deadlines stay realistic.
+Supported evidence includes:
+- GitHub
+- Documentation
+- Notebook
+- Report
+- Presentation
+- Demo / Video
+- Screenshot
+- Contribution Statement
 
-## How writes work
+Contribution statements describe what a student claims they contributed.
+They are not treated as proof by themselves.
 
-The API (`server/api.ts`) is the only thing that writes. Every request carries the acting account,
-and the server checks ownership before changing anything — a company can only manage its own
-challenges, a university only its own students' work, a student only their own projects and
-profile. Each change runs in a transaction, notifies the affected accounts, and returns a fresh
-snapshot so every page reflects the database immediately.
+## AI-Assisted Evidence Analysis
 
-## AI evidence analysis
+WSL uses AI to help organize submitted evidence against the skills
+required by a challenge.
 
-When a student asks WSL to analyze their evidence, `server/ai.ts` grades it against each skill the
-challenge requires:
+AI can:
+- identify relevant evidence
+- surface supporting lines
+- identify evidence gaps
+- produce skill-level signals
 
-- **Model grading (Groq or Gemini).** The evidence is sent to the configured model with structured JSON output: a 0-100 score per
-  skill plus the exact lines of the student's work that prove it. WSL checks every quoted line
-  against the real content and drops any that aren't there or only repeat the brief; a skill with no
-  confirmed quote is capped at 20. The quotes appear in the mentor's "Why WSL found this" box.
-- **Brief echo is never evidence.** Lines copied from the challenge brief are ignored when scoring,
-  and a submission that mostly repeats the brief is rejected when it's submitted.
-- **Only real content counts.** An evidence title or description is the student's own claim and
-  never raises a score. Public GitHub links are read automatically (the README and the top few
-  source files, `server/github.ts`); other links are left for the mentor.
-- **Repeatable results.** Each analysis is keyed by a hash of the exact evidence content, the
-  required skills and the model. Re-analyzing unchanged evidence returns the stored result instantly
-  ("No new evidence since the last analysis.") instead of calling the model again, and the evidence
-  page shows which model produced the result and when. Calls use temperature 0.
-- **Quota and outages.** If the model fails (a 429 from the free tier's daily limit, a timeout), a
-  skill it graded before keeps that result — it is never overwritten with offline numbers. A failed
-  run isn't cached, so *Retry* reaches the model again.
-- **Offline fallback.** Only a skill with no model result yet (no key configured, or the model was
-  unavailable on its first analysis) is scored by a stricter local scorer (`server/ml/analyze.ts`),
-  which looks for concrete, skill-specific signs and quotes the lines it found. It never suggests
-  "Demonstrated", and it's labeled "Estimated offline, not graded by the AI model".
-- **Pre-graded demo data.** `npm run db:grade-seed` grades the seeded projects with the live model
-  once and stores the result in `server/ml/seed-grades.json`. Seeding uses a stored result while its
-  evidence still matches, so the tour shows model-graded results without any live call. Projects
-  without a stored result are seeded with the offline scorer.
+AI does not:
+- certify a student
+- make the university verification decision
+- expose unverified proof to companies
 
-Student evidence is not run through the personal-data screen below — that screen exists to catch a
-company accidentally posting sensitive data in a public challenge brief, not to gate a student's own
-work, which is only ever sent to the grading provider the server is configured with.
+## University Verification
 
-AI signals are informational only. A skill reaches a student's record only when a university mentor
-verifies it, and companies only see verified skills unless they choose to include unverified signals.
+University reviewers make the final decision for each student and skill.
 
-| Environment variable | Purpose |
-|---|---|
-| `GROQ_API_KEY` | Enables grading with Groq. Used first when both keys are set. |
-| `GROQ_MODEL` | Optional. Defaults to `openai/gpt-oss-120b` (supports strict JSON schema output). |
-| `GEMINI_API_KEY` | Enables grading with Gemini. |
-| `GEMINI_MODEL` | Optional. Defaults to `gemini-flash-latest`, Google's alias for its newest Flash model. |
-| `WSL_AI_PROVIDER` | Optional, `groq` or `gemini`, to choose when both keys are set. With neither key, the offline scorer is used. |
-| `GITHUB_TOKEN` | Optional. Raises the GitHub API rate limit for reading repository links. |
+A project can only be confirmed to a company when every required
+student × skill has a current explicit university decision.
 
-## Demo tour
-(This is the single-student tour; for the team scenario see [the EnergyWise walkthrough](#the-energywise-walkthrough-one-project-three-students-three-bodies-of-proof).)
+## Verified Talent Discovery
 
-The sign-in page opens with **Yazan Al-Masri**, a student with a full record, and a **Take the
-tour** button. The tour follows him through all three roles: IRIS's challenge, Amman Arab
-University assigning it, Yazan's evidence (including a one-click attempt to game the AI by
-submitting the brief, which is rejected), the mentor verifying quoted evidence, and IRIS finding
-him in Talent Discovery. Run `npm run db:reset` (or the reset in the account menu) before
-rehearsing, so his project is back to "Evidence Under Review".
+Companies discover students based on verified proof rather than
+claimed skills.
 
-**Demo auth, not production auth:** the signed-in account is a client-supplied `x-wsl-actor`
-header, trusted once its id is confirmed to exist — there's no password, session, or signed token.
-Ownership checks on every write are real and independent of this; what's missing for a real
-deployment is proof the request came from that account. Set `WSL_DEMO_MODE=false` to disable the
-one genuinely destructive action available in this mode, resetting the database.
+A company can see:
+- verified skills
+- project context
+- student's contribution
+- supporting evidence
+- university verification
 
-## Teams, contribution and individual proof
-
-A project is shared; proof is not. The student who starts a project can add classmates **from the same
-university**, so one university is the verification authority for the whole team. Then, for every member:
-
-- **Contribution.** Each member (owner included) records what they contributed, in their own words
-  (`projects.owner_role_note`, `project_members.role_note`). It is a claim for the reviewer to check
-  against that student's evidence — never proof by itself. An optional *Contribution Statement* piece of
-  evidence says the same at length, and is kept for the reviewer, never analyzed as work.
-- **Evidence.** Every item has one author (`evidence.student_id`). Types: GitHub, Documentation,
-  Notebook, Report, Presentation, Demo / Video, Screenshot, Contribution Statement
-  (`src/lib/evidenceTypes.ts`; what each takes — a link, a file, or text — is shared by the form and the
-  API). Videos, screenshots and statements are kept for the reviewer and are not analyzed.
-- **Analysis.** `POST /projects/:id/ai-review` reads only the calling student's own evidence and writes
-  that student's signals (`skill_signals` is unique per project **and student** and skill). The analysis
-  cache is per student (`analysis_runs`).
-- **Verification.** A reviewer decides one student's one skill at a time; only that student is told, and the
-  reviewer is the coordinator of that student's program. Confirming the project to the company needs
-  **every team member × every required skill** to hold a *current, explicit* university decision: Verified,
-  Not Verified, or Insufficient Evidence the reviewer acknowledged. Pending, More Evidence Requested, a skill
-  never reviewed (including one with no evidence at all) and anything *stale* all block it. Insufficient
-  Evidence can only be acknowledged where WSL found nothing, and a skill WSL found nothing for can never be
-  verified (the server refuses, not just the UI); acknowledged skills are never shared with a company.
-- **Stale evidence.** A decision stops counting when its student adds any evidence after it (a video
-  included), when that skill is re-analyzed after it, or when the student's current evidence has not been
-  analyzed yet. Re-analysis takes new evidence into a verified skill: if it changes what WSL found
-  (level, quotes, evidence behind it) the skill goes back to *Pending* and the reviewer and the student
-  are told; if not, it keeps its verification until the reviewer looks at the new evidence.
-- **What each account receives.** Enforced in the snapshot, not the UI: a student gets only their own
-  evidence and signals; contribution notes go to the team, the owning university, and (after
-  confirmation, for students with verified skills) a company; academic and personal details go to the
-  student, their university, and a company that can discover them through verified proof (never the
-  student number); company feedback goes to the project's own company, team and university; drafts to the
-  company that wrote them.
-- **Teams.** Members must study at the owner's university. A legacy member from another university can
-  be detached by the owner or the owner's university even with work on the project: their evidence stays
-  on record but is no longer part of the team's project or review.
-- **Proof.** A student's profile, a company's Talent Discovery and the project pages all read the same
-  per-student signals, so a skill is only ever shown for the student whose own evidence and verification
-  back it. Required skills are never treated as demonstrated skills.
-- **Verified Talent Discovery.** `GET /api/talent?skills=Python,SQL&university=<id>&industry=<exact>` (companies
-  only) returns students for whom **every** searched skill is verified *right now*; no skills means everyone
-  with at least one. A skill counts only when its signal is Verified (and not one WSL found nothing for), its
-  project was confirmed to companies, the student is on that project's team at the university that verified
-  them, the verification is current by the same freshness rule confirmation uses (`isStale` in
-  `server/api.ts`), and everything it cites is that student's own work. Skill matching is exact and
-  case-insensitive — never substring. Results are ordered by verified skills, then most recent
-  verification, then name, then id, and carry **no score**: a candidate is name, program, university,
-  year, each searched skill with the project that proves it, the university and date that verified it, and
-  the student's own contribution (a claim, not proof). A company is never sent AI scores or reasoning,
-  reviewer names or notes, student numbers, or students without eligible proof; `GET /api/talent/:id` is a
-  404 for a student with none, and saving, showing interest in or inviting a student requires the same
-  eligibility. Facets (skills, universities, industries) count eligible talent only.
-
-## Attached files & privacy screening
-
-When submitting a challenge, a company can upload a challenge description document (PDF, DOC,
-DOCX) instead of writing one, and up to three dataset files (CSV, TSV, XLSX, JSON, TXT; 10 MB
-each). Files are stored in SQLite (`challenge_files`) and served by
-`GET /api/challenges/:id/files/:fileId` only to accounts that can see the challenge.
-
-Every challenge, both its text and its files, is screened in `server/screening.ts` for personal
-data (phone numbers, emails, national ID / passport numbers, addresses, dates of birth, card and
-IBAN numbers, and name/phone/address columns in tables), whatever sensitivity level the company
-picked. If anything is found, nothing is saved: the company sees what was found (masked) and
-either goes back to edit or confirms it's OK to share. A confirmed challenge carries a notice for
-universities and students, and its history records what was shared. A file WSL can't read (a
-scanned PDF, for example) is flagged the same way, because WSL can't vouch for what's in it.
+AI scores, reviewer notes and unverified evidence remain internal.
 
 ## Architecture
 
-![WSL architecture](public/architecture.svg)
+[architecture image]
 
-See [docs/architecture.md](docs/architecture.md) for each component and the main flows. The diagram
-is also available as [public/architecture.png](public/architecture.png) for slides; regenerate both
-with `npm run docs:architecture` after editing it.
+See `docs/architecture.md` for the detailed architecture.
 
-## Stack
+## Tech Stack
 
-- React + TypeScript + Vite, React Router, Tailwind CSS v4
-- Node.js API (`server/`) mounted into Vite in development, standalone in production
-- SQLite via `node:sqlite` — schema in `server/db.ts`, demo data in `server/seed.ts`
+...
 
-## Testing and known limitations
+## Running Locally
 
-`npm test` runs the API suite (`server/test/`) against a real HTTP server and a throwaway SQLite
-database. It never reaches a live model or GitHub: provider keys from `.env` are cleared and every
-model or GitHub response a test needs is mocked. It covers, among others:
+...
 
-- ownership and visibility (who can read and change what), per-skill verification and the project
-  status it rolls up to, and company feedback never changing a verification;
-- repeat analysis of unchanged evidence returning the identical cached result without a model call;
-- a model failure (429) leaving a previous model-graded result untouched, a retry reaching the model
-  again, and the offline fallback being labeled;
-- quotes and rubric criteria the model invents being dropped, and brief-copying evidence being
-  rejected or scored low;
-- invalid GitHub links, unreadable repositories, a challenge with no skills or learning outcomes, and
-  Arabic evidence (normalized, accepted when relevant, rejected when copied or unrelated);
-- `/api/health`, the pre-graded seed cache, and upgrading an older database (v13 → v14 keeps every
-  signal and makes them per student);
-- the confirmation invariant (every student × every required skill needs a current, explicit decision),
-  stale evidence, re-analysis of verified skills, and what each kind of account can read
-  (`review-confirmation.test.ts`, `access-boundaries.test.ts`);
-- teams and individual proof: same-university teams, per-member contributions, one student's evidence
-  never reaching another's analysis or skills, per-student review and notifications, a contribution
-  statement never becoming proof, and the whole *EnergyWise* loop from a company's new challenge to each
-  student's own verified proof and company discovery (`energywise-scenario.test.ts`);
-- the eight evidence types and what each accepts (files, links, text), and Google Docs, notebooks,
-  presentations and screenshots.
+## Demo Walkthrough
 
-Things to try in the demo: follow the EnergyWise walkthrough above; press *Re-analyze* twice on the same project; submit a GitLab link as a
-GitHub repository; submit a challenge with no skills; paste the challenge brief back as evidence;
-submit evidence written in Arabic.
+...
 
-**Known limitations — said plainly:**
+## Testing
 
-- **Demo auth.** The signed-in account is a client-supplied `X-WSL-Actor` header with no password,
-  session or signed token. Ownership checks are real, but anyone can claim any account. Not
-  production authentication.
-- **AI results are signals, not certificates.** A model can misjudge work, and an evidence-confidence
-  score measures how strongly the submitted work supports a skill, not the student's proficiency.
-  Only a university mentor's verification puts a skill on a student's record.
-- **Free-tier model quota.** Groq's free tier allows a fixed number of tokens per day (200,000 for
-  `openai/gpt-oss-120b` — on the order of 60–100 analyses). When it runs out, existing model results are kept, but new
-  projects only get offline estimates until the quota resets. New evidence is graded again by the
-  model, so borderline skills can still move between analyses even at temperature 0.
-- **The offline fallback is weaker.** It matches skill-specific patterns in the text; it can't judge
-  whether the code is correct or the analysis is sound, and it caps below "Demonstrated".
-- **Relevance check language coverage.** Word overlap works for English and Arabic. Evidence written
-  in a different script than the brief (Arabic work on an English brief) isn't judged at intake and is
-  left to the AI grader, and a translated copy of the brief isn't caught as copying.
-- **Other checks are heuristic.** The personal-data screen is pattern-based and can miss or
-  over-flag data; it screens company challenges, not student evidence. The GitHub reader only reads
-  public repositories, and only the README plus a few source files.
-- **Single-file database.** SQLite in one process, unencrypted on disk — fine for a demo, not for
-  scale or sensitive data.
-- **Seeded data is illustrative.** The universities and companies are real names, but every person,
-  challenge, submission, verification and piece of feedback is fictional and doesn't represent them.
+211 / 211 tests passing
+
+The test suite covers:
+- ownership and access boundaries
+- individual proof isolation
+- team contributions
+- evidence analysis
+- verification rules
+- stale evidence
+- company discovery
+- EnergyWise end-to-end flow
+- evidence types
+- API behaviour
+
+## Known Limitations
+
+- Demo authentication is not production authentication.
+- AI analysis is assistive and can be imperfect.
+- Some evidence types are reviewer-visible rather than automatically analyzed.
+- GitHub analysis is limited to public repositories and selected readable content.
+- SQLite is suitable for the MVP/demo, not production-scale deployment.
+- Cross-university teams are not currently supported.
+- Seed data is illustrative and fictional where individuals/submissions are concerned.
+
+## Replit Deployment
+
+...
+
+## License
+...
