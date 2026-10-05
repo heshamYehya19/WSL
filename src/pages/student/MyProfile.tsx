@@ -3,61 +3,14 @@ import { useDemoUser } from "../../state/demoUser"
 import { useStore } from "../../state/store"
 import { SkillRecordBody } from "../../components/profile/SkillRecordBody"
 import { CountUp } from "../../hooks/useCountUp"
-import { LanguageToggle } from "../../components/ui/LanguageToggle"
-import { isolate, langProps, useLanguage } from "../../lib/i18n"
 import { studentProjects, studentSignals } from "../../lib/selectors"
 import type { Availability } from "../../types"
 
-const AVAILABILITIES: Availability[] = ["Open to Opportunities", "Open to Internships", "Not Available"]
-
-const TEXT = {
-  en: {
-    eyebrow: "My Profile",
-    title: "Living Skill Record",
-    availability: { "Open to Opportunities": "Open to Opportunities", "Open to Internships": "Open to Internships", "Not Available": "Not Available" } as Record<Availability, string>,
-    availabilityHint: {
-      "Open to Opportunities": "Companies can reach out about jobs",
-      "Open to Internships": "Internships and placements only",
-      "Not Available": "Hidden from outreach for now",
-    } as Record<Availability, string>,
-    year: (y: string) => y,
-    gpa: (g: string) => `GPA ${g}`,
-    avgTitle: (n: number) => `Average evidence confidence: ${n}`,
-    noBio: "No bio yet. Add a short intro so companies know what you're about.",
-    notClaims: (first: string) => `Not what ${first} claims to know — what their work has demonstrated.`,
-    edit: "Edit bio & availability",
-    stats: ["Projects", "Skill signals", "University verified", "Evidence items"],
-    availabilityHeading: "Availability",
-    bio: "Bio",
-    bioHelp: "Companies see this on your candidate profile. Your skill signals can't be edited — they come from your evidence.",
-    saving: "Saving…",
-    save: "Save changes",
-    cancel: "Cancel",
-  },
-  ar: {
-    eyebrow: "ملفي الشخصي",
-    title: "سجل المهارات الحي",
-    availability: { "Open to Opportunities": "متاح للفرص", "Open to Internships": "متاح للتدريب", "Not Available": "غير متاح" } as Record<Availability, string>,
-    availabilityHint: {
-      "Open to Opportunities": "يمكن للشركات التواصل معك بشأن الوظائف",
-      "Open to Internships": "التدريب العملي فقط",
-      "Not Available": "مخفي عن تواصل الشركات حاليًا",
-    } as Record<Availability, string>,
-    year: (y: string) => y.replace(/^Year (\d+)$/, "السنة $1"),
-    gpa: (g: string) => `المعدل ${g}`,
-    avgTitle: (n: number) => `متوسط ثقة الأدلة: ${n}`,
-    noBio: "لا توجد نبذة بعد. أضف تعريفًا قصيرًا لتعرف الشركات من أنت.",
-    notClaims: (first: string) => `ليس ما يدّعي ${isolate(first)} معرفته — بل ما أثبته عمله.`,
-    edit: "تعديل النبذة والإتاحة",
-    stats: ["المشاريع", "مؤشرات المهارات", "موثّقة من الجامعة", "عناصر الأدلة"],
-    availabilityHeading: "الإتاحة",
-    bio: "النبذة",
-    bioHelp: "تظهر هذه النبذة للشركات في ملفك كمرشّح. لا يمكن تعديل مؤشرات مهاراتك — فهي مستمدة من أدلتك.",
-    saving: "جارٍ الحفظ…",
-    save: "حفظ التغييرات",
-    cancel: "إلغاء",
-  },
-}
+const AVAILABILITIES: { value: Availability; hint: string }[] = [
+  { value: "Open to Opportunities", hint: "Companies can reach out about jobs" },
+  { value: "Open to Internships", hint: "Internships and placements only" },
+  { value: "Not Available", hint: "Hidden from outreach for now" },
+]
 
 export default function MyProfile() {
   const { student } = useDemoUser()
@@ -66,9 +19,7 @@ export default function MyProfile() {
   const [bio, setBio] = useState("")
   const [availability, setAvailability] = useState<Availability>("Open to Opportunities")
   const [saving, setSaving] = useState(false)
-  const [lang, setLang] = useLanguage()
   if (!student) return null
-  const t = TEXT[lang]
   const uni = getUniversity(student.universityId)
   const program = getProgram(student.programId)
 
@@ -78,10 +29,10 @@ export default function MyProfile() {
   const avgScore = uniqueSkills.size ? Math.round([...uniqueSkills.values()].reduce((a, b) => a + b, 0) / uniqueSkills.size) : 0
   const verifiedCount = new Set(mySignals.filter((s) => s.status === "Verified").map((s) => s.skill)).size
   const stats = [
-    { label: t.stats[0], value: studentProjects(projects, student.id).length },
-    { label: t.stats[1], value: uniqueSkills.size },
-    { label: t.stats[2], value: verifiedCount },
-    { label: t.stats[3], value: evidence.filter((e) => e.studentId === student.id).length },
+    { label: "Projects", value: studentProjects(projects, student.id).length },
+    { label: "Skill signals", value: uniqueSkills.size },
+    { label: "University verified", value: verifiedCount },
+    { label: "Evidence items", value: evidence.filter((e) => e.studentId === student.id).length },
   ]
   const isOpen = student.availability !== "Not Available"
 
@@ -99,13 +50,10 @@ export default function MyProfile() {
   }
 
   return (
-    <div {...langProps(lang)} className={`mx-auto max-w-5xl ${langProps(lang).className}`}>
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <div className="mb-1.5 text-xs font-semibold tracking-wide text-teal-600 uppercase">{t.eyebrow}</div>
-          <h1 className="text-2xl font-bold tracking-tight text-ink-950 sm:text-3xl">{t.title}</h1>
-        </div>
-        <LanguageToggle lang={lang} onChange={setLang} />
+    <div className="mx-auto max-w-5xl">
+      <div className="mb-6">
+        <div className="mb-1.5 text-xs font-semibold tracking-wide text-teal-600 uppercase">My Profile</div>
+        <h1 className="text-2xl font-bold tracking-tight text-ink-950 sm:text-3xl">Living Skill Record</h1>
       </div>
 
       {/* HERO CARD */}
@@ -117,7 +65,7 @@ export default function MyProfile() {
         <div className="relative p-6 sm:p-8">
           <div className="flex flex-wrap items-start gap-5">
             {/* Avatar with a ring that fills to the student's average score */}
-            <div className="group relative h-20 w-20 shrink-0" title={t.avgTitle(avgScore)}>
+            <div className="group relative h-20 w-20 shrink-0" title={`Average evidence confidence: ${avgScore}`}>
               <div
                 className="absolute inset-0 rounded-full transition-transform duration-500 group-hover:rotate-180"
                 style={{ background: `conic-gradient(var(--color-teal-400) ${avgScore * 3.6}deg, rgba(255,255,255,0.08) 0deg)` }}
@@ -128,7 +76,7 @@ export default function MyProfile() {
                 </span>
               </div>
               {avgScore > 0 && (
-                <span className="absolute -end-1 -bottom-1 rounded-full border-2 border-night bg-teal-300 px-1.5 text-[10px] font-bold text-ink-950">
+                <span className="absolute -right-1 -bottom-1 rounded-full border-2 border-night bg-teal-300 px-1.5 text-[10px] font-bold text-ink-950">
                   {avgScore}
                 </span>
               )}
@@ -140,9 +88,9 @@ export default function MyProfile() {
                 {program?.name ?? student.field} · {uni?.name}
               </p>
               <div className="mt-3 flex flex-wrap gap-1.5">
-                {[t.year(student.year), t.gpa(student.gpa.toFixed(2)), student.city, `#${student.studentNumber}`].map((tag) => (
-                  <span key={tag} className="rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-[11px] font-medium text-white/70">
-                    {tag}
+                {[student.year, `GPA ${student.gpa.toFixed(2)}`, student.city, `#${student.studentNumber}`].map((t) => (
+                  <span key={t} className="rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-[11px] font-medium text-white/70">
+                    {t}
                   </span>
                 ))}
               </div>
@@ -157,18 +105,20 @@ export default function MyProfile() {
                 {isOpen && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-teal-400 opacity-60 motion-reduce:animate-none" />}
                 <span className={`relative inline-flex h-2 w-2 rounded-full ${isOpen ? "bg-teal-400" : "bg-ink-400"}`} />
               </span>
-              {t.availability[student.availability]}
+              {student.availability}
             </span>
           </div>
 
           <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
             <div>
               {student.bio ? (
-                <p dir="auto" className="max-w-2xl text-sm leading-relaxed text-white/85">{student.bio}</p>
+                <p className="max-w-2xl text-sm leading-relaxed text-white/85">{student.bio}</p>
               ) : (
-                <p className="max-w-2xl text-sm text-white/55 italic">{t.noBio}</p>
+                <p className="max-w-2xl text-sm text-white/55 italic">No bio yet. Add a short intro so companies know what you're about.</p>
               )}
-              <p className="mt-3 max-w-xl border-s-2 border-teal-400/50 ps-3 text-xs text-white/55">{t.notClaims(student.name.split(" ")[0])}</p>
+              <p className="mt-3 max-w-xl border-l-2 border-teal-400/50 pl-3 text-xs text-white/55">
+                Not what {student.name.split(" ")[0]} claims to know — what their work has demonstrated.
+              </p>
             </div>
             {!editing && (
               <button
@@ -178,7 +128,7 @@ export default function MyProfile() {
                 <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
                 </svg>
-                {t.edit}
+                Edit bio &amp; availability
               </button>
             )}
           </div>
@@ -199,29 +149,29 @@ export default function MyProfile() {
 
       {editing && (
         <div className="animate-fade-in-up mt-4 rounded-2xl border border-teal-400/40 bg-surface p-5 shadow-lg shadow-teal-500/5">
-          <div className="mb-2 text-xs font-semibold tracking-wide text-ink-500 uppercase">{t.availabilityHeading}</div>
+          <div className="mb-2 text-xs font-semibold tracking-wide text-ink-500 uppercase">Availability</div>
           <div className="grid gap-2 sm:grid-cols-3">
             {AVAILABILITIES.map((a) => {
-              const active = availability === a
+              const active = availability === a.value
               return (
                 <button
-                  key={a}
+                  key={a.value}
                   type="button"
-                  onClick={() => setAvailability(a)}
+                  onClick={() => setAvailability(a.value)}
                   aria-pressed={active}
-                  className={`rounded-xl border p-3 text-start transition-all duration-200 hover:-translate-y-0.5 ${
+                  className={`rounded-xl border p-3 text-left transition-all duration-200 hover:-translate-y-0.5 ${
                     active ? "border-teal-500 bg-teal-100/60 ring-2 ring-teal-400/30" : "border-ink-200 hover:border-ink-300"
                   }`}
                 >
-                  <div className="text-sm font-semibold text-ink-900">{t.availability[a]}</div>
-                  <div className="mt-0.5 text-xs text-ink-500">{t.availabilityHint[a]}</div>
+                  <div className="text-sm font-semibold text-ink-900">{a.value}</div>
+                  <div className="mt-0.5 text-xs text-ink-500">{a.hint}</div>
                 </button>
               )
             })}
           </div>
 
           <div className="mt-4 mb-2 flex items-baseline justify-between">
-            <span className="text-xs font-semibold tracking-wide text-ink-500 uppercase">{t.bio}</span>
+            <span className="text-xs font-semibold tracking-wide text-ink-500 uppercase">Bio</span>
             <span className="text-[11px] text-ink-400 tabular-nums">{bio.length}/600</span>
           </div>
           <textarea
@@ -231,18 +181,18 @@ export default function MyProfile() {
             maxLength={600}
             className="w-full rounded-xl border border-ink-200 bg-surface px-3 py-2 text-sm outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20"
           />
-          <p className="mt-1 text-xs text-ink-400">{t.bioHelp}</p>
+          <p className="mt-1 text-xs text-ink-400">Companies see this on your candidate profile. Your skill signals can't be edited — they come from your evidence.</p>
           <div className="mt-4 flex gap-3">
             <button onClick={save} disabled={saving} className="rounded-full bg-night px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-teal-600 disabled:opacity-50">
-              {saving ? t.saving : t.save}
+              {saving ? "Saving…" : "Save changes"}
             </button>
-            <button onClick={() => setEditing(false)} className="text-sm font-medium text-ink-400 hover:text-ink-700">{t.cancel}</button>
+            <button onClick={() => setEditing(false)} className="text-sm font-medium text-ink-400 hover:text-ink-700">Cancel</button>
           </div>
         </div>
       )}
 
       <div className="mt-10">
-        <SkillRecordBody studentId={student.id} projectHref={(pid) => `/student/projects/${pid}`} lang={lang} />
+        <SkillRecordBody studentId={student.id} projectHref={(pid) => `/student/projects/${pid}`} />
       </div>
     </div>
   )
