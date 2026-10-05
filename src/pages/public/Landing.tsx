@@ -3,27 +3,12 @@ import { FlowLoop } from "../../components/ui/FlowLoop"
 import { SkillChip } from "../../components/ui/SkillChip"
 import { ConfidenceMeter } from "../../components/ui/ConfidenceMeter"
 import { StatusBadge } from "../../components/ui/StatusBadge"
-import { HeroSkillRecord } from "../../components/ui/HeroSkillRecord"
+import { HeroNetwork } from "../../components/ui/HeroNetwork"
 import { Reveal } from "../../components/ui/Reveal"
 import { useShowcase } from "../../lib/showcase"
-import { useStore } from "../../state/store"
-
-const CLAIMED = [
-  "“Proficient in Python” — a line the student wrote about themselves",
-  "Nobody checked it",
-  "No link to any work",
-  "Reads the same on hundreds of CVs",
-]
-const PROVEN = [
-  "Python · Intermediate — assessed against named criteria, not a self-rating",
-  "Verified by a named university mentor",
-  "Quotes the exact lines of the student's own work",
-  "Tied to a real problem a company set",
-]
 
 export default function Landing() {
   const showcase = useShowcase()
-  const { showcase: heroRecord } = useStore()
 
   return (
     <div>
@@ -41,9 +26,10 @@ export default function Landing() {
                 <span className="text-3xl font-extrabold tracking-tight text-white">WSL</span>
                 <span className="font-arabic text-3xl font-bold text-teal-300">وصل</span>
               </div>
-              <h1 className="text-4xl font-bold tracking-tight text-balance text-white sm:text-5xl">
-                <span className="block">University teaches you what to know.</span>
-                <span className="block text-teal-300">WSL proves what you can do.</span>
+              <h1 className="text-4xl font-bold tracking-tight text-white sm:text-5xl">
+                Your Degree Says You Know.
+                <br />
+                Your Work Should Prove It.
               </h1>
               <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-ink-300 lg:mx-0">
                 WSL connects universities, students, and organizations through real-world projects and
@@ -64,37 +50,9 @@ export default function Landing() {
                 </Link>
               </div>
             </div>
-            {heroRecord && <HeroSkillRecord record={heroRecord} />}
+            <HeroNetwork />
           </div>
         </div>
-      </section>
-
-      {/* CLAIMED VS PROVEN */}
-      <section className="mx-auto max-w-5xl px-4 pt-16 sm:px-6">
-        <Reveal className="grid gap-4 md:grid-cols-2">
-          <div className="rounded-2xl border border-ink-200 bg-surface p-6">
-            <div className="text-xs font-semibold tracking-wide text-ink-400 uppercase">Claimed on a CV</div>
-            <ul className="mt-4 space-y-2.5">
-              {CLAIMED.map((line) => (
-                <li key={line} className="flex gap-2 text-sm text-ink-600">
-                  <span className="text-ink-300" aria-hidden="true">–</span>
-                  {line}
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="rounded-2xl border border-teal-400/50 bg-teal-50 p-6">
-            <div className="text-xs font-semibold tracking-wide text-teal-700 uppercase">Proven on WSL</div>
-            <ul className="mt-4 space-y-2.5">
-              {PROVEN.map((line) => (
-                <li key={line} className="flex gap-2 text-sm text-ink-800">
-                  <span className="font-bold text-verified-600" aria-hidden="true">✓</span>
-                  {line}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </Reveal>
       </section>
 
       {/* CORE FLOW */}

@@ -353,28 +353,6 @@ export interface Snapshot {
   companyActions: CompanyAction[]
   /** Only the signed-in account's own notifications. */
   notifications: AppNotification[]
-  /** One verified skill record for the public landing page — see ShowcaseRecord. */
-  showcase: ShowcaseRecord | null
-}
-
-/**
- * A real verified skill record from the database, shown on the public landing page.
- * Only mentor-verified skills from work already confirmed to the company — the same
- * thing every signed-in company can already see — never unverified signals.
- */
-export interface ShowcaseRecord {
-  studentName: string
-  program: string
-  university: string
-  projectTitle: string
-  company: string
-  skills: {
-    skill: string
-    level: SuggestedLevel
-    quote: EvidenceQuote & { evidenceTitle: string }
-    verifiedBy: string
-    verifiedAt: string
-  }[]
 }
 
 export interface DemoUserState {
