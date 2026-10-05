@@ -8,6 +8,33 @@ export function studentProjects(projects: Project[], studentId: string) {
   return projects.filter((p) => p.studentId === studentId || p.members.some((m) => m.studentId === studentId))
 }
 
+/** The people on a project, owner first, each with what they say they contributed. */
+export function teamOf(project: Project) {
+  return [
+    { studentId: project.studentId, roleNote: project.ownerRoleNote, isOwner: true },
+    ...project.members.map((m) => ({ studentId: m.studentId, roleNote: m.roleNote, isOwner: false })),
+  ]
+}
+
+/** What one student says they contributed to a project ("" if they haven't said). */
+export function contributionOf(project: Project, studentId: string) {
+  return teamOf(project).find((m) => m.studentId === studentId)?.roleNote ?? ""
+}
+
+export function isOnTeam(project: Project, studentId: string) {
+  return teamOf(project).some((m) => m.studentId === studentId)
+}
+
+/** One student's signals on one project — never the whole team's. */
+export function signalsBy(signals: SkillSignal[], projectId: string, studentId: string) {
+  return signals.filter((s) => s.projectId === projectId && s.studentId === studentId)
+}
+
+/** The evidence one student authored on one project. */
+export function evidenceBy(evidence: Evidence[], projectId: string, studentId: string) {
+  return evidence.filter((e) => e.projectId === projectId && e.studentId === studentId)
+}
+
 export function studentSignals(signals: SkillSignal[], studentId: string) {
   return signals.filter((s) => s.studentId === studentId)
 }

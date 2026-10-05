@@ -14,6 +14,8 @@ const realFetch = llmDeps.fetch
 
 interface Signal {
   projectId: string
+  studentId?: string
+  analyzedAt?: string
   skill: string
   evidenceConfidence: number
   aiNote: string
@@ -21,7 +23,7 @@ interface Signal {
 }
 interface Snap {
   skillSignals: Signal[]
-  projects: { id: string; gradedModel?: string }[]
+  projects: { id: string; analysis: { studentId: string; model: string; gradedAt: string }[] }[]
   evidence: { id: string; projectId: string; type: string; title: string; description: string; content?: string }[]
 }
 
@@ -92,6 +94,23 @@ describe("grading survives quota limits and outages", () => {
     expect(retry.json.result).toMatchObject({ unchanged: false, failed: false })
     expect(calls).toHaveLength(2)
     expect((await yazanSignals()).find((s) => s.skill === "Machine Learning")!.evidenceConfidence).toBe(64)
+  })
+
+  it("tells a failed analysis from a completed one: only a completed run records itself beside the signals it wrote", async () => {
+    // The page uses this to offer Retry only after a real failure — never after a clean offline run.
+    const latest = (snap: Snap) => Math.max(...snap.skillSignals.filter((x) => x.projectId === PROJECT && x.studentId === "stu-aau-yazan").map((x) => new Date(x.analyzedAt!).getTime()))
+    const recorded = (snap: Snap) => new Date(snap.projects.find((x) => x.id === PROJECT)!.analysis.find((r) => r.studentId === "stu-aau-yazan")!.gradedAt).getTime()
+
+    process.env.GEMINI_API_KEY = "test-key"
+    geminiRateLimited([])
+    await analyze()
+    const failed = await snapshot()
+    expect(recorded(failed)).toBeLessThan(latest(failed))
+
+    geminiScores(70, [])
+    await analyze()
+    const completed = await snapshot()
+    expect(recorded(completed)).toBeGreaterThanOrEqual(latest(completed))
   })
 
   it("with no previous model result, a failure falls back to the offline scorer and is labeled as such", async () => {
@@ -194,7 +213,7 @@ describe("pre-graded seed results", () => {
     const snap = await snapshot()
     const signals = snap.skillSignals.filter((s) => s.projectId === PROJECT)
     expect(signals.every((s) => s.evidenceConfidence === 77 && s.gradedSource === "model")).toBe(true)
-    expect(snap.projects.find((p) => p.id === PROJECT)!.gradedModel).toBe("test-model")
+    expect(snap.projects.find((p) => p.id === PROJECT)!.analysis.find((a) => a.studentId === "stu-aau-yazan")!.model).toBe("test-model")
   })
 
   it("ignores a stale pre-graded result whose evidence no longer matches", async () => {
@@ -202,6 +221,6 @@ describe("pre-graded seed results", () => {
     const snap = await snapshot()
     const signals = snap.skillSignals.filter((s) => s.projectId === PROJECT)
     expect(signals.every((s) => s.gradedSource === "offline")).toBe(true)
-    expect(snap.projects.find((p) => p.id === PROJECT)!.gradedModel).toBe("offline")
+    expect(snap.projects.find((p) => p.id === PROJECT)!.analysis.find((a) => a.studentId === "stu-aau-yazan")!.model).toBe("offline")
   })
 })

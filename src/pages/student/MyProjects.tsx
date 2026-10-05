@@ -6,7 +6,7 @@ import { StatusBadge } from "../../components/ui/StatusBadge"
 import { EmptyState } from "../../components/ui/EmptyState"
 import { SkillChip } from "../../components/ui/SkillChip"
 import { PageHero, Pills, StageTrack } from "../../components/ui/ListKit"
-import { challengeFor, isEvidenced, skillsForProject } from "../../lib/selectors"
+import { challengeFor, evidenceBy, isEvidenced, signalsBy, studentProjects } from "../../lib/selectors"
 import { formatDate } from "../../lib/format"
 import type { Project } from "../../types"
 
@@ -84,8 +84,8 @@ export default function MyProjects() {
   const [tab, setTab] = useState<Tab>("all")
   if (!student) return null
 
-  const myProjects = projects
-    .filter((p) => p.studentId === student.id)
+  // Projects you started and projects you're a teammate on.
+  const myProjects = studentProjects(projects, student.id)
     .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
   const count = (t: Tab) => (t === "all" ? myProjects.length : myProjects.filter((p) => TAB_OF(p) === t).length)
   const shown = myProjects.filter((p) => tab === "all" || TAB_OF(p) === tab)
@@ -142,8 +142,8 @@ export default function MyProjects() {
               {shown.map((p, i) => {
                 const org = getOrg(p.organizationId)
                 const challenge = challengeFor(challenges, p)
-                const myEv = evidence.filter((e) => e.projectId === p.id)
-                const signals = skillsForProject(skillSignals, p.id).filter(isEvidenced)
+                const myEv = evidenceBy(evidence, p.id, student.id)
+                const signals = signalsBy(skillSignals, p.id, student.id).filter(isEvidenced)
                 const ratedSkills = new Set(signals.map((s) => s.skill))
                 const pending = (challenge?.requiredSkills ?? []).filter((s) => !ratedSkills.has(s))
                 const step = nextStep(p, myEv.length)
@@ -164,7 +164,8 @@ export default function MyProjects() {
                           <div className="min-w-0">
                             <h3 className="font-semibold text-ink-900 transition-colors group-hover:text-teal-600">{p.title}</h3>
                             <p className="text-xs text-ink-400">
-                              {org?.name} · Started {formatDate(p.startedAt)} · {myEv.length} evidence item{myEv.length === 1 ? "" : "s"}
+                              {org?.name} · Started {formatDate(p.startedAt)} · {myEv.length} of your evidence item{myEv.length === 1 ? "" : "s"}
+                              {p.members.length > 0 ? ` · Team of ${p.members.length + 1}` : ""}
                             </p>
                           </div>
                           <StatusBadge status={p.status} />

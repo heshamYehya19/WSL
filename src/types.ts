@@ -10,12 +10,16 @@ export type EvidenceType =
   | "Analysis"
   | "Dataset / Model"
   | "Video Walkthrough"
+  | "Notebook"
+  | "Screenshot"
+  | "Contribution Statement"
 
 // A lean, linear pipeline: company submits -> WSL's private-data screen (automatic,
-// invisible) -> university assigns it college-wide -> a student works it solo ->
-// AI surfaces evidence-backed skill signals -> a university mentor verifies/rejects/
-// requests more evidence on each one individually -> once every required skill has a
-// final decision, the mentor confirms the evidence for the company to see -> the
+// invisible) -> university assigns it college-wide -> a student (or a team from one
+// university) works it, each student submitting their own evidence ->
+// AI surfaces evidence-backed skill signals for each student -> a university mentor
+// verifies/rejects/requests more evidence on each one individually -> once every skill
+// with evidence has a final decision, the mentor confirms the evidence for the company to see -> the
 // company may leave structured feedback (never affects verification).
 // "Verified" and "Completed" are parallel terminal branches (see src/lib/pipeline.ts):
 // Verified = every required skill was Verified; Completed = confirmed, but at least
@@ -132,7 +136,12 @@ export interface Challenge {
   organizationId: string
   problemDescription: string
   objectives: string[]
+  /** What students are expected to hand back (the deliverables). */
   expectedOutput: string
+  /** How long the work should take, e.g. "4–6 weeks". Empty if the company didn't say. */
+  duration: string
+  /** Anything students must respect: tools, data handling, scope. Empty if none. */
+  constraints: string
   industry: string
   difficulty: Difficulty
   requiredSkills: string[]
@@ -193,7 +202,12 @@ export interface SkillCriterion {
   met: boolean
 }
 
-export type SkillSignalStatus = "Pending Verification" | "Verified" | "More Evidence Requested" | "Rejected"
+/**
+ * "Insufficient Evidence" is a reviewer's explicit decision: WSL found nothing that demonstrates the
+ * skill and the university acknowledged it. It is distinct from a signal whose suggestedLevel is
+ * "Insufficient" and still "Pending Verification" — that is only WSL's analysis result, not yet a decision.
+ */
+export type SkillSignalStatus = "Pending Verification" | "Verified" | "More Evidence Requested" | "Rejected" | "Insufficient Evidence"
 // "Insufficient" is not a low tier — it means too few rubric criteria were met to
 // claim any real tier at all, so WSL says so instead of forcing one.
 export type SuggestedLevel = "Insufficient" | "Foundational" | "Intermediate" | "Advanced" | "Demonstrated"
@@ -259,6 +273,33 @@ export interface ProjectMember {
   roleNote: string
 }
 
+/**
+ * Where one student's one required skill stands for confirmation. Only "verified", "not-verified" and
+ * "acknowledged" (Insufficient Evidence the university explicitly acknowledged) are decisions; and a
+ * decision only counts while it is current — see ReviewItem.stale.
+ */
+export type ReviewState = "verified" | "not-verified" | "acknowledged" | "pending" | "more-evidence" | "unreviewed"
+
+/** One cell of (team member × required skill) in the confirmation check. */
+export interface ReviewItem {
+  studentId: string
+  skill: string
+  state: ReviewState
+  /** New evidence was added, or analysis re-run, after the decision — or the student's evidence isn't analyzed yet. */
+  stale: boolean
+  /** A current, explicit university decision. */
+  resolved: boolean
+}
+
+/** What stands between a project and confirmation to the company. The server computes it; the client only displays it. */
+export interface ProjectReview {
+  /** Every team member × every required skill has a current decision (and nothing else blocks confirmation). */
+  ready: boolean
+  /** Non-empty when something other than a skill decision blocks confirmation (e.g. a teammate from another university). */
+  problems: string[]
+  items: ReviewItem[]
+}
+
 /** A company's structured, written reaction to a project's verified evidence — never a rating, and never able to change a skill's verified status. */
 export interface CompanyFeedback {
   strongTechnicalExecution: boolean
@@ -273,15 +314,20 @@ export interface Project {
   challengeId: string
   title: string
   organizationId: string
-  /** The project's owner. Solo is the default — most projects have no members beyond this. */
+  /** The project's owner — the student who started it. */
   studentId: string
-  /** Additional contributors on a team project. Empty for every solo project. */
+  /** What the owner says they contributed ("" until they write it). Members' statements are in `members`. */
+  ownerRoleNote: string
+  /** The other students on the team (same university as the owner). Empty on a solo project. */
   members: ProjectMember[]
   status: ChallengeStatus
   startedAt: string
-  /** The exact model ("openai/gpt-oss-120b") or "offline" that produced the current skill signals, and when. Unset before the first analysis. */
-  gradedModel?: string
-  gradedAt?: string
+  /** When each team member's evidence was last analyzed, and by which model ("offline" when the fallback scorer ran). Per student, never per project. */
+  analysis: { studentId: string; model: string; gradedAt: string }[]
+  /** How many pieces of evidence each team member has submitted — a count only; the evidence itself is private to its author and the university. */
+  evidenceCounts: { studentId: string; count: number }[]
+  /** The confirmation check: everything for a university, the caller's own skills for a student, nothing for a company. */
+  review: ProjectReview | null
   tasks: ProjectTask[]
   feedback: FeedbackEntry[]
   companyFeedback?: CompanyFeedback

@@ -12,8 +12,11 @@ import type { ChallengeFileKind, ScreeningFinding, ScreeningKind } from "../src/
 export const MAX_FILE_BYTES = 10 * 1024 * 1024
 export const MAX_DATASET_FILES = 3
 
-/** What a file is for: a challenge's description or datasets, or a student's documentation evidence. */
-export type UploadKind = ChallengeFileKind | "evidence"
+/**
+ * What a file is for: a challenge's description or datasets, or one kind of student evidence —
+ * a document or report, a notebook, a presentation, or a screenshot.
+ */
+export type UploadKind = ChallengeFileKind | "evidence" | "notebook" | "presentation" | "image"
 
 interface FileFormat {
   mime: string
@@ -35,6 +38,19 @@ const FORMATS: Record<UploadKind, Record<string, FileFormat>> = {
     ".txt": { mime: "text/plain" },
     ".md": { mime: "text/markdown" },
   },
+  notebook: {
+    ".ipynb": { mime: "application/x-ipynb+json" },
+  },
+  presentation: {
+    ".pdf": { mime: "application/pdf", magic: [0x25, 0x50, 0x44, 0x46] },
+    ".pptx": { mime: "application/vnd.openxmlformats-officedocument.presentationml.presentation", magic: [0x50, 0x4b] },
+  },
+  image: {
+    ".png": { mime: "image/png", magic: [0x89, 0x50, 0x4e, 0x47] },
+    ".jpg": { mime: "image/jpeg", magic: [0xff, 0xd8, 0xff] },
+    ".jpeg": { mime: "image/jpeg", magic: [0xff, 0xd8, 0xff] },
+    ".webp": { mime: "image/webp", magic: [0x52, 0x49, 0x46, 0x46] },
+  },
   dataset: {
     ".csv": { mime: "text/csv", tabular: true },
     ".tsv": { mime: "text/tab-separated-values", tabular: true },
@@ -48,6 +64,9 @@ export const ACCEPTED_EXTENSIONS: Record<UploadKind, string[]> = {
   description: Object.keys(FORMATS.description),
   dataset: Object.keys(FORMATS.dataset),
   evidence: Object.keys(FORMATS.evidence),
+  notebook: Object.keys(FORMATS.notebook),
+  presentation: Object.keys(FORMATS.presentation),
+  image: Object.keys(FORMATS.image),
 }
 
 export interface PreparedFile {
@@ -72,7 +91,8 @@ export async function prepareFile(kind: UploadKind, rawName: string, data: Buffe
   const ext = name.slice(name.lastIndexOf(".")).toLowerCase()
   const format = FORMATS[kind][ext]
   if (!format) {
-    const what = kind === "description" ? "Challenge description" : kind === "evidence" ? "Documents" : "Dataset"
+    const what =
+      kind === "description" ? "Challenge description" : kind === "evidence" ? "Documents" : kind === "notebook" ? "Notebooks" : kind === "presentation" ? "Presentations" : kind === "image" ? "Screenshots" : "Dataset"
     throw new UploadError(`${what} files must be ${ACCEPTED_EXTENSIONS[kind].join(", ")} — “${name}” isn't.`)
   }
   if (data.length === 0) throw new UploadError(`“${name}” is empty.`)
@@ -92,6 +112,17 @@ export async function prepareFile(kind: UploadKind, rawName: string, data: Buffe
       case ".docx":
         text = docxText(data)
         break
+      case ".pptx":
+        text = pptxText(data)
+        break
+      case ".ipynb":
+        text = notebookText(data)
+        break
+      case ".png":
+      case ".jpg":
+      case ".jpeg":
+      case ".webp":
+        break // an image has no text to read — it is kept for the reviewer to look at
       case ".doc":
         text = legacyDocText(data)
         if (text) unreadable = "WSL could only partly read this older Word format — save it as .docx or .pdf for a full check."
@@ -110,7 +141,7 @@ export async function prepareFile(kind: UploadKind, rawName: string, data: Buffe
     unreadable = "WSL couldn't open this file to check it — it may be damaged or password-protected."
   }
   if (table) text = table.map((r) => r.join("\t")).join("\n")
-  if (!unreadable && text.replace(/\s/g, "").length < 20) {
+  if (!unreadable && kind !== "image" && text.replace(/\s/g, "").length < 20) {
     unreadable = "WSL couldn't find readable text in this file (it may be a scanned image), so it couldn't check it for personal data."
   }
   return { kind, name, mime: format.mime, data, text, unreadable, table }
@@ -197,6 +228,30 @@ function docxText(data: Buffer): string {
       ),
     )
     .join("\n")
+}
+
+/** The text on a PowerPoint's slides, in slide order. */
+function pptxText(data: Buffer): string {
+  const slides = unzip(data, (n) => /^ppt\/slides\/slide\d+\.xml$/.test(n))
+  if (slides.size === 0) throw new Error("not a PowerPoint file")
+  const number = (name: string) => Number(/slide(\d+)\.xml$/.exec(name)![1])
+  return [...slides.entries()]
+    .sort((a, b) => number(a[0]) - number(b[0]))
+    .map(([, xml]) => decodeXml([...xml.matchAll(/<a:t>([\s\S]*?)<\/a:t>/g)].map((m) => m[1]).join(" ")))
+    .join("\n")
+}
+
+/** A Jupyter notebook's code and markdown cells, as plain text. */
+function notebookText(data: Buffer): string {
+  const nb = JSON.parse(decodeText(data)) as { cells?: { cell_type?: string; source?: string | string[] }[] }
+  if (!Array.isArray(nb.cells)) throw new Error("not a notebook")
+  return nb.cells
+    .map((c) => {
+      const src = Array.isArray(c.source) ? c.source.join("") : String(c.source ?? "")
+      return c.cell_type === "markdown" ? src.split("\n").map((l) => `# ${l}`).join("\n") : src
+    })
+    .filter((s) => s.trim())
+    .join("\n\n")
 }
 
 /** Old binary .doc: no parser, so pull out runs of readable UTF-16 / ASCII text. */

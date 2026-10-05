@@ -22,18 +22,18 @@ const STAGES = [
   },
   {
     who: "Student",
-    title: "Solves it and submits evidence",
-    body: "Eligible students discover the challenge and start a project, submitting real code, documents, and data as evidence of their work.",
+    title: "Works on it and submits their own evidence",
+    body: "A student starts the project — alone, or with classmates from the same university. Each student records what they contributed and submits their own evidence: repositories, notebooks, reports, presentations, screenshots.",
   },
   {
     who: "WSL",
     title: "Organizes the evidence",
-    body: "WSL organizes what was submitted against each required skill. AI helps surface the relevant evidence and any gaps for the reviewer — it assists, it never decides, and it never blocks anything.",
+    body: "WSL organizes each student's own evidence against each required skill. AI helps surface the relevant evidence and any gaps for the reviewer — it assists, it never decides, and it never blocks anything. One student's evidence is never credited to another.",
   },
   {
     who: "University",
     title: "Verifies each skill individually",
-    body: "A university reviewer inspects every skill against the student's own evidence and verifies it, asks for more evidence, or declines to verify it. The verification belongs to the university.",
+    body: "A university reviewer inspects every skill against that student's own evidence and contribution, and verifies it, asks for more evidence, or declines to verify it. The verification belongs to the university — and to that one student.",
   },
   {
     who: "University",

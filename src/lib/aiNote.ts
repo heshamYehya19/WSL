@@ -37,6 +37,8 @@ export function verificationLabel(status: SkillSignal["status"]): string {
       return "Not verified"
     case "More Evidence Requested":
       return "More evidence requested"
+    case "Insufficient Evidence":
+      return "Insufficient evidence · reviewed"
     default:
       return "Awaiting university verification"
   }
@@ -62,12 +64,19 @@ export function hasReadableContent(e: Evidence): boolean {
 export function evidenceSources(e: Evidence): EvidenceSource[] {
   const read = e.analyzedFiles ?? []
   const sources: EvidenceSource[] = []
+  // Kept for the reviewer, never analyzed: say so plainly rather than implying WSL tried and failed.
+  if (e.type === "Contribution Statement") {
+    return [{ label: "Contribution statement", detail: "The student's own account — kept for the reviewer, not analyzed as work", analyzed: false }]
+  }
+  if (e.type === "Screenshot") return [{ label: "Screenshot", detail: "Available for university review", analyzed: false }]
+  if (e.type === "Video Walkthrough") return [{ label: "Demo / video link", detail: "Available for university review", analyzed: false }]
   if (e.link) {
     if (e.type === "GitHub Repository") {
       sources.push(read.length > 0 ? { label: "Repository", detail: `Read by WSL: ${read.join(", ")}`, analyzed: true } : { label: "Repository link", detail: "Available for university review", analyzed: false })
     } else {
       const doc = read.includes("Google Doc")
-      sources.push({ label: "Linked document", detail: doc ? "Read by WSL" : "Available for university review", analyzed: doc })
+      const noun = e.type === "Notebook" ? "notebook" : e.type === "Project Report" ? "report" : e.type === "Presentation" ? "presentation" : "document"
+      sources.push({ label: `Linked ${noun}`, detail: doc ? "Read by WSL" : "Available for university review", analyzed: doc })
     }
   }
   if (e.file) {

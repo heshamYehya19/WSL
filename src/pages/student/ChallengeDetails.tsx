@@ -7,7 +7,8 @@ import { StatusBadge } from "../../components/ui/StatusBadge"
 import { IllustrativeDataNote } from "../../components/ui/IllustrativeDataNote"
 import { ChallengeFileList, SharedDataNotice } from "../../components/ui/ChallengeFiles"
 import { formatDate, daysUntil } from "../../lib/format"
-import { assignmentFor, canStudentSee, statusAtUniversity } from "../../lib/selectors"
+import { assignmentFor, canStudentSee, isOnTeam, statusAtUniversity } from "../../lib/selectors"
+import { LifecycleStepper } from "../../components/ui/LifecycleStepper"
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -27,7 +28,8 @@ export default function ChallengeDetails() {
 
   const found = challenges.find((c) => c.id === id)
   const challenge = found && student && canStudentSee(found, student) ? found : undefined
-  const existingProject = student ? projects.find((p) => p.challengeId === id && p.studentId === student.id) : undefined
+  // A project you started, or one a classmate started and added you to.
+  const existingProject = student ? projects.find((p) => p.challengeId === id && isOnTeam(p, student.id)) : undefined
 
   if (!challenge) {
     return <EmptyChallenge />
@@ -57,6 +59,7 @@ export default function ChallengeDetails() {
         action={<StatusBadge status={statusAtUniversity(challenge, student!.universityId, projects, students)} />}
       />
       <IllustrativeDataNote company={org?.name} />
+      <LifecycleStepper status={statusAtUniversity(challenge, student!.universityId, projects, students)} className="mb-6 rounded-2xl border border-ink-200 bg-surface px-4 py-3" />
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="rounded-2xl border border-ink-200 bg-surface px-6 lg:col-span-2">
@@ -74,9 +77,19 @@ export default function ChallengeDetails() {
               ))}
             </ul>
           </Section>
-          <Section title="Expected Output">
+          <Section title="Deliverables">
             <p className="text-sm text-ink-700">{challenge.expectedOutput}</p>
           </Section>
+          {challenge.duration && (
+            <Section title="Duration">
+              <p className="text-sm text-ink-700">{challenge.duration}</p>
+            </Section>
+          )}
+          {challenge.constraints && (
+            <Section title="Constraints">
+              <p className="text-sm text-ink-700">{challenge.constraints}</p>
+            </Section>
+          )}
           <Section title="Required Skills">
             <div className="flex flex-wrap gap-1.5">
               {challenge.requiredSkills.map((s) => (
@@ -118,13 +131,18 @@ export default function ChallengeDetails() {
           <div className="sticky top-24 rounded-2xl border border-ink-200 bg-surface p-5">
             <dl className="space-y-3 text-sm">
               <div className="flex justify-between"><dt className="text-ink-400">Difficulty</dt><dd className="font-medium text-ink-800">{challenge.difficulty}</dd></div>
+              {challenge.duration && <div className="flex justify-between"><dt className="text-ink-400">Duration</dt><dd className="font-medium text-ink-800">{challenge.duration}</dd></div>}
               <div className="flex justify-between"><dt className="text-ink-400">Deadline</dt><dd className="font-medium text-ink-800">{formatDate(challenge.deadline)}</dd></div>
               <div className="flex justify-between"><dt className="text-ink-400">Time left</dt><dd className="font-medium text-ink-800">{Math.max(daysUntil(challenge.deadline), 0)} days</dd></div>
               {assignmentFor(challenge, student?.universityId) && (
                 <div className="flex justify-between"><dt className="text-ink-400">Assigned to</dt><dd className="text-right font-medium text-ink-800">{assignmentFor(challenge, student?.universityId)?.program}</dd></div>
               )}
             </dl>
-            <p className="mt-3 text-xs text-ink-400">You'll work this challenge on your own — not as a team.</p>
+            <p className="mt-3 text-xs text-ink-400">
+              {existingProject && existingProject.studentId !== student?.id
+                ? "A classmate added you to this project. Record what you're contributing, then submit your own evidence."
+                : "Work on your own, or start the project and add classmates from your university. Either way, each of you records your own contribution and submits your own evidence."}
+            </p>
             <button
               onClick={handleStart}
               disabled={!student || starting || (closed && !existingProject)}

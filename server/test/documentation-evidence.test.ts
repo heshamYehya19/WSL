@@ -72,12 +72,12 @@ function pdf(text: string): Buffer {
 describe("evidence types", () => {
   beforeEach(() => resetDatabase())
 
-  it("offers only GitHub Repository and Documentation", async () => {
-    for (const type of ["Code", "Dataset / Model", "Project Report"]) {
+  it("offers the eight evidence types and nothing else", async () => {
+    for (const type of ["Code", "Dataset / Model", "Analysis", "Prototype", "Something else"]) {
       const res = await addEvidence({ type, title: "Detector", link: "https://docs.example.com/report" })
       expect(res.status).toBe(400)
       expect(res.json.field).toBe("type")
-      expect(String(res.json.error)).toMatch(/GitHub Repository or Documentation/)
+      expect(String(res.json.error)).toMatch(/GitHub, Documentation, Notebook, Report, Presentation, Demo \/ Video, Screenshot, Contribution Statement/)
     }
   })
 })
@@ -121,7 +121,7 @@ describe("Documentation evidence from a link", () => {
     const res = await addEvidence({ type: "Documentation", title: "Evaluation report" })
     expect(res.status).toBe(400)
     expect(res.json.field).toBe("link")
-    expect(String(res.json.error)).toMatch(/link to your document .* or attach the file/)
+    expect(String(res.json.error)).toMatch(/link to your documentation or attach the file/)
   })
 })
 

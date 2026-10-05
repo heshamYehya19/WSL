@@ -56,7 +56,7 @@ export default function ChallengeDiscovery() {
       <PageHero
         eyebrow="Challenge Discovery"
         title="Challenges assigned by your university"
-        subtitle="Every challenge here passed WSL's automatic screening and was assigned by your university — pick one and work it on your own."
+        subtitle="Every challenge here passed WSL's automatic screening and was assigned by your university — pick one and work it alone or with classmates from your university."
         stats={[
           { label: "open to you", value: open.length, accent: true },
           { label: "closing within 2 weeks", value: closingSoon },

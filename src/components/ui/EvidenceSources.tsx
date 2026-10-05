@@ -1,4 +1,5 @@
 import { evidenceSources, hasReadableContent } from "../../lib/aiNote"
+import { NOT_ANALYZED_TYPES } from "../../lib/evidenceTypes"
 import type { Evidence } from "../../types"
 
 /**
@@ -15,7 +16,7 @@ export function EvidenceSources({ evidence }: { evidence: Evidence }) {
           <span className={s.analyzed ? "font-medium text-teal-600" : "text-ink-500"}>{s.detail}</span>
         </li>
       ))}
-      {!hasReadableContent(evidence) && <li className="text-ink-400">No readable content was available for automatic analysis.</li>}
+      {!hasReadableContent(evidence) && !NOT_ANALYZED_TYPES.includes(evidence.type) && <li className="text-ink-400">No readable content was available for automatic analysis.</li>}
     </ul>
   )
 }

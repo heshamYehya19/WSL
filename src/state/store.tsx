@@ -12,6 +12,10 @@ export interface NewChallengeInput {
   industry: string
   difficulty: Difficulty
   learningOutcomes: string[]
+  /** What students hand back. Blank lets the server use its default wording. */
+  deliverables: string
+  duration: string
+  constraints: string
   datasetAvailability: string
   dataSensitivity: DataSensitivity
   deadline: string
@@ -29,6 +33,7 @@ export type CreateChallengeResult = { id: string } | { findings: ScreeningFindin
 
 /** Lets a form show a server validation error next to the field it belongs to, instead of as a toast. */
 export type FieldErrorHandler = (field: string, message: string) => void
+export type ReviewDecision = "verify" | "request-more-evidence" | "reject" | "insufficient"
 
 interface StoreContextValue extends Snapshot {
   getOrg: (id: string) => Snapshot["organizations"][number] | undefined
@@ -45,6 +50,9 @@ interface StoreContextValue extends Snapshot {
   submitDraft: (id: string) => Promise<boolean>
   assignChallenge: (id: string, programId: string) => Promise<boolean>
   startProject: (challengeId: string) => Promise<string | undefined>
+  addTeammate: (projectId: string, studentId: string, onFieldError?: FieldErrorHandler) => Promise<boolean>
+  removeTeammate: (projectId: string, studentId: string) => Promise<boolean>
+  recordContribution: (projectId: string, text: string, onFieldError?: FieldErrorHandler) => Promise<boolean>
   addEvidence: (
     projectId: string,
     input: { type: EvidenceType; title: string; link: string; content: string; file?: { name: string; data: string } },
@@ -55,9 +63,11 @@ interface StoreContextValue extends Snapshot {
   reviewSignal: (
     projectId: string,
     signalId: string,
-    decision: "verify" | "request-more-evidence" | "reject",
+    decision: ReviewDecision,
     options?: { suggestedLevel?: SuggestedLevel; reviewerNotes?: string },
   ) => Promise<boolean>
+  /** A decision on a required skill that has no signal yet (nothing analyzed): ask for more evidence, or acknowledge insufficient evidence. */
+  reviewSkill: (projectId: string, studentId: string, skill: string, decision: "request-more-evidence" | "insufficient", options?: { reviewerNotes?: string }) => Promise<boolean>
   confirmToCompany: (projectId: string, note: string) => Promise<boolean>
   submitCompanyFeedback: (
     projectId: string,
@@ -158,6 +168,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       submitDraft: (id) => ok(run("POST", `/challenges/${id}/submit`)),
       assignChallenge: (id, programId) => ok(run("POST", `/challenges/${id}/assign`, { programId })),
       startProject: (challengeId) => run<{ id: string }>("POST", `/challenges/${challengeId}/start`).then((r) => (r.ok ? r.result.id : undefined)),
+      addTeammate: (projectId, studentId, onFieldError) => ok(run("POST", `/projects/${projectId}/members`, { studentId }, onFieldError)),
+      removeTeammate: (projectId, studentId) => ok(run("POST", `/projects/${projectId}/members/${studentId}/remove`)),
+      recordContribution: (projectId, text, onFieldError) => ok(run("POST", `/projects/${projectId}/contribution`, { text }, onFieldError)),
       addEvidence: (projectId, input, onFieldError) =>
         run<{ notice?: string } | null>("POST", `/projects/${projectId}/evidence`, input, onFieldError).then((r) => {
           if (r.ok && r.result?.notice) setToast(r.result.notice)
@@ -176,6 +189,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }),
       reviewSignal: (projectId, signalId, decision, options) =>
         ok(run("POST", `/projects/${projectId}/signals/${signalId}/review`, { decision, ...options })),
+      reviewSkill: (projectId, studentId, skill, decision, options) =>
+        ok(run("POST", `/projects/${projectId}/students/${encodeURIComponent(studentId)}/skills/${encodeURIComponent(skill)}/review`, { decision, ...options })),
       confirmToCompany: (projectId, note) => ok(run("POST", `/projects/${projectId}/confirm`, { note })),
       submitCompanyFeedback: (projectId, feedback) => ok(run("POST", `/projects/${projectId}/company-feedback`, feedback)),
       toggleSavedStudent: (studentId) => ok(run("POST", `/students/${studentId}/company-actions`, { kind: "saved" satisfies CompanyActionKind })),

@@ -1,6 +1,8 @@
 import { useState } from "react"
 import { ConfidenceMeter } from "../ui/ConfidenceMeter"
-import { StatusBadge } from "../ui/StatusBadge"
+import { VerificationPill } from "../ui/VerificationPill"
+import { evidenceTypeLabel } from "../../lib/evidenceTypes"
+import { PROOF_STATE_LABEL, STALE_NOTICE, skillProofState } from "../../lib/proof"
 import { EvidenceQuotes } from "../ui/EvidenceQuotes"
 import { CriteriaChecklist } from "../ui/CriteriaChecklist"
 import { assessmentLabel, evidenceStrengthFor, splitAiNote } from "../../lib/aiNote"
@@ -8,18 +10,21 @@ import { EvidenceSources } from "../ui/EvidenceSources"
 import { formatDate } from "../../lib/format"
 import type { Evidence, SkillSignal } from "../../types"
 
-type Decision = "verify" | "request-more-evidence" | "reject"
+type Decision = "verify" | "request-more-evidence" | "reject" | "insufficient"
 
 export function SignalReviewCard({
   signal,
   evidence,
   verifierName,
+  stale = false,
   onReview,
 }: {
   signal: SkillSignal
-  /** All of this project's evidence — filtered here to what this signal actually drew on. */
+  /** The student's own evidence — filtered here to what this signal actually drew on. */
   evidence: Evidence[]
   verifierName?: string
+  /** The student added evidence (or WSL re-analyzed) after the decision shown here, so it no longer counts. */
+  stale?: boolean
   onReview: (decision: Decision, options?: { reviewerNotes?: string }) => Promise<boolean>
 }) {
   const [notesDraft, setNotesDraft] = useState("")
@@ -27,20 +32,22 @@ export function SignalReviewCard({
   const [saving, setSaving] = useState(false)
 
   const supportingEvidence = evidence.filter((e) => signal.evidenceIds.includes(e.id))
-  const decided = signal.status === "Verified" || signal.status === "Rejected"
+  const decided = signal.status === "Verified" || signal.status === "Rejected" || signal.status === "Insufficient Evidence"
+  // WSL found nothing for this skill: there is no evidence to verify or decline — the reviewer acknowledges that, or asks for more.
+  const nothingFound = signal.suggestedLevel === "Insufficient" && signal.status !== "Verified"
 
   const choose = (decision: Decision) => {
-    if (decision === "verify") {
-      submit("verify")
+    if (decision === "verify" || decision === "insufficient") {
+      submit(decision)
       return
     }
     setActive((cur) => (cur === decision ? null : decision))
   }
 
   const submit = async (decision: Decision) => {
-    if (decision !== "verify" && !notesDraft.trim()) return
+    if ((decision === "reject" || decision === "request-more-evidence") && !notesDraft.trim()) return
     setSaving(true)
-    const ok = await onReview(decision, decision === "verify" ? undefined : { reviewerNotes: notesDraft.trim() })
+    const ok = await onReview(decision, decision === "verify" || decision === "insufficient" ? undefined : { reviewerNotes: notesDraft.trim() })
     setSaving(false)
     if (ok) {
       setActive(null)
@@ -56,7 +63,7 @@ export function SignalReviewCard({
             <h4 className="font-semibold text-ink-900">{signal.skill}</h4>
             <span className="rounded-full bg-ink-100 px-2 py-0.5 text-[10px] font-semibold text-ink-600">{assessmentLabel(signal.suggestedLevel)}</span>
           </div>
-          <div className="mt-1"><StatusBadge status={signal.status} /></div>
+          <div className="mt-1"><VerificationPill status={signal.status} insufficient={signal.suggestedLevel === "Insufficient"} /></div>
         </div>
         <div className="w-36">
           <p className="mb-1 text-right text-[11px] font-semibold text-ink-600">Evidence Strength: {evidenceStrengthFor(signal.evidenceConfidence)}</p>
@@ -65,6 +72,12 @@ export function SignalReviewCard({
       </div>
 
       <p className="mt-2 text-[11px] text-ink-400">AI analysis is supporting information. University verification is final.</p>
+
+      {stale && (
+        <p role="status" className="mt-2 rounded-lg bg-amber-100 px-2.5 py-1.5 text-[11px] font-medium text-amber-700">
+          {STALE_NOTICE}
+        </p>
+      )}
 
       {signal.gradedSource === "offline" && (
         <p className="mt-2 rounded-lg bg-amber-100 px-2.5 py-1.5 text-[11px] font-medium text-amber-600">
@@ -103,7 +116,7 @@ export function SignalReviewCard({
           {supportingEvidence.length === 0 && <p className="text-xs text-ink-400">No evidence linked to this signal.</p>}
           {supportingEvidence.map((e) => (
             <div key={e.id} className="rounded-lg border border-ink-100 px-2.5 py-1.5 text-xs">
-              <span className="font-semibold text-ink-800">{e.type}</span> <span className="text-ink-600">{e.title}</span>
+              <span className="font-semibold text-ink-800">{evidenceTypeLabel(e.type)}</span> <span className="text-ink-600">{e.title}</span>
               <EvidenceSources evidence={e} />
             </div>
           ))}
@@ -117,22 +130,35 @@ export function SignalReviewCard({
       )}
       {decided && (
         <p className="mt-2 text-[11px] text-ink-400">
-          {signal.status} · Reviewed by {verifierName ?? "a university reviewer"}
+          {PROOF_STATE_LABEL[skillProofState(signal)]} · Reviewed by {verifierName ?? "a university reviewer"}
           {signal.verifiedAt ? ` · ${formatDate(signal.verifiedAt)}` : ""}
         </p>
       )}
 
       <div className="mt-4 flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => choose("verify")}
-          disabled={saving}
-          className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50 ${
-            signal.status === "Verified" ? "bg-verified-500 text-ink-950" : "bg-night text-white hover:bg-teal-600"
-          }`}
-        >
-          Verify Skill
-        </button>
+        {nothingFound ? (
+          <button
+            type="button"
+            onClick={() => choose("insufficient")}
+            disabled={saving}
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50 ${
+              signal.status === "Insufficient Evidence" ? "bg-ink-200 text-ink-900" : "bg-night text-white hover:bg-teal-600"
+            }`}
+          >
+            Acknowledge Insufficient Evidence
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => choose("verify")}
+            disabled={saving}
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50 ${
+              signal.status === "Verified" ? "bg-verified-500 text-ink-950" : "bg-night text-white hover:bg-teal-600"
+            }`}
+          >
+            Verify Skill
+          </button>
+        )}
         <button
           type="button"
           onClick={() => choose("request-more-evidence")}
@@ -144,18 +170,25 @@ export function SignalReviewCard({
         >
           Request More Evidence
         </button>
-        <button
-          type="button"
-          onClick={() => choose("reject")}
-          aria-pressed={active === "reject"}
-          disabled={saving}
-          className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50 ${
-            signal.status === "Rejected" ? "border-danger-400 bg-danger-100 text-danger-600" : "border-ink-200 text-ink-600 hover:border-danger-400"
-          }`}
-        >
-          Reject Signal
-        </button>
+        {!nothingFound && (
+          <button
+            type="button"
+            onClick={() => choose("reject")}
+            aria-pressed={active === "reject"}
+            disabled={saving}
+            className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50 ${
+              signal.status === "Rejected" ? "border-danger-400 bg-danger-100 text-danger-600" : "border-ink-200 text-ink-600 hover:border-danger-400"
+            }`}
+          >
+            Decline to Verify
+          </button>
+        )}
       </div>
+      {nothingFound && (
+        <p className="mt-2 text-[11px] text-ink-400">
+          WSL found nothing in this student's submitted evidence that demonstrates {signal.skill}. Acknowledging that records your decision — it is about the evidence, not the student.
+        </p>
+      )}
 
       {active && (
         <div className="mt-3">

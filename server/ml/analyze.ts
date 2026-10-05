@@ -301,7 +301,9 @@ const RUBRICS: Record<string, Indicator[]> = {
     i(/\bprivate\s+final\s+\w+/, "uses immutable, injected dependencies", 8),
   ],
   sql: [
-    i(/\bSELECT\b.+\bFROM\b|^\s*FROM\s+\w+/i, "writes SELECT queries", 14),
+    // A FROM on its own line only counts when it reads like SQL (a table, then the end of the statement or a
+    // clause) — Python's "from sklearn.ensemble import X" is an import, not a query.
+    i(/\bSELECT\b.+\bFROM\b|^\s*FROM\s+[\w.]+(\s+(AS\s+)?\w+)?\s*(;|$|\b(WHERE|JOIN|GROUP|ORDER|LEFT|RIGHT|INNER|FULL|HAVING|LIMIT)\b)/im, "writes SELECT queries", 14),
     i(/\b(LEFT|RIGHT|INNER|FULL)?\s*JOIN\s+\w+/i, "joins tables", 12),
     i(/\bGROUP\s+BY\b|\bHAVING\b|\b(COUNT|SUM|AVG)\s*\(/i, "aggregates data in SQL", 12),
     i(/\b(CREATE\s+TABLE|ALTER\s+TABLE|PRIMARY\s+KEY|FOREIGN\s+KEY|REFERENCES\s+\w+|CREATE\s+(UNIQUE\s+)?INDEX)\b/i, "designs a database schema", 14),
@@ -617,6 +619,26 @@ export function analyzableContent(e: EvidenceLike): string {
  * and quotes the lines it relied on. Evidence with no content (a bare link) can
  * only be checked by a mentor, so it never raises a score.
  */
+/**
+ * The result for a student with nothing WSL can analyze — for example, only a contribution
+ * statement, which says what they claim to have done but is not itself work. Every skill is
+ * "Insufficient": nothing in the submitted evidence demonstrates it (which is not a statement
+ * about what the student can do).
+ */
+export function noEvidenceResults(requiredSkills: string[]): SimulatedRating[] {
+  return requiredSkills.map((skill) => ({
+    skill,
+    rating: INSUFFICIENT_RATING,
+    suggestedLevel: "Insufficient" as const,
+    note: `No ${skill} evidence was found in the submitted evidence.`,
+    quotes: [],
+    evidenceIds: [],
+    criteria: [],
+    source: "offline" as const,
+    model: "offline",
+  }))
+}
+
 export function simulateAIReview(requiredSkills: string[], submittedEvidence: EvidenceLike[], challenge: ChallengeContext): SimulatedRating[] {
   if (submittedEvidence.length === 0) return []
   const echo = new BriefEcho(challenge)

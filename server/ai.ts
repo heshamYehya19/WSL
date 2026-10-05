@@ -21,7 +21,7 @@ import { analyzableContent, simulateAIReview } from "./ml/analyze.ts"
 import type { ChallengeContext, EvidenceLike, SimulatedRating } from "./ml/analyze.ts"
 import { configuredProvider, gradeWithModel } from "./ml/llm-grader.ts"
 
-export { canonicalSkillName, checkRelevance, simulateAIReview, suggestedLevelFor } from "./ml/analyze.ts"
+export { canonicalSkillName, checkRelevance, noEvidenceResults, simulateAIReview, suggestedLevelFor } from "./ml/analyze.ts"
 export type { ChallengeContext, EvidenceQuote, RelevanceCheck, SkillCriterion, SimulatedRating, SuggestedLevel } from "./ml/analyze.ts"
 
 /** The model this server would grade with right now, or "offline" with no key configured. */

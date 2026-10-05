@@ -6,7 +6,7 @@ import { StatusBadge } from "../../components/ui/StatusBadge"
 import { EmptyState } from "../../components/ui/EmptyState"
 import { DeadlinePill, DifficultyBars, PageHero, Pills, SearchInput, StageTrack } from "../../components/ui/ListKit"
 import { daysUntil } from "../../lib/format"
-import { assignmentFor, isRoutedTo, statusAtUniversity } from "../../lib/selectors"
+import { assignmentFor, isRoutedTo, statusAtUniversity, teamOf } from "../../lib/selectors"
 
 type Tab = "incoming" | "assigned" | "all"
 
@@ -40,7 +40,12 @@ export default function UniversityChallenges() {
   const list = (tab === "incoming" ? incoming : tab === "assigned" ? assigned : relevant).filter(
     ({ c }) => !q || `${c.title} ${c.requiredSkills.join(" ")} ${getOrg(c.organizationId)?.name ?? ""}`.toLowerCase().includes(q),
   )
-  const ourStudentsOn = (challengeId: string) => projects.filter((p) => p.challengeId === challengeId && isUniversityStudent(p.studentId, university.id))
+  // Every student on a team counts as working, not only the one who started the project.
+  const ourStudentsOn = (challengeId: string) =>
+    projects
+      .filter((p) => p.challengeId === challengeId)
+      .flatMap((p) => teamOf(p))
+      .filter((m) => isUniversityStudent(m.studentId, university.id))
 
   return (
     <div>
@@ -52,7 +57,7 @@ export default function UniversityChallenges() {
           { label: "waiting for you to assign", value: incoming.length, accent: incoming.length > 0 },
           { label: "assigned", value: assigned.length },
           { label: "open to every university", value: relevant.filter((r) => r.c.preferredUniversityId === null).length },
-          { label: "students working", value: new Set(assigned.flatMap((r) => ourStudentsOn(r.c.id).map((p) => p.studentId))).size },
+          { label: "students working", value: new Set(assigned.flatMap((r) => ourStudentsOn(r.c.id).map((m) => m.studentId))).size },
         ]}
       />
 
@@ -137,7 +142,7 @@ export default function UniversityChallenges() {
                     <span className="inline-flex items-center gap-1.5 font-medium text-teal-600">
                       <span className="flex -space-x-1.5">
                         {onIt.slice(0, 3).map((p) => (
-                          <span key={p.id} className="h-4 w-4 rounded-full border-2 border-surface bg-gradient-to-br from-teal-400 to-teal-600" />
+                          <span key={p.studentId} className="h-4 w-4 rounded-full border-2 border-surface bg-gradient-to-br from-teal-400 to-teal-600" />
                         ))}
                       </span>
                       {mine.program} · {onIt.length} working

@@ -1,4 +1,4 @@
-// Pre-grades every seeded project's evidence with the live model (Groq or Gemini,
+// Pre-grades every seeded student's evidence (per project, per student) with the live model (Groq or Gemini,
 // whichever is configured) and writes the result to server/ml/seed-grades.json.
 // seed.ts reads that file at seed time, using the stored result whenever its hash
 // still matches the current evidence — so the demo tour never needs a live model
@@ -46,25 +46,39 @@ try {
 const output: Record<string, Entry> = { ...existing }
 let graded = 0
 
-const projects = db.prepare("SELECT id, challenge_id FROM projects").all() as Row[]
+const projects = db.prepare("SELECT id, challenge_id, student_id FROM projects").all() as Row[]
+// Evidence the analysis never reads (statements, videos, screenshots) — mirrors src/lib/evidenceTypes.ts.
+const { NOT_ANALYZED_TYPES } = await import("../src/lib/evidenceTypes.ts")
 
-for (const proj of projects) {
+// One grade per (project, student): each student's skills come only from their own evidence.
+// The owner's entry is keyed by the project id (as it always was); teammates by `project:student`.
+const pairs = projects.flatMap((proj) =>
+  (db.prepare("SELECT DISTINCT student_id FROM skill_signals WHERE project_id = ? ORDER BY student_id").all(String(proj.id)) as Row[]).map((r) => ({
+    proj,
+    studentId: String(r.student_id),
+  })),
+)
+
+for (const { proj, studentId } of pairs) {
   const projectId = String(proj.id)
+  const key = studentId === String(proj.student_id) ? projectId : `${projectId}:${studentId}`
   const evidenceRows = db
-    .prepare("SELECT id, type, title, description, content, fetched_content FROM evidence WHERE project_id = ? ORDER BY submitted_at")
-    .all(projectId) as Row[]
-  if (evidenceRows.length === 0) continue
-  const evidence = evidenceRows.map((r) => ({
-    id: String(r.id),
-    type: String(r.type),
-    title: String(r.title),
-    description: String(r.description),
-    content: [r.content, r.fetched_content].filter(Boolean).map(String).join("\n\n") || undefined,
-  }))
+    .prepare("SELECT id, type, title, description, content, fetched_content FROM evidence WHERE project_id = ? AND student_id = ? ORDER BY submitted_at")
+    .all(projectId, studentId) as Row[]
+  const evidence = evidenceRows
+    .filter((r) => !NOT_ANALYZED_TYPES.includes(String(r.type)))
+    .map((r) => ({
+      id: String(r.id),
+      type: String(r.type),
+      title: String(r.title),
+      description: String(r.description),
+      content: [r.content, r.fetched_content].filter(Boolean).map(String).join("\n\n") || undefined,
+    }))
+  if (evidence.length === 0) continue
 
-  // Exactly the skills seed.ts grades for this project (its seeded signals), so the
-  // hash written here is the same one seed.ts recomputes when it looks the entry up.
-  const skills = (db.prepare("SELECT skill FROM skill_signals WHERE project_id = ? ORDER BY id").all(projectId) as Row[]).map((r) => String(r.skill))
+  // Exactly the skills seed.ts grades for this student (their seeded signals), so the hash
+  // written here is the same one seed.ts recomputes when it looks the entry up.
+  const skills = (db.prepare("SELECT skill FROM skill_signals WHERE project_id = ? AND student_id = ? ORDER BY id").all(projectId, studentId) as Row[]).map((r) => String(r.skill))
   if (skills.length === 0) continue
   const challengeRow = db.prepare("SELECT problem_description, objectives, expected_output FROM challenges WHERE id = ?").get(String(proj.challenge_id)) as Row
   const challenge = {
@@ -76,14 +90,14 @@ for (const proj of projects) {
   try {
     const results = await gradeWithModel(provider, skills, evidence, challenge)
     if (results.length !== skills.length) {
-      console.warn(`Skipping ${projectId}: the model only answered ${results.length}/${skills.length} required skills.`)
+      console.warn(`Skipping ${key}: the model only answered ${results.length}/${skills.length} required skills.`)
       continue
     }
-    output[projectId] = { model: provider.model, hash: hashEvidenceSet(skills, evidence, provider.model), gradedAt: new Date().toISOString(), results }
+    output[key] = { model: provider.model, hash: hashEvidenceSet(skills, evidence, provider.model), gradedAt: new Date().toISOString(), results }
     graded++
-    console.log(`Graded ${projectId} (${skills.length} skills) with ${provider.model}`)
+    console.log(`Graded ${key} (${skills.length} skills) with ${provider.model}`)
   } catch (err) {
-    console.warn(`Failed to grade ${projectId}${existing[projectId] ? " — keeping its previous entry" : ""}:`, err instanceof Error ? err.message : err)
+    console.warn(`Failed to grade ${key}${existing[key] ? " — keeping its previous entry" : ""}:`, err instanceof Error ? err.message : err)
   }
 }
 

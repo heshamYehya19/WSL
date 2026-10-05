@@ -39,10 +39,10 @@ describe("snapshot visibility", () => {
   })
 
   it("a student only sees evidence for their own projects and ones they're a team member on", async () => {
-    const res = await server.call("GET", "/snapshot", "student:stu-just-ahmad")
+    const res = await server.call("GET", "/snapshot", "student:stu-ju-omar")
     const snap = res.json.snapshot as unknown as SnapshotShape
 
-    // stu-just-ahmad is a project_members row on prj-skytech-maintenance-sara (Sara's project).
+    // stu-ju-omar is a project_members row on prj-skytech-maintenance-sara (Sara's project).
     expect(snap.evidence.some((e) => e.projectId === "prj-skytech-maintenance-sara")).toBe(true)
     // Not a member of, nor the owner of, prj-echo-helpdesk-leen.
     expect(snap.evidence.some((e) => e.projectId === "prj-echo-helpdesk-leen")).toBe(false)

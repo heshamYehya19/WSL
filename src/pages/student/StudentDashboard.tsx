@@ -6,7 +6,7 @@ import { StatusBadge } from "../../components/ui/StatusBadge"
 import { SkillChip } from "../../components/ui/SkillChip"
 import { EmptyState } from "../../components/ui/EmptyState"
 import { formatRelative } from "../../lib/format"
-import { challengeFor, isEvidenced, skillsForProject, studentProjects, studentSignals } from "../../lib/selectors"
+import { challengeFor, evidenceBy, isEvidenced, signalsBy, studentProjects, studentSignals } from "../../lib/selectors"
 
 function greeting() {
   const h = new Date().getHours()
@@ -139,8 +139,8 @@ export default function StudentDashboard() {
               {myProjects.map((p, i) => {
                 const org = getOrg(p.organizationId)
                 const challenge = challengeFor(challenges, p)
-                const projectSignals = skillsForProject(skillSignals, p.id).filter(isEvidenced)
-                const myEv = evidence.filter((e) => e.projectId === p.id)
+                const projectSignals = signalsBy(skillSignals, p.id, student.id).filter(isEvidenced)
+                const myEv = evidenceBy(evidence, p.id, student.id)
                 return (
                   <Link
                     key={p.id}

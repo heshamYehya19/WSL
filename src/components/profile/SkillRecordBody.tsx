@@ -4,8 +4,10 @@ import { useStore } from "../../state/store"
 import { SkillChip } from "../ui/SkillChip"
 import { StatusBadge } from "../ui/StatusBadge"
 import { formatDate } from "../../lib/format"
-import { challengeFor, isEvidenced, skillsForProject, studentProjects, studentSignals } from "../../lib/selectors"
-import type { Project, SkillSignal } from "../../types"
+import { useDemoUser } from "../../state/demoUser"
+import { challengeFor, contributionOf, isEvidenced, skillsForProject, studentProjects, studentSignals, teamOf } from "../../lib/selectors"
+import { evidenceTypeLabel } from "../../lib/evidenceTypes"
+import type { Evidence, Project, SkillSignal } from "../../types"
 
 interface SkillSummary {
   skill: string
@@ -23,20 +25,18 @@ function ShieldIcon({ className = "h-3.5 w-3.5" }: { className?: string }) {
   )
 }
 
-function ContributionLine({ project, studentId, nameOf }: { project: Project; studentId: string; nameOf: (id: string) => string | undefined }) {
-  const mine = project.members.find((m) => m.studentId === studentId)
-  const others = project.members.filter((m) => m.studentId !== studentId)
-  const owner = project.studentId === studentId ? undefined : (nameOf(project.studentId) ?? "a teammate")
+/** This student's own contribution on a project, and who they worked with. Teammates' skills are never shown here. */
+function ContributionLine({ project, studentId, self, nameOf }: { project: Project; studentId: string; self: boolean; nameOf: (id: string) => string | undefined }) {
+  const contribution = contributionOf(project, studentId)
+  const others = teamOf(project).filter((m) => m.studentId !== studentId)
   return (
     <div className="mt-0.5 space-y-0.5 text-xs text-ink-400">
-      {mine && (
-        <p>
-          <span className="font-semibold text-ink-600">Your contribution:</span> {mine.roleNote}
-        </p>
-      )}
       <p>
-        Team project{owner ? ` — owned by ${owner}` : ""}
-        {others.length > 0 ? ` · ${others.map((m) => `${nameOf(m.studentId) ?? "a teammate"}: ${m.roleNote}`).join(" · ")}` : ""}
+        <span className="font-semibold text-ink-600">{self ? "Your contribution" : "Their contribution"}:</span>{" "}
+        {contribution || <span className="italic">{self ? "not recorded yet" : "not recorded"}</span>}
+      </p>
+      <p>
+        Team project{others.length > 0 ? ` · with ${others.map((m) => nameOf(m.studentId) ?? "a teammate").join(", ")}` : ""}
       </p>
     </div>
   )
@@ -76,16 +76,23 @@ function SkillCard({
   projectHref,
   getStaff,
   universityOf,
+  project,
+  studentId,
+  evidenceItems,
 }: {
   s: SkillSummary
   index: number
   projectHref: (projectId: string) => string
   getStaff: (id: string) => { name: string; universityId: string } | undefined
   universityOf: (universityId: string) => string | undefined
+  project?: Project
+  studentId: string
+  evidenceItems: Evidence[]
 }) {
   const verified = s.signal.status === "Verified"
   const verifier = s.signal.verifiedBy ? getStaff(s.signal.verifiedBy) : undefined
   const metCount = s.signal.criteria.filter((c) => c.met).length
+  const contribution = project ? contributionOf(project, studentId) : ""
   return (
     <div
       style={{ animationDelay: `${index * 40}ms` }}
@@ -112,6 +119,29 @@ function SkillCard({
           )}
         </div>
       </div>
+
+      {/* The chain behind the skill: project → contribution → evidence → verification. */}
+      {project && (
+        <dl className="mt-2.5 space-y-1 text-[11px] text-ink-600">
+          <div>
+            <dt className="inline font-semibold text-ink-700">Project: </dt>
+            <dd className="inline">{project.title}</dd>
+          </div>
+          {contribution && (
+            <div>
+              <dt className="inline font-semibold text-ink-700">Contribution: </dt>
+              <dd className="inline">{contribution}</dd>
+            </div>
+          )}
+          {evidenceItems.length > 0 && (
+            <div>
+              <dt className="inline font-semibold text-ink-700">Evidence: </dt>
+              <dd className="inline">{evidenceItems.map((e) => `${e.title} (${evidenceTypeLabel(e.type)})`).join("; ")}</dd>
+            </div>
+          )}
+        </dl>
+      )}
+
       {verified ? (
         <div className="mt-2.5 space-y-0.5 text-[11px] text-ink-500">
           <div className="inline-flex items-center gap-1 rounded-full bg-verified-100 px-2 py-0.5 text-[10px] font-semibold text-verified-600">
@@ -131,14 +161,14 @@ function SkillCard({
       ) : (
         <div className="mt-2.5 space-y-1 text-[11px] text-ink-400">
           <div className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
-            {s.signal.status === "Rejected" ? "Not verified" : "Awaiting university verification"}
+            {s.signal.status === "Rejected" ? "Not Verified" : s.signal.status === "More Evidence Requested" ? "More Evidence Requested" : "Pending University Verification"}
           </div>
           <p>
             {s.signal.status === "Rejected"
-              ? "A university reviewer looked at this and did not verify it."
-              : s.signal.suggestedLevel === "Insufficient"
-                ? "Not enough evidence yet — add more evidence and run the analysis again."
-                : "Evidence identified; a university reviewer has not checked it yet."}
+              ? "The university has not verified this evidence as sufficient."
+              : s.signal.status === "More Evidence Requested"
+                ? "The university asked for more evidence before it can decide."
+                : "Evidence identified; a university reviewer has not decided yet."}
           </p>
         </div>
       )}
@@ -157,6 +187,8 @@ export function SkillRecordBody({
   verifiedOnlyByDefault?: boolean
 }) {
   const { projects, challenges, evidence, skillSignals, getOrg, getStaff, getStudent, getUniversity } = useStore()
+  const { student: viewer } = useDemoUser()
+  const self = viewer?.id === studentId
   const universityOf = (id: string) => getUniversity(id)?.name
   const [filter, setFilter] = useState<"all" | "verified">(verifiedOnlyByDefault ? "verified" : "all")
   const [mounted, setMounted] = useState(false)
@@ -227,7 +259,17 @@ export function SkillRecordBody({
         ) : (
           <div key={filter} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {shownSkills.map((s, i) => (
-              <SkillCard key={s.skill} s={s} index={i} projectHref={projectHref} getStaff={getStaff} universityOf={universityOf} />
+              <SkillCard
+                key={s.skill}
+                s={s}
+                index={i}
+                projectHref={projectHref}
+                getStaff={getStaff}
+                universityOf={universityOf}
+                project={projects.find((p) => p.id === s.projectId)}
+                studentId={studentId}
+                evidenceItems={evidence.filter((e) => e.studentId === studentId && s.signal.evidenceIds.includes(e.id))}
+              />
             ))}
           </div>
         )}
@@ -270,7 +312,7 @@ export function SkillRecordBody({
                         <p className="text-xs text-ink-400">
                           {org?.name} · {challenge?.industry} · {started.toLocaleDateString(undefined, { month: "short", year: "numeric" })}
                         </p>
-                        {p.members.length > 0 && <ContributionLine project={p} studentId={studentId} nameOf={(id) => getStudent(id)?.name} />}
+                        {p.members.length > 0 && <ContributionLine project={p} studentId={studentId} self={self} nameOf={(id) => getStudent(id)?.name} />}
                       </div>
                     </div>
                     <StatusBadge status={p.status} />
@@ -314,7 +356,7 @@ export function SkillRecordBody({
                             key={e.id}
                             className="inline-flex items-center gap-1 rounded-lg border border-ink-200 bg-ink-50 px-2 py-1 text-xs text-ink-600 transition-colors hover:border-teal-400"
                           >
-                            <span className="font-semibold text-ink-800">{e.type}</span>
+                            <span className="font-semibold text-ink-800">{evidenceTypeLabel(e.type)}</span>
                             <span className="text-ink-300">·</span>
                             <span className="max-w-[12rem] truncate">{e.title}</span>
                           </span>

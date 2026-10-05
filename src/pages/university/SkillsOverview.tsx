@@ -4,7 +4,7 @@ import { useDemoUser } from "../../state/demoUser"
 import { useStore } from "../../state/store"
 import { EmptyState } from "../../components/ui/EmptyState"
 import { PageHero, Pills, SearchInput } from "../../components/ui/ListKit"
-import { studentSignals } from "../../lib/selectors"
+import { isEvidenced, studentProjects, studentSignals } from "../../lib/selectors"
 import { formatRelative } from "../../lib/format"
 
 type View = "cards" | "heatmap"
@@ -21,7 +21,8 @@ export default function SkillsOverview() {
   if (!university) return null
 
   const roster = studentsOfUniversity(university.id).map((s) => {
-    const signals = studentSignals(skillSignals, s.id)
+    // A skill WSL found no evidence of is not something the student has practised.
+    const signals = studentSignals(skillSignals, s.id).filter(isEvidenced)
     const best = new Map<string, number>()
     for (const sig of signals) best.set(sig.skill, Math.max(best.get(sig.skill) ?? 0, sig.evidenceConfidence))
     const scores = [...best.values()]
@@ -31,7 +32,7 @@ export default function SkillsOverview() {
       best,
       avg: scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0,
       verified: new Set(signals.filter((sig) => sig.status === "Verified").map((sig) => sig.skill)).size,
-      projectCount: projects.filter((p) => p.studentId === s.id).length,
+      projectCount: studentProjects(projects, s.id).length,
       lastActive,
     }
   })

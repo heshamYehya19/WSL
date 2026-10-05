@@ -1,19 +1,26 @@
 import { Reveal } from "./Reveal"
 
-// Illustrative: based on the seeded team project (Sara, Omar and Ahmad on SkyTech's
-// predictive-maintenance challenge). Roles are the contribution notes stored on that project.
+// Illustrative: the seeded EnergyWise team (Jordan Energy Solutions' "Smart Campus Energy Optimization"),
+// three students at one university. Roles are the contribution each student recorded; evidence and
+// skills are what their own submissions contain. Nothing here is verified until a reviewer decides.
 const CONTRIBUTORS = [
   {
-    name: "Omar Al-Fayez",
-    role: "Python preprocessing and ML model training for the risk score",
-    evidence: "risk_model.py · Code",
-    skills: ["Python", "Machine Learning"],
+    name: "Ahmad Al-Khatib",
+    role: "Database design, SQL analysis, and the data-processing pipeline",
+    evidence: "Schema and SQL reports · Documentation; Data pipeline · GitHub",
+    skills: ["SQL", "Python", "Data Analysis"],
   },
   {
-    name: "Ahmad Obeidat",
-    role: "REST API integration and database design for the asset store",
-    evidence: "Asset Risk API Reference · Documentation",
-    skills: ["REST API Design", "SQL"],
+    name: "Sara Al-Najjar",
+    role: "Feature engineering, the machine-learning model, and model evaluation",
+    evidence: "Anomaly detection · Notebook; Model evaluation · Report",
+    skills: ["Machine Learning"],
+  },
+  {
+    name: "Omar Al-Fayez",
+    role: "Dashboard, visualizations, and the presentation",
+    evidence: "Dashboard · GitHub; Walkthrough · Presentation",
+    skills: ["Data Visualization"],
   },
 ]
 
@@ -47,8 +54,8 @@ export function GitHubVsWsl() {
           <div className="rounded-2xl border border-teal-400/50 bg-teal-50 p-6">
             <div className="text-xs font-semibold tracking-wide text-teal-700 uppercase">On WSL</div>
             <p className="mt-3 text-sm font-semibold text-ink-900">
-              Predictive maintenance for SkyTech's field equipment
-              <span className="font-normal text-ink-500"> — a real challenge from Enterprise Software (ERP)</span>
+              Smart Campus Energy Optimization
+              <span className="font-normal text-ink-500"> — a real challenge from Jordan Energy Solutions</span>
             </p>
             <div className="mt-4 space-y-3">
               {CONTRIBUTORS.map((c) => (
@@ -70,8 +77,8 @@ export function GitHubVsWsl() {
               ))}
             </div>
             <p className="mt-3 text-[11px] text-ink-400">
-              Illustrative example from the demo team project — fictional students. Each contribution is reviewed and verified by a university,
-              not read off a commit count.
+              Illustrative example from the demo team project — fictional students. Each student's skills come only from their own evidence and are verified
+              (or not) one at a time by their university, never read off a commit count.
             </p>
           </div>
         </Reveal>

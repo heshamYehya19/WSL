@@ -1,18 +1,54 @@
 # WSL | وصل
 
-**Your Degree Says You Know. Your Work Should Prove It.**
+**Don't Just Graduate With a Degree. Graduate With Proof.**
 
 WSL is an education-to-employment evidence infrastructure, built for the Jordan 2076 Hackathon
 (Amman track — Innovation in Education & Learning Systems).
 
-Real-world problems become university learning projects. Learning projects produce student work.
-Student work becomes evidence. AI analyzes that evidence for skill signals. A human university
-mentor verifies each signal. Verified skills join a student's living skill record — discoverable
-by companies looking for demonstrated capability, not claimed skills.
+Industry need → real-world challenge → student work → evidence → university verification →
+verified proof → talent. A company's real problem becomes a university project. Students — alone or
+in a team from one university — each record what they contributed and submit their own evidence. AI
+helps organize that evidence for review; a human university reviewer decides, skill by skill and
+student by student, what is verified. Verified proof joins each student's profile, discoverable by
+companies looking for demonstrated capability, not claimed skills.
 
 > The project isn't the product. The evidence infrastructure is.
 
 **Live demo:** _not deployed yet — add the URL here once it's live (see [Deploying on Replit](#deploying-on-replit))._
+
+## The EnergyWise walkthrough (one project, three students, three bodies of proof)
+
+The seed contains a complete team scenario you can follow in about five minutes. **Jordan Energy
+Solutions** posted *Smart Campus Energy Optimization* (Energy & Technology · Intermediate · 4–6
+weeks; required skills Python, Data Analysis, SQL, Machine Learning, Data Visualization). The
+University of Jordan assigned it to its Computer Science students, and three of them work on one
+project, *EnergyWise*:
+
+| Student | Contribution (their own words) | Their evidence |
+|---|---|---|
+| Ahmad Al-Khatib | Database design, SQL analysis, the data-processing pipeline | SQL schema and reports (Documentation), data pipeline (GitHub), contribution statement |
+| Sara Al-Najjar | Feature engineering, the machine-learning model, model evaluation | Anomaly-detection notebook, model evaluation report, contribution statement |
+| Omar Al-Fayez | Dashboard, visualizations, the presentation | Dashboard (GitHub), walkthrough (Presentation), demo video, contribution statement |
+
+WSL has analyzed each student's **own** evidence separately — Ahmad's SQL is never credited to Sara or
+Omar — and nothing is verified yet. To walk the loop (open `/login` and pick the accounts):
+
+1. **Company** — *Jordan Energy Solutions*: the challenge brief (deliverables, duration, constraints)
+   and the lifecycle stepper. **University** — *University of Jordan* → *Submissions* → the EnergyWise
+   card.
+2. **Reviewer** (University of Jordan): the project page has one section per student — their
+   contribution, their evidence, and one card per required skill showing what the evidence demonstrates,
+   the lines behind it, and the gaps. Verify Ahmad's SQL; ask Omar for more evidence on Python; leave
+   the rest. Skills the evidence doesn't show read *Insufficient evidence* and need no decision.
+3. **Students** — sign in as Ahmad, Sara or Omar: each sees the shared project but only their own
+   evidence and skills, records their contribution, and sees *Verified by University of Jordan* only
+   for what the reviewer verified for them. The owner (Ahmad) can add classmates from his university.
+4. **Reviewer** — decide the rest, then **Confirm to Company**. **Company** — *Talent Discovery* now
+   finds each student through their own verified skills; open one to follow *skill → project → their
+   contribution → evidence → university verification*.
+
+The demo database only reseeds when it is empty: after pulling this version, run `npm run db:reset`
+(or the reset in the account menu) to get the scenario.
 
 ## Running locally
 
@@ -77,11 +113,11 @@ in the UI. The seed contains:
 - **5 universities** (real): Amman Arab University, The Hashemite University, University of Jordan,
   Jordan University of Science and Technology, Applied Science Private University — each with its
   IT faculty, programs, and faculty mentors.
-- **15 students** (fictional), 3 per university, majoring in AI, Software Engineering, Cyber Security,
+- **16 students** (fictional), 3–4 per university, majoring in AI, Software Engineering, Cyber Security,
   Computer Science, or Business Information Technology.
-- **5 companies** (real): Estarta HQ, Echo Technology, IRIS Technology Jordan, SkyTech Enterprise
-  Systems, Advanced Business Solutions — each with fictional contact people, challenges, and job
-  opportunities.
+- **6 companies** (real): Estarta HQ, Echo Technology, IRIS Technology Jordan, SkyTech Enterprise
+  Systems, Jordan Energy Solutions, Advanced Business Solutions — each with fictional contact people,
+  challenges, and job opportunities.
 - Challenges at every pipeline stage, plus projects, evidence, AI evidence signals, university
   verification decisions, company feedback, and per-account notifications that are all consistent
   with each other.
@@ -143,6 +179,7 @@ verifies it, and companies only see verified skills unless they choose to includ
 | `GITHUB_TOKEN` | Optional. Raises the GitHub API rate limit for reading repository links. |
 
 ## Demo tour
+(This is the single-student tour; for the team scenario see [the EnergyWise walkthrough](#the-energywise-walkthrough-one-project-three-students-three-bodies-of-proof).)
 
 The sign-in page opens with **Yazan Al-Masri**, a student with a full record, and a **Take the
 tour** button. The tour follows him through all three roles: IRIS's challenge, Amman Arab
@@ -156,6 +193,30 @@ header, trusted once its id is confirmed to exist — there's no password, sessi
 Ownership checks on every write are real and independent of this; what's missing for a real
 deployment is proof the request came from that account. Set `WSL_DEMO_MODE=false` to disable the
 one genuinely destructive action available in this mode, resetting the database.
+
+## Teams, contribution and individual proof
+
+A project is shared; proof is not. The student who starts a project can add classmates **from the same
+university**, so one university is the verification authority for the whole team. Then, for every member:
+
+- **Contribution.** Each member (owner included) records what they contributed, in their own words
+  (`projects.owner_role_note`, `project_members.role_note`). It is a claim for the reviewer to check
+  against that student's evidence — never proof by itself. An optional *Contribution Statement* piece of
+  evidence says the same at length, and is kept for the reviewer, never analyzed as work.
+- **Evidence.** Every item has one author (`evidence.student_id`). Types: GitHub, Documentation,
+  Notebook, Report, Presentation, Demo / Video, Screenshot, Contribution Statement
+  (`src/lib/evidenceTypes.ts`; what each takes — a link, a file, or text — is shared by the form and the
+  API). Videos, screenshots and statements are kept for the reviewer and are not analyzed.
+- **Analysis.** `POST /projects/:id/ai-review` reads only the calling student's own evidence and writes
+  that student's signals (`skill_signals` is unique per project **and student** and skill). The analysis
+  cache is per student (`analysis_runs`).
+- **Verification.** A reviewer decides one student's one skill at a time; only that student is told, and the
+  reviewer is the coordinator of that student's program. Skills the evidence doesn't show
+  (*Insufficient evidence*) need no decision and are never shared. Confirming the project to the company
+  needs every skill that has evidence decided, for every student.
+- **Proof.** A student's profile, a company's Talent Discovery and the project pages all read the same
+  per-student signals, so a skill is only ever shown for the student whose own evidence and verification
+  back it. Required skills are never treated as demonstrated skills.
 
 ## Attached files & privacy screening
 
@@ -201,9 +262,16 @@ model or GitHub response a test needs is mocked. It covers, among others:
   rejected or scored low;
 - invalid GitHub links, unreadable repositories, a challenge with no skills or learning outcomes, and
   Arabic evidence (normalized, accepted when relevant, rejected when copied or unrelated);
-- `/api/health`, the pre-graded seed cache, and upgrading an older database.
+- `/api/health`, the pre-graded seed cache, and upgrading an older database (v13 → v14 keeps every
+  signal and makes them per student);
+- teams and individual proof: same-university teams, per-member contributions, one student's evidence
+  never reaching another's analysis or skills, per-student review and notifications, a contribution
+  statement never becoming proof, and the whole *EnergyWise* loop from a company's new challenge to each
+  student's own verified proof and company discovery (`energywise-scenario.test.ts`);
+- the eight evidence types and what each accepts (files, links, text), and Google Docs, notebooks,
+  presentations and screenshots.
 
-Things to try in the demo: press *Re-analyze* twice on the same project; submit a GitLab link as a
+Things to try in the demo: follow the EnergyWise walkthrough above; press *Re-analyze* twice on the same project; submit a GitLab link as a
 GitHub repository; submit a challenge with no skills; paste the challenge brief back as evidence;
 submit evidence written in Arabic.
 

@@ -1,0 +1,254 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - link "WSL وصل" [ref=e6] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e13]: WSL
+        - generic [ref=e14]: وصل
+      - navigation [ref=e15]:
+        - link "About" [ref=e16] [cursor=pointer]:
+          - /url: /about
+        - link "How It Works" [ref=e17] [cursor=pointer]:
+          - /url: /how-it-works
+        - link "For Students" [ref=e18] [cursor=pointer]:
+          - /url: /for-students
+        - link "For Universities" [ref=e19] [cursor=pointer]:
+          - /url: /for-universities
+        - link "For Companies" [ref=e20] [cursor=pointer]:
+          - /url: /for-companies
+      - generic [ref=e21]:
+        - button "Switch to dark mode" [ref=e22]
+        - link "Sign In" [ref=e26] [cursor=pointer]:
+          - /url: /login
+  - main [ref=e27]:
+    - generic [ref=e28]:
+      - generic [ref=e30]:
+        - generic [ref=e31]: Sign In
+        - heading "Continue as..." [level=1] [ref=e32]
+        - paragraph [ref=e33]: Choose your account. Each student, university, and company has its own data on WSL, and everything you do is saved to that account. You can switch accounts anytime from the top bar.
+      - generic [ref=e35]:
+        - generic [ref=e36]:
+          - generic [ref=e37]: YM
+          - generic [ref=e38]:
+            - generic [ref=e39]: Start here
+            - heading "Yazan Al-Masri" [level=2] [ref=e40]
+            - paragraph [ref=e41]: Cyber Security · Year 4 · Amman Arab University
+            - paragraph [ref=e42]: "Follow one student through the whole loop: IRIS posts a challenge, his university assigns it, he submits real code, WSL organizes the evidence and quotes the lines behind each skill, his university verifies them, and IRIS finds him by proof instead of a CV. About three minutes."
+        - generic [ref=e43]:
+          - button "Take the tour →" [ref=e44]
+          - button "Open Yazan's skill record" [ref=e45]
+      - generic [ref=e46]:
+        - generic [ref=e47]:
+          - generic [ref=e48]: Student
+          - heading "Browse challenges, submit evidence, build your skill record." [level=3] [ref=e53]
+          - generic [ref=e54]:
+            - generic [ref=e55]:
+              - generic [ref=e56]: Amman Arab University
+              - generic [ref=e57]:
+                - button "YM Yazan Al-Masri Cyber Security · Year 4 →" [ref=e58]:
+                  - generic [ref=e59]: YM
+                  - generic [ref=e60]:
+                    - generic [ref=e61]: Yazan Al-Masri
+                    - generic [ref=e62]: Cyber Security · Year 4
+                  - generic [ref=e63]: →
+                - button "RZ Rahaf Abu Zaid Artificial Intelligence · Year 3 →" [ref=e64]:
+                  - generic [ref=e65]: RZ
+                  - generic [ref=e66]:
+                    - generic [ref=e67]: Rahaf Abu Zaid
+                    - generic [ref=e68]: Artificial Intelligence · Year 3
+                  - generic [ref=e69]: →
+                - button "MS Mohammad Al-Shboul Computer Science · Year 2 →" [ref=e70]:
+                  - generic [ref=e71]: MS
+                  - generic [ref=e72]:
+                    - generic [ref=e73]: Mohammad Al-Shboul
+                    - generic [ref=e74]: Computer Science · Year 2
+                  - generic [ref=e75]: →
+            - generic [ref=e76]:
+              - generic [ref=e77]: Applied Science Private University
+              - generic [ref=e78]:
+                - button "MK Mais Khalil Artificial Intelligence · Year 2 →" [ref=e79]:
+                  - generic [ref=e80]: MK
+                  - generic [ref=e81]:
+                    - generic [ref=e82]: Mais Khalil
+                    - generic [ref=e83]: Artificial Intelligence · Year 2
+                  - generic [ref=e84]: →
+                - button "BQ Bashar Qatamin Software Engineering · Year 3 →" [ref=e85]:
+                  - generic [ref=e86]: BQ
+                  - generic [ref=e87]:
+                    - generic [ref=e88]: Bashar Qatamin
+                    - generic [ref=e89]: Software Engineering · Year 3
+                  - generic [ref=e90]: →
+                - button "LT Lujain Al-Tarawneh Computer Science · Year 4 →" [ref=e91]:
+                  - generic [ref=e92]: LT
+                  - generic [ref=e93]:
+                    - generic [ref=e94]: Lujain Al-Tarawneh
+                    - generic [ref=e95]: Computer Science · Year 4
+                  - generic [ref=e96]: →
+            - generic [ref=e97]:
+              - generic [ref=e98]: Jordan University of Science and Technology
+              - generic [ref=e99]:
+                - button "AO Ahmad Obeidat Software Engineering · Year 4 →" [ref=e100]:
+                  - generic [ref=e101]: AO
+                  - generic [ref=e102]:
+                    - generic [ref=e103]: Ahmad Obeidat
+                    - generic [ref=e104]: Software Engineering · Year 4
+                  - generic [ref=e105]: →
+                - button "KR Khaled Rawashdeh Cyber Security · Year 3 →" [ref=e106]:
+                  - generic [ref=e107]: KR
+                  - generic [ref=e108]:
+                    - generic [ref=e109]: Khaled Rawashdeh
+                    - generic [ref=e110]: Cyber Security · Year 3
+                  - generic [ref=e111]: →
+                - button "NM Noor Al-Momani Artificial Intelligence · Year 3 →" [ref=e112]:
+                  - generic [ref=e113]: NM
+                  - generic [ref=e114]:
+                    - generic [ref=e115]: Noor Al-Momani
+                    - generic [ref=e116]: Artificial Intelligence · Year 3
+                  - generic [ref=e117]: →
+            - generic [ref=e118]:
+              - generic [ref=e119]: The Hashemite University
+              - generic [ref=e120]:
+                - button "LZ Leen Al-Zoubi Software Engineering · Year 4 →" [ref=e121]:
+                  - generic [ref=e122]: LZ
+                  - generic [ref=e123]:
+                    - generic [ref=e124]: Leen Al-Zoubi
+                    - generic [ref=e125]: Software Engineering · Year 4
+                  - generic [ref=e126]: →
+                - button "DO Dana Al-Omari Computer Science · Year 3 →" [ref=e127]:
+                  - generic [ref=e128]: DO
+                  - generic [ref=e129]:
+                    - generic [ref=e130]: Dana Al-Omari
+                    - generic [ref=e131]: Computer Science · Year 3
+                  - generic [ref=e132]: →
+                - button "HH Hamza Bani Hani Cyber Security · Year 3 →" [ref=e133]:
+                  - generic [ref=e134]: HH
+                  - generic [ref=e135]:
+                    - generic [ref=e136]: Hamza Bani Hani
+                    - generic [ref=e137]: Cyber Security · Year 3
+                  - generic [ref=e138]: →
+            - generic [ref=e139]:
+              - generic [ref=e140]: University of Jordan
+              - generic [ref=e141]:
+                - button "OF Omar Al-Fayez Artificial Intelligence · Year 4 →" [ref=e142]:
+                  - generic [ref=e143]: OF
+                  - generic [ref=e144]:
+                    - generic [ref=e145]: Omar Al-Fayez
+                    - generic [ref=e146]: Artificial Intelligence · Year 4
+                  - generic [ref=e147]: →
+                - button "TH Tala Haddad Business Information Technology · Year 4 →" [ref=e148]:
+                  - generic [ref=e149]: TH
+                  - generic [ref=e150]:
+                    - generic [ref=e151]: Tala Haddad
+                    - generic [ref=e152]: Business Information Technology · Year 4
+                  - generic [ref=e153]: →
+                - button "SN Sara Al-Najjar Computer Science · Year 2 →" [ref=e154]:
+                  - generic [ref=e155]: SN
+                  - generic [ref=e156]:
+                    - generic [ref=e157]: Sara Al-Najjar
+                    - generic [ref=e158]: Computer Science · Year 2
+                  - generic [ref=e159]: →
+        - generic [ref=e160]:
+          - generic [ref=e161]: University
+          - heading "Assign challenges, monitor submissions, confirm work to companies." [level=3] [ref=e166]
+          - generic [ref=e167]:
+            - button "AAU Amman Arab University Amman · Private · Est. 1999 →" [ref=e168]:
+              - generic [ref=e169]: AAU
+              - generic [ref=e170]:
+                - generic [ref=e171]: Amman Arab University
+                - generic [ref=e172]: Amman · Private · Est. 1999
+              - generic [ref=e173]: →
+            - button "ASU Applied Science Private University Amman · Private · Est. 1991 →" [ref=e174]:
+              - generic [ref=e175]: ASU
+              - generic [ref=e176]:
+                - generic [ref=e177]: Applied Science Private University
+                - generic [ref=e178]: Amman · Private · Est. 1991
+              - generic [ref=e179]: →
+            - button "JUS Jordan University of Science and Technology Irbid · Public · Est. 1986 →" [ref=e180]:
+              - generic [ref=e181]: JUS
+              - generic [ref=e182]:
+                - generic [ref=e183]: Jordan University of Science and Technology
+                - generic [ref=e184]: Irbid · Public · Est. 1986
+              - generic [ref=e185]: →
+            - button "HU The Hashemite University Zarqa · Public · Est. 1995 →" [ref=e186]:
+              - generic [ref=e187]: HU
+              - generic [ref=e188]:
+                - generic [ref=e189]: The Hashemite University
+                - generic [ref=e190]: Zarqa · Public · Est. 1995
+              - generic [ref=e191]: →
+            - button "UJ University of Jordan Amman · Public · Est. 1962 →" [ref=e192]:
+              - generic [ref=e193]: UJ
+              - generic [ref=e194]:
+                - generic [ref=e195]: University of Jordan
+                - generic [ref=e196]: Amman · Public · Est. 1962
+              - generic [ref=e197]: →
+        - generic [ref=e198]:
+          - generic [ref=e199]: Company
+          - heading "Submit challenges and discover verified talent." [level=3] [ref=e204]
+          - generic [ref=e205]:
+            - button "ABS Advanced Business Solutions Business Software & Analytics →" [ref=e206]:
+              - generic [ref=e207]: ABS
+              - generic [ref=e208]:
+                - generic [ref=e209]: Advanced Business Solutions
+                - generic [ref=e210]: Business Software & Analytics
+              - generic [ref=e211]: →
+            - button "ECHO Echo Technology IT Services & Software →" [ref=e212]:
+              - generic [ref=e213]: ECHO
+              - generic [ref=e214]:
+                - generic [ref=e215]: Echo Technology
+                - generic [ref=e216]: IT Services & Software
+              - generic [ref=e217]: →
+            - button "EST Estarta HQ Customer Experience & BPO →" [ref=e218]:
+              - generic [ref=e219]: EST
+              - generic [ref=e220]:
+                - generic [ref=e221]: Estarta HQ
+                - generic [ref=e222]: Customer Experience & BPO
+              - generic [ref=e223]: →
+            - button "IRIS IRIS Technology Jordan IT Solutions & Security →" [ref=e224]:
+              - generic [ref=e225]: IRIS
+              - generic [ref=e226]:
+                - generic [ref=e227]: IRIS Technology Jordan
+                - generic [ref=e228]: IT Solutions & Security
+              - generic [ref=e229]: →
+            - button "SKY SkyTech Enterprise Systems Enterprise Software (ERP) →" [ref=e230]:
+              - generic [ref=e231]: SKY
+              - generic [ref=e232]:
+                - generic [ref=e233]: SkyTech Enterprise Systems
+                - generic [ref=e234]: Enterprise Software (ERP)
+              - generic [ref=e235]: →
+  - contentinfo [ref=e236]:
+    - generic [ref=e237]:
+      - generic [ref=e238]:
+        - generic [ref=e239]:
+          - link "WSL وصل" [ref=e240] [cursor=pointer]:
+            - /url: /
+            - generic [ref=e247]: WSL
+            - generic [ref=e248]: وصل
+          - paragraph [ref=e249]: WSL is the evidence infrastructure connecting universities, students, and organizations — turning real-world learning into verified, demonstrated skill.
+        - generic [ref=e250]:
+          - generic [ref=e251]:
+            - generic [ref=e252]: Platform
+            - list [ref=e253]:
+              - listitem [ref=e254]:
+                - link "How It Works" [ref=e255] [cursor=pointer]:
+                  - /url: /how-it-works
+              - listitem [ref=e256]:
+                - link "About WSL" [ref=e257] [cursor=pointer]:
+                  - /url: /about
+              - listitem [ref=e258]:
+                - link "Sign In" [ref=e259] [cursor=pointer]:
+                  - /url: /login
+          - generic [ref=e260]:
+            - generic [ref=e261]: Audiences
+            - list [ref=e262]:
+              - listitem [ref=e263]:
+                - link "For Students" [ref=e264] [cursor=pointer]:
+                  - /url: /for-students
+              - listitem [ref=e265]:
+                - link "For Universities" [ref=e266] [cursor=pointer]:
+                  - /url: /for-universities
+              - listitem [ref=e267]:
+                - link "For Companies" [ref=e268] [cursor=pointer]:
+                  - /url: /for-companies
+      - generic [ref=e269]:
+        - generic [ref=e270]: "Jordan 2076 Hackathon — Amman track: Innovation in Education & Learning Systems."
+        - generic [ref=e271]: "Illustrative data: universities and companies are real Jordanian institutions, but every person, challenge and result shown is fictional and not endorsed by them."

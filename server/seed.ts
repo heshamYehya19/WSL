@@ -2,8 +2,9 @@ import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import type { DatabaseSync } from "node:sqlite"
-import { hashEvidenceSet, simulateAIReview } from "./ai.ts"
+import { hashEvidenceSet, noEvidenceResults, simulateAIReview } from "./ai.ts"
 import type { SimulatedRating } from "./ai.ts"
+import { NOT_ANALYZED_TYPES } from "../src/lib/evidenceTypes.ts"
 
 // Initial content for the WSL database. Universities and companies are real
 // Jordanian institutions; every person, challenge, submission, and rating is
@@ -60,8 +61,15 @@ export const EVIDENCE_LINKS: Record<string, string> = {
   "ev-tala-1": "github.com/tala-haddad/sme-sales-model",
   "ev-tala-2": "drive.google.com/file/d/1Nf5wQ9kLx2TmR7zV3bC8sJhE6fY4gA0dM/view",
   "ev-tala-3": "docs.google.com/presentation/d/1Gy7tR2wQp4LmX9zN5bC3sJhE8fK6vA0dT/view",
-  "ev-maint-1": "github.com/sara-alnajjar/asset-risk-model",
-  "ev-maint-2": "github.com/sara-alnajjar/asset-risk-model/blob/main/api/README.md",
+  "ev-maint-1": "github.com/omar-alfayez/asset-risk-model",
+  "ev-maint-3": "github.com/sara-alnajjar/asset-risk-dashboard",
+  "ev-energy-ahmad-1": "docs.google.com/document/d/1EwAhm7Qk4TzR9vLx2NpB6cJsY3fD8gUo/edit",
+  "ev-energy-ahmad-2": "github.com/ahmad-alkhatib/energywise-pipeline",
+  "ev-energy-sara-1": "github.com/sara-alnajjar/energywise-ml/blob/main/notebooks/anomaly_model.ipynb",
+  "ev-energy-sara-2": "drive.google.com/file/d/1EwSr5Kp8TzL2vNx9RbC4cJsY7fD3gUa/view",
+  "ev-energy-omar-1": "github.com/omar-alfayez/energywise-dashboard",
+  "ev-energy-omar-2": "docs.google.com/presentation/d/1EwOm3Rk7TzP5vLx9NqB2cJsY6fD4gUe/edit",
+  "ev-energy-omar-3": "youtube.com/watch?v=energywise-dashboard-demo",
 }
 
 export function seedDatabase(db: DatabaseSync): void {
@@ -202,6 +210,13 @@ export function seedDatabase(db: DatabaseSync): void {
       about: "Builds and implements enterprise resource planning and business management systems for organizations in Jordan.",
     },
     {
+      id: "org-jes",
+      name: "Jordan Energy Solutions",
+      industry: "Energy & Technology",
+      initials: "JES",
+      about: "Energy-efficiency and smart-metering company working with universities, hospitals and municipalities across Jordan to cut and understand their electricity use.",
+    },
+    {
       id: "org-abs",
       name: "Advanced Business Solutions",
       industry: "Business Software & Analytics",
@@ -224,6 +239,8 @@ export function seedDatabase(db: DatabaseSync): void {
     ["ctc-iris-1", "org-iris", "Lama Kurdi", "Security Operations Lead", 1],
     ["ctc-skytech-1", "org-skytech", "Ziad Hijazi", "Solutions Architect", 1],
     ["ctc-skytech-2", "org-skytech", "Nadine Saadeh", "Product Manager, ERP Analytics", 0],
+    ["ctc-jes-1", "org-jes", "Layan Tamimi", "Head of Smart Energy Programs", 1],
+    ["ctc-jes-2", "org-jes", "Sami Nuimat", "Facilities Data Engineer", 0],
     ["ctc-abs-1", "org-abs", "Ruba Shawabkeh", "BI Practice Lead", 1],
   ]
   for (const c of contacts) run("INSERT INTO company_contacts (id, company_id, name, role, is_primary) VALUES (?, ?, ?, ?, ?)", ...c)
@@ -249,6 +266,8 @@ export function seedDatabase(db: DatabaseSync): void {
       "AI student specializing in natural language processing, especially Arabic and code-switched Arabic/English text."],
     ["stu-ju-sara", "uni-ju", "prg-ju-cs", "0219945", "Sara Al-Najjar", "Year 2", 3.37, "Madaba", "Open to Internships",
       "Computer science student exploring data analysis and web development through coursework and side projects."],
+    ["stu-ju-ahmad", "uni-ju", "prg-ju-cs", "0207316", "Ahmad Al-Khatib", "Year 3", 3.51, "Amman", "Open to Opportunities",
+      "Computer science student who likes the part of a project where messy data becomes a clean database — schema design, SQL, and the pipelines that feed everything else."],
     ["stu-just-ahmad", "uni-just", "prg-just-se", "125893", "Ahmad Obeidat", "Year 4", 3.62, "Irbid", "Open to Opportunities",
       "Software engineering student focused on backend systems — Java, Spring Boot, and well-tested APIs."],
     ["stu-just-noor", "uni-just", "prg-just-ai", "131472", "Noor Al-Momani", "Year 3", 3.74, "Irbid", "Open to Internships",
@@ -764,7 +783,71 @@ export function seedDatabase(db: DatabaseSync): void {
         ["Evidence Under Review", -3, "WSL analyzed the team's submitted evidence automatically."],
       ],
     },
+    {
+      id: "chal-jes-energy",
+      company: "org-jes",
+      contact: "ctc-jes-1",
+      title: "Smart Campus Energy Optimization",
+      problem:
+        "Jordan Energy Solutions installs smart meters across university campuses, but the hourly readings sit in spreadsheets nobody has time to read. Facilities teams cannot see which buildings use the most energy, when consumption is unusual, or whether a spike is a faulty system or a busy exam week. JES wants a small analytics prototype for one campus: a clean database of the meter readings, SQL reports that answer facilities' everyday questions, a model that flags abnormal consumption, and a dashboard a facilities manager could open without help.",
+      objectives: [
+        "Clean the meter readings and load them into a documented database",
+        "Write SQL reports for energy use by building, faculty and time of day",
+        "Engineer features and train a model that flags abnormal consumption",
+        "Evaluate how many known incidents the model catches and how many false alarms it raises",
+        "Build a dashboard that shows usage by building and highlights anomalies",
+      ],
+      expected:
+        "A documented database with the cleaned readings, a set of SQL reports, an anomaly-detection model with a written evaluation, and a dashboard that shows energy use by building and flags unusual consumption.",
+      industry: "Energy & Technology",
+      difficulty: "Intermediate",
+      skills: ["Python", "Data Analysis", "SQL", "Machine Learning", "Data Visualization"],
+      outcomes: [
+        "Turn raw meter data into a clean, queryable database",
+        "Choose and evaluate a model for a real anomaly-detection problem",
+        "Communicate energy insights to non-technical facilities staff",
+        "Practice dividing a data project between teammates and recording each person's contribution",
+      ],
+      dataset: "Six months of anonymized hourly smart-meter readings for 24 campus buildings, plus a short list of known incidents",
+      sensitivity: "None (Public Dataset)",
+      deadline: 25,
+      preferred: "uni-ju",
+      visibility: "Public",
+      requirements: ["Project report", "GitHub repository", "Presentation"],
+      assignedUni: "uni-ju",
+      assignedProgram: "prg-ju-cs",
+      history: [
+        ["Draft", -31],
+        ["Sent to University", -31, SCREEN_NOTE],
+        ["University Assigned", -27, "Assigned to B.Sc. Computer Science students at University of Jordan."],
+        ["In Progress", -18, "Ahmad Al-Khatib started the project."],
+        ["Evidence Under Review", -2, "WSL analyzed the team's submitted evidence automatically."],
+      ],
+    },
   ]
+
+  // How long each challenge should take and what students must respect. Kept beside the challenges
+  // (not in each entry) so the brief reads the same as one a company would write in the form.
+  const briefExtras: Record<string, { duration: string; constraints: string }> = {
+    "chal-estarta-intent": { duration: "6 weeks", constraints: "Use only the anonymized transcripts provided. Arabic and English must both be handled." },
+    "chal-estarta-access": { duration: "4 weeks", constraints: "Work only from the documented access logs and policies provided; do not scan or touch live systems." },
+    "chal-echo-helpdesk": { duration: "6–8 weeks", constraints: "Any stack is fine, but the API must be documented so Echo's team could extend it." },
+    "chal-iris-anomaly": { duration: "4–6 weeks", constraints: "Use the anonymized NetFlow sample provided. Do not collect traffic from real networks." },
+    "chal-iris-ssh": { duration: "3–4 weeks", constraints: "Work from the provided auth logs only." },
+    "chal-iris-phishing": { duration: "4 weeks", constraints: "Simulated campaigns only; no real employee data or live mail systems." },
+    "chal-skytech-inventory": { duration: "6 weeks", constraints: "Java and a SQL database; include automated tests." },
+    "chal-skytech-forecast": { duration: "5 weeks", constraints: "Use the anonymized spare-parts history provided." },
+    "chal-skytech-rbac": { duration: "5 weeks", constraints: "Roles and permissions must be configurable, not hard-coded." },
+    "chal-abs-bi": { duration: "4–6 weeks", constraints: "Use the sample sales dataset provided; no client data." },
+    "chal-abs-workflow": { duration: "4 weeks", constraints: "" },
+    "chal-echo-mobile": { duration: "5 weeks", constraints: "A clickable prototype is enough — no production backend needed." },
+    "chal-skytech-maintenance": { duration: "6 weeks", constraints: "Work as a team: each member's contribution has to be recorded and backed by their own evidence." },
+    "chal-jes-energy": {
+      duration: "4–6 weeks",
+      constraints:
+        "Use only the anonymized sample data provided — no personal data. Python, SQL and open-source libraries only, and document how someone else could re-run your analysis. Work as a team and record each member's contribution.",
+    },
+  }
 
   for (const c of challenges) {
     const status = c.history[c.history.length - 1][0]
@@ -772,11 +855,12 @@ export function seedDatabase(db: DatabaseSync): void {
     run(
       `INSERT INTO challenges (id, company_id, contact_id, title, problem_description, objectives, expected_output, industry, difficulty,
         required_skills, learning_outcomes, dataset_availability, data_sensitivity, deadline, preferred_university_id, visibility,
-        submission_requirements, status, created_at, submitted_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        submission_requirements, status, created_at, submitted_at, duration, constraints_note)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       c.id, c.company, c.contact, c.title, c.problem, json(c.objectives), c.expected, c.industry, c.difficulty,
       json(c.skills), json(c.outcomes), c.dataset, c.sensitivity, d(c.deadline), c.preferred, c.visibility,
       json(c.requirements), status, d(c.history[0][1]), sent ? d(sent[1]) : null,
+      briefExtras[c.id]?.duration ?? "", briefExtras[c.id]?.constraints ?? "",
     )
     for (const [hStatus, day, note] of c.history) {
       run("INSERT INTO challenge_history (challenge_id, status, at, note) VALUES (?, ?, ?, ?)", c.id, hStatus, d(day), note ?? null)
@@ -804,6 +888,8 @@ export function seedDatabase(db: DatabaseSync): void {
   interface SeedEvidence { id: string; student?: string; type: string; title: string; description: string; day: number; content?: string }
   interface SeedSignal {
     skill: string
+    /** Whose signal this is; defaults to the project's owner. Each student's signals come from their own evidence. */
+    student?: string
     status?: "Verified" | "More Evidence Requested" | "Rejected"
     verifiedBy?: string
     verifiedDay?: number
@@ -813,6 +899,8 @@ export function seedDatabase(db: DatabaseSync): void {
     id: string
     challenge: string
     student: string
+    /** What the owner says they contributed — every team member, owner included, records their own. */
+    ownerRoleNote?: string
     members?: { student: string; roleNote: string }[]
     status: string
     started: number
@@ -1313,13 +1401,10 @@ Insight from the sample clients: two branches sell the most but have the lowest 
       id: "prj-skytech-maintenance-sara",
       challenge: "chal-skytech-maintenance",
       student: "stu-ju-sara",
-      // A team project: Sara owns it, Omar and Ahmad contribute specific, individually
-      // attributed parts — evidence below is submitted by whichever member actually did
-      // the work, not pooled under the owner.
-      members: [
-        { student: "stu-ju-omar", roleNote: "Python preprocessing and ML model training for the risk score" },
-        { student: "stu-just-ahmad", roleNote: "REST API integration and database design for the asset store" },
-      ],
+      // A team project inside one university: Sara owns it and Omar joined. Each of them recorded
+      // what they contributed and submitted their own evidence, so each gets their own signals.
+      ownerRoleNote: "Requirements, data exploration, and the risk dashboard for field managers.",
+      members: [{ student: "stu-ju-omar", roleNote: "Python preprocessing and ML model training for the risk score" }],
       status: "Evidence Under Review",
       started: -20,
       tasksDone: 2,
@@ -1353,22 +1438,27 @@ logs[["asset_id", "risk_score"]].to_csv("asset_risk_scores.csv", index=False)
 `,
         },
         {
-          id: "ev-maint-2",
-          student: "stu-just-ahmad",
-          type: "Documentation",
-          title: "Asset Risk API Reference",
-          description: "REST endpoints exposing per-asset risk scores and the underlying asset/maintenance database schema for the ERP purchasing module to call.",
-          day: -4,
-          content: `# Asset Risk API
+          id: "ev-maint-3",
+          student: "stu-ju-sara",
+          type: "GitHub Repository",
+          title: "Asset risk dashboard",
+          description: "A dashboard that shows each asset's failure risk and the sensor trend behind it.",
+          day: -5,
+          content: `import pandas as pd
+import matplotlib.pyplot as plt
 
-GET /api/assets/{assetId}/risk
-  -> { "assetId": string, "riskScore": number, "asOf": string }
+risk = pd.read_csv("asset_risk_scores.csv")
 
-GET /api/assets/at-risk?threshold=0.7
-  -> list of assets above the given risk threshold, sorted by riskScore desc
+def plot_top_risk_assets(scores: pd.DataFrame, top_n: int = 10) -> None:
+    top = scores.sort_values("risk_score", ascending=False).head(top_n)
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.barh(top["asset_id"], top["risk_score"], color="#0f766e")
+    ax.set_title("Highest-risk assets this week")
+    ax.set_xlabel("Estimated failure risk")
+    ax.legend(["risk score"])
+    fig.savefig("top_risk_assets.png")
 
-Backed by the asset and maintenance_log tables (see schema.sql) — the purchasing
-module polls /at-risk daily to flag parts to stock ahead of a likely failure.
+plot_top_risk_assets(risk)
 `,
         },
       ],
@@ -1382,10 +1472,225 @@ module polls /at-risk daily to flag parts to stock ahead of a likely failure.
       analyzed: -3,
       feedback: [],
     },
+    {
+      // The headline scenario: one project, three students, three different contributions, each
+      // backed by that student's own evidence and reviewed on its own. Nothing here is verified yet,
+      // so a reviewer can walk the whole flow.
+      id: "prj-jes-energywise",
+      challenge: "chal-jes-energy",
+      student: "stu-ju-ahmad",
+      ownerRoleNote: "Database design, SQL analysis, and the data-processing pipeline.",
+      members: [
+        { student: "stu-ju-sara", roleNote: "Feature engineering, the machine-learning model, and model evaluation." },
+        { student: "stu-ju-omar", roleNote: "Dashboard, visualizations, and the presentation." },
+      ],
+      status: "Evidence Under Review",
+      started: -18,
+      tasksDone: 3,
+      evidence: [
+        {
+          id: "ev-energy-ahmad-1",
+          type: "Documentation",
+          title: "EnergyWise — database schema and SQL analysis",
+          description: "",
+          day: -9,
+          content: `CREATE TABLE buildings (
+  building_id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL,
+  faculty TEXT,
+  floor_area_m2 REAL
+);
+
+CREATE TABLE energy_usage (
+  reading_id INTEGER PRIMARY KEY,
+  building_id INTEGER NOT NULL REFERENCES buildings(building_id),
+  recorded_at TIMESTAMP NOT NULL,
+  energy_kwh REAL NOT NULL
+);
+
+CREATE INDEX idx_usage_building_time ON energy_usage (building_id, recorded_at);
+
+-- Which buildings use the most energy?
+SELECT
+    building_id,
+    SUM(energy_kwh) AS total_energy
+FROM energy_usage
+GROUP BY building_id
+ORDER BY total_energy DESC;
+
+-- How does consumption change through the day?
+SELECT
+    strftime('%H', recorded_at) AS hour_of_day,
+    AVG(energy_kwh) AS average_kwh
+FROM energy_usage
+GROUP BY hour_of_day
+ORDER BY hour_of_day;
+`,
+        },
+        {
+          id: "ev-energy-ahmad-2",
+          type: "GitHub Repository",
+          title: "EnergyWise data pipeline",
+          description: "Cleans the raw meter readings and loads them into the campus energy database.",
+          day: -8,
+          content: `import sqlite3
+import pandas as pd
+
+def load_readings(path: str) -> pd.DataFrame:
+    readings = pd.read_csv(path, parse_dates=["recorded_at"])
+    readings = readings.dropna(subset=["energy_kwh"])
+    readings["hour"] = readings["recorded_at"].dt.hour
+    return readings
+
+def save_to_database(readings: pd.DataFrame, db_path: str) -> int:
+    with sqlite3.connect(db_path) as conn:
+        readings.to_sql("energy_usage", conn, if_exists="append", index=False)
+    return len(readings)
+
+readings = load_readings("campus_meter_readings.csv")
+loaded = save_to_database(readings, "energywise.db")
+print(f"Loaded {loaded} readings into the database")
+`,
+        },
+        {
+          id: "ev-energy-ahmad-3",
+          type: "Contribution Statement",
+          title: "What I contributed to EnergyWise",
+          description: "",
+          day: -7,
+          content:
+            "I designed the database schema for the meter readings, wrote the SQL queries behind the energy-by-building and time-of-day reports, and built the Python pipeline that cleans the raw readings and loads them into the database the rest of the team works from.",
+        },
+        {
+          id: "ev-energy-sara-1",
+          student: "stu-ju-sara",
+          type: "Notebook",
+          title: "EnergyWise anomaly detection notebook",
+          description: "Feature engineering, an energy-use model, and an isolation-forest anomaly detector, with evaluation.",
+          day: -6,
+          content: `import pandas as pd
+from sklearn.ensemble import IsolationForest, RandomForestRegressor
+from sklearn.metrics import precision_score, recall_score
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+
+def build_features(usage: pd.DataFrame) -> pd.DataFrame:
+    usage["hour"] = usage["recorded_at"].dt.hour
+    usage["is_weekend"] = usage["recorded_at"].dt.dayofweek >= 5
+    usage["rolling_mean_24h"] = usage.groupby("building_id")["energy_kwh"].transform(lambda s: s.rolling(24).mean())
+    return usage.dropna()
+
+features = build_features(usage)
+X = features[["hour", "is_weekend", "rolling_mean_24h", "temperature_c"]]
+y = features["energy_kwh"]
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=7)
+
+model = RandomForestRegressor(n_estimators=200, max_depth=12, random_state=7)
+model.fit(X_train, y_train)
+expected = model.predict(X_test)
+
+detector = IsolationForest(n_estimators=300, contamination=0.02, random_state=7)
+features["flagged"] = detector.fit_predict(StandardScaler().fit_transform(X)) == -1
+print("recall", recall_score(features["is_incident"], features["flagged"]))
+print("precision", precision_score(features["is_incident"], features["flagged"]))
+`,
+        },
+        {
+          id: "ev-energy-sara-2",
+          student: "stu-ju-sara",
+          type: "Project Report",
+          title: "EnergyWise model evaluation report",
+          description: "",
+          day: -4,
+          content:
+            "Model evaluation. We tested the isolation forest against the 31 incidents JES listed for the six months of data. At a contamination setting of 2% it flagged 28 of the 31 incidents, a recall of 90%, at a precision of 64%, which is about 4 false alarms a week for the whole campus. The three missed incidents were slow drifts rather than sudden spikes, so a rolling 7-day baseline would catch them. We chose the 2% setting because facilities staff said they can follow up about five alerts a week.",
+        },
+        {
+          id: "ev-energy-sara-3",
+          student: "stu-ju-sara",
+          type: "Contribution Statement",
+          title: "What I contributed to EnergyWise",
+          description: "",
+          day: -4,
+          content:
+            "I engineered the hourly, weekend and rolling-average features, trained the energy-use model and the isolation-forest anomaly detector, and evaluated how many of JES's known incidents the detector catches and how many false alarms it raises.",
+        },
+        {
+          id: "ev-energy-omar-1",
+          student: "stu-ju-omar",
+          type: "GitHub Repository",
+          title: "EnergyWise dashboard",
+          description: "A Plotly Dash dashboard for facilities staff.",
+          day: -5,
+          content: `import pandas as pd
+import plotly.express as px
+from dash import Dash, Input, Output, dcc, html
+
+usage = pd.read_csv("energy_by_building.csv")
+app = Dash(__name__)
+
+app.layout = html.Div([
+    html.H1("EnergyWise campus energy dashboard"),
+    dcc.Dropdown(id="faculty", options=sorted(usage["faculty"].unique())),
+    dcc.Graph(id="usage-bar"),
+    dcc.Graph(id="anomaly-heatmap"),
+])
+
+@app.callback(Output("usage-bar", "figure"), Input("faculty", "value"))
+def update_bar(faculty: str):
+    # tooltip shows the building and its total kWh
+    chosen = usage[usage["faculty"] == faculty]
+    fig = px.bar(chosen, x="building", y="energy_kwh", hover_data=["energy_kwh"])
+    fig.update_layout(xaxis_title="Building", yaxis_title="Energy (kWh)")
+    return fig
+`,
+        },
+        {
+          id: "ev-energy-omar-2",
+          student: "stu-ju-omar",
+          type: "Presentation",
+          title: "EnergyWise dashboard walkthrough",
+          description: "",
+          day: -3,
+          content:
+            "Slide 2: A bar chart of energy use by building lets a facilities manager see which buildings use the most. Slide 3: A heat map of hourly consumption shows when each building peaks, and anomalies are marked on it. Slide 4: A faculty dropdown filters every chart on the dashboard. Slide 5: Each chart has axis labels and a tooltip so non-technical staff can read it without help.",
+        },
+        {
+          id: "ev-energy-omar-3",
+          student: "stu-ju-omar",
+          type: "Video Walkthrough",
+          title: "Dashboard demo (3 minutes)",
+          description: "A short screen recording of the dashboard in use.",
+          day: -3,
+        },
+        {
+          id: "ev-energy-omar-4",
+          student: "stu-ju-omar",
+          type: "Contribution Statement",
+          title: "What I contributed to EnergyWise",
+          description: "",
+          day: -3,
+          content:
+            "I built the dashboard in Plotly Dash, designed the charts that let facilities staff see usage by building and spot anomalies, and prepared and delivered the team's presentation.",
+        },
+      ],
+      signals: [
+        { skill: "Python" },
+        { skill: "Data Analysis" },
+        { skill: "SQL" },
+        { skill: "Machine Learning" },
+        { skill: "Data Visualization" },
+      ],
+      analyzed: -2,
+      feedback: [],
+    },
   ]
 
   for (const p of projects) {
-    run("INSERT INTO projects (id, challenge_id, student_id, status, started_at) VALUES (?, ?, ?, ?, ?)", p.id, p.challenge, p.student, p.status, d(p.started))
+    run(
+      "INSERT INTO projects (id, challenge_id, student_id, status, started_at, owner_role_note) VALUES (?, ?, ?, ?, ?, ?)",
+      p.id, p.challenge, p.student, p.status, d(p.started), p.ownerRoleNote ?? "",
+    )
     objectivesOf(p.challenge).forEach((title, i) => {
       run("INSERT INTO project_tasks (id, project_id, position, title, done) VALUES (?, ?, ?, ?, ?)", `${p.id}-t${i + 1}`, p.id, i, title, i < p.tasksDone ? 1 : 0)
     })
@@ -1395,39 +1700,49 @@ module polls /at-risk daily to flag parts to stock ahead of a likely failure.
     for (const e of p.evidence) {
       run(
         "INSERT INTO evidence (id, project_id, student_id, type, title, description, link, content, submitted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        e.id, p.id, e.student ?? p.student, e.type, e.title, e.description, EVIDENCE_LINKS[e.id], e.content ?? null, d(e.day),
+        e.id, p.id, e.student ?? p.student, e.type, e.title, e.description, EVIDENCE_LINKS[e.id] ?? "", e.content ?? null, d(e.day),
       )
     }
     if (p.signals.length > 0) {
-      const skills = p.signals.map((s) => s.skill)
-      const evidenceLike = p.evidence.map((e) => ({ id: e.id, type: e.type, title: e.title, description: e.description, content: e.content }))
-      const cached = loadSeedGrades()[p.id]
-      const cacheValid =
-        !!cached &&
-        skills.every((sk) => cached.results.some((r) => r.skill === sk)) &&
-        cached.hash === hashEvidenceSet(skills, evidenceLike, cached.model)
-      const gradedModel = cacheValid ? cached!.model : "offline"
-      const results = cacheValid ? cached!.results : simulateAIReview(skills, evidenceLike, challengeContextOf(p.challenge))
-      p.signals.forEach((s, i) => {
-        // By name, not position: a pre-graded file may list skills in a different order.
-        const r = results.find((x) => x.skill === s.skill) ?? results[i]
-        const sigId = `sig-${p.id}-${i + 1}`
-        const status = s.status ?? "Pending Verification"
+      // Each student who submitted evidence gets their own signals, analyzed from that student's evidence
+      // only. Evidence the analysis never reads (statements, videos, screenshots) is left out.
+      const skills = [...new Set(p.signals.map((sg) => sg.skill))]
+      const authors = [...new Set(p.evidence.map((e) => e.student ?? p.student))]
+      for (const author of authors) {
+        const evidenceLike = p.evidence
+          .filter((e) => (e.student ?? p.student) === author && !NOT_ANALYZED_TYPES.includes(e.type))
+          .map((e) => ({ id: e.id, type: e.type, title: e.title, description: e.description, content: e.content }))
+        // The pre-graded file is keyed by project for the owner (as it always was) and by project:student for teammates.
+        const cached = loadSeedGrades()[author === p.student ? p.id : `${p.id}:${author}`]
+        const cacheValid =
+          !!cached &&
+          skills.every((sk) => cached.results.some((r) => r.skill === sk)) &&
+          cached.hash === hashEvidenceSet(skills, evidenceLike, cached.model)
+        const gradedModel = cacheValid ? cached!.model : "offline"
+        const results = cacheValid
+          ? cached!.results
+          : evidenceLike.length === 0
+            ? noEvidenceResults(skills)
+            : simulateAIReview(skills, evidenceLike, challengeContextOf(p.challenge))
+        skills.forEach((skill, i) => {
+          // By name, not position: a pre-graded file may list skills in a different order.
+          const r = results.find((x) => x.skill === skill) ?? results[i]
+          const decided = p.signals.find((sg) => sg.skill === skill && (sg.student ?? p.student) === author)
+          const sigId = author === p.student ? `sig-${p.id}-${i + 1}` : `sig-${p.id}-${author}-${i + 1}`
+          const status = decided?.status ?? "Pending Verification"
+          run(
+            `INSERT INTO skill_signals (id, project_id, student_id, skill, evidence_confidence, ai_note, ai_quotes, ai_criteria, suggested_level, graded_source, status, verified_by, verified_at, reviewer_notes, analyzed_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            sigId, p.id, author, skill, r.rating, r.note, JSON.stringify(r.quotes), JSON.stringify(r.criteria), r.suggestedLevel, r.source, status,
+            decided?.verifiedBy ?? null, decided?.verifiedBy && decided.verifiedDay !== undefined ? d(decided.verifiedDay) : null, decided?.reviewerNotes ?? null, d(p.analyzed!),
+          )
+          for (const ev of r.evidenceIds) run("INSERT INTO skill_signal_evidence (signal_id, evidence_id) VALUES (?, ?)", sigId, ev)
+        })
         run(
-          `INSERT INTO skill_signals (id, project_id, student_id, skill, evidence_confidence, ai_note, ai_quotes, ai_criteria, suggested_level, graded_source, status, verified_by, verified_at, reviewer_notes, analyzed_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          sigId, p.id, p.student, s.skill, r.rating, r.note, JSON.stringify(r.quotes), JSON.stringify(r.criteria), r.suggestedLevel, r.source, status,
-          s.verifiedBy ?? null, s.verifiedBy && s.verifiedDay !== undefined ? d(s.verifiedDay) : null, s.reviewerNotes ?? null, d(p.analyzed!),
+          "INSERT INTO analysis_runs (project_id, student_id, evidence_hash, model, graded_at) VALUES (?, ?, ?, ?, ?)",
+          p.id, author, hashEvidenceSet(skills, evidenceLike, gradedModel), gradedModel, d(p.analyzed!),
         )
-        for (const ev of r.evidenceIds) run("INSERT INTO skill_signal_evidence (signal_id, evidence_id) VALUES (?, ?)", sigId, ev)
-      })
-      run(
-        "UPDATE projects SET graded_evidence_hash = ?, graded_model = ?, graded_at = ? WHERE id = ?",
-        hashEvidenceSet(skills, evidenceLike, gradedModel),
-        gradedModel,
-        d(p.analyzed!),
-        p.id,
-      )
+      }
     }
     if (p.companyFeedback) {
       const cf = p.companyFeedback
@@ -1491,6 +1806,11 @@ module polls /at-risk daily to flag parts to stock ahead of a likely failure.
     ["company", "org-abs", "Submission ready for your review", "University of Jordan confirmed Tala Haddad's submission for “Build a Sales Performance BI Dashboard for SMEs”.", "/company/submissions/prj-abs-bi-tala", -4, 0],
     ["university", "uni-aau", "Evidence signals ready for review", "WSL found evidence signals in Yazan Al-Masri's submission for “Detect Anomalies in Network Traffic Logs”.", "/university/projects/prj-iris-anomaly-yazan", -2, 0],
     ["university", "uni-just", "Evidence signals ready for review", "WSL found evidence signals in Khaled Rawashdeh's submission for “Audit Remote Agent Access Security”.", "/university/projects/prj-estarta-access-khaled", -3, 0],
+    ["university", "uni-ju", "Evidence ready for review", "WSL analyzed Ahmad Al-Khatib's, Sara Al-Najjar's and Omar Al-Fayez's evidence for “Smart Campus Energy Optimization”.", "/university/projects/prj-jes-energywise", -2, 0],
+    ["student", "stu-ju-sara", "You were added to a team project", "Ahmad Al-Khatib added you to “Smart Campus Energy Optimization”. Record what you're contributing, then submit your own evidence.", "/student/projects/prj-jes-energywise", -17, 1],
+    ["student", "stu-ju-omar", "You were added to a team project", "Ahmad Al-Khatib added you to “Smart Campus Energy Optimization”. Record what you're contributing, then submit your own evidence.", "/student/projects/prj-jes-energywise", -17, 1],
+    ["company", "org-jes", "Challenge assigned", "University of Jordan assigned “Smart Campus Energy Optimization” to B.Sc. Computer Science students.", "/company/challenges/chal-jes-energy", -27, 1],
+    ["company", "org-jes", "Student started your challenge", "Ahmad Al-Khatib (JU) started “Smart Campus Energy Optimization”.", "/company/challenges/chal-jes-energy", -18, 1],
     ["university", "uni-hu", "New challenge received", "IRIS Technology Jordan sent “Phishing Awareness Simulation & Reporting Dashboard”.", "/university/challenges/chal-iris-phishing", -3, 0],
     ["university", "uni-ju", "Company sent feedback on your student's work", "Estarta HQ sent feedback on Omar Al-Fayez's submission for “Classify Customer Call Intents from Transcripts”.", "/university/projects/prj-estarta-intent-omar", -30, 1],
     ["student", "stu-ju-omar", "Estarta HQ sent feedback", "Your submission for “Classify Customer Call Intents from Transcripts” received company feedback.", "/student/projects/prj-estarta-intent-omar", -30, 1],

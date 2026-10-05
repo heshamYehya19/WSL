@@ -4,7 +4,8 @@ import { Link, useParams } from "react-router-dom"
 import { useStore } from "../../state/store"
 import { useDemoUser } from "../../state/demoUser"
 import { StatusBadge } from "../../components/ui/StatusBadge"
-import { challengeFor, skillsForProject } from "../../lib/selectors"
+import { challengeFor, evidenceBy, signalsBy, skillsForProject, teamOf } from "../../lib/selectors"
+import { evidenceTypeLabel } from "../../lib/evidenceTypes"
 import { formatDate } from "../../lib/format"
 import { EvidenceSources } from "../../components/ui/EvidenceSources"
 import { EvidenceQuotes } from "../../components/ui/EvidenceQuotes"
@@ -23,9 +24,7 @@ export default function CompanySubmission() {
   // Companies only see submissions to their own challenges.
   const project = projects.find((p) => p.id === projectId && p.organizationId === company?.id)
   const signals = project ? skillsForProject(skillSignals, project.id) : []
-  // Companies only see what a university verified; an unverified skill is never presented as proven.
-  const verifiedSignals = signals.filter((s) => s.status === "Verified")
-  const unverifiedCount = signals.length - verifiedSignals.length
+  // Companies only see what a university verified, student by student; an unverified skill is never presented as proven.
   const [flags, setFlags] = useState<Record<(typeof FEEDBACK_OPTIONS)[number]["key"], boolean>>(() => ({
     strongTechnicalExecution: project?.companyFeedback?.strongTechnicalExecution ?? false,
     relevantForInternship: project?.companyFeedback?.relevantForInternship ?? false,
@@ -62,7 +61,9 @@ export default function CompanySubmission() {
 
       <div className="mt-3 mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-xs text-ink-400">{student?.name} · {uni?.name}</p>
+          <p className="text-xs text-ink-400">
+            {teamOf(project).map((m) => getStudent(m.studentId)?.name).filter(Boolean).join(", ")} · {uni?.name}
+          </p>
           <h1 className="text-2xl font-bold tracking-tight text-ink-950">{project.title}</h1>
           <p className="mt-1 text-sm text-ink-500">{challenge?.industry}</p>
         </div>
@@ -75,58 +76,88 @@ export default function CompanySubmission() {
         </div>
       ) : (
       <div className="rounded-2xl border border-ink-200 bg-surface p-6">
-        <h3 className="mb-3 text-xs font-semibold tracking-wide text-teal-600 uppercase">University-Approved Evidence</h3>
-        <div className="space-y-2">
-          {projectEvidence.map((e) => (
-            <div key={e.id} className="rounded-xl border border-ink-200 p-3">
-              <span className="rounded bg-ink-50 px-1.5 py-0.5 text-[11px] font-semibold text-ink-600">{e.type}</span>{" "}
-              <span className="text-sm font-medium text-ink-800">{e.title}</span>
-              <p className="mt-1 text-xs text-ink-500">{e.description}</p>
-              {e.link && <p className="mt-1 text-xs break-all text-teal-600">{e.link}</p>}
-              <EvidenceFileLink evidence={e} />
-              {e.content && <pre className="mt-2 max-h-24 overflow-hidden rounded-lg whitespace-pre-wrap [overflow-wrap:anywhere] bg-ink-50 px-2.5 py-2 font-mono text-[11px] text-ink-600">{e.content}</pre>}
-              <EvidenceSources evidence={e} />
-            </div>
-          ))}
-          {projectEvidence.length === 0 && <p className="text-sm text-ink-400">No evidence submitted.</p>}
-        </div>
-
-        <h3 className="mt-6 mb-3 text-xs font-semibold tracking-wide text-teal-600 uppercase">Verified Proof</h3>
-        <div className="space-y-3">
-          {verifiedSignals.map((s) => (
-            <div key={s.id} className="rounded-xl border border-ink-200 p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold text-ink-900">
-                  {s.skill}
-                  <span className="ml-1.5 text-xs font-semibold text-verified-600">✓ Verified by the university</span>
-                </span>
-              </div>
-              {s.criteria.length > 0 && (
-                <div className="mt-3">
-                  <CriteriaChecklist criteria={s.criteria} />
+        <h3 className="mb-1 text-xs font-semibold tracking-wide text-teal-600 uppercase">Verified proof, student by student</h3>
+        <p className="mb-4 text-xs text-ink-500">
+          The project is shared; the proof is individual. Each section shows one student's own contribution and only the skills the university
+          verified for them.
+        </p>
+        <div className="space-y-5">
+          {teamOf(project).map((member) => {
+            const person = getStudent(member.studentId)
+            const theirEvidence = evidenceBy(projectEvidence, project.id, member.studentId)
+            const theirSignals = signalsBy(signals, project.id, member.studentId)
+            const theirVerified = theirSignals.filter((s) => s.status === "Verified")
+            // The API only sends a company the verified skills and the evidence behind them — nothing else of a student's reaches here.
+            const work = theirEvidence
+            return (
+              <section key={member.studentId} className="rounded-xl border border-ink-200 p-4" aria-label={`${person?.name ?? "Student"}'s verified proof`}>
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-night text-xs font-bold text-teal-300">{person?.initials}</span>
+                  <div className="min-w-0">
+                    <Link to={`/company/talent/${member.studentId}`} className="text-sm font-semibold text-ink-900 hover:text-teal-600">{person?.name}</Link>
+                    <p className="text-xs text-ink-400">{person?.field} · {person ? getUniversity(person.universityId)?.shortName : ""}</p>
+                  </div>
                 </div>
-              )}
-              {s.aiQuotes.length > 0 && (
-                <div className="mt-3">
-                  <p className="mb-1 text-[11px] font-semibold tracking-wide text-ink-400 uppercase">Proof in the work</p>
-                  <EvidenceQuotes quotes={s.aiQuotes} evidenceTitle={(id) => projectEvidence.find((e) => e.id === id)?.title} />
-                </div>
-              )}
-              {s.verifiedBy && (
-                <p className="mt-1.5 text-[11px] text-ink-400">
-                  Verified by {getUniversity(getStaff(s.verifiedBy)?.universityId ?? "")?.name ?? "the university"}
-                  {getStaff(s.verifiedBy) ? ` · Reviewed by ${getStaff(s.verifiedBy)!.name}` : ""}
-                  {s.verifiedAt ? ` · ${formatDate(s.verifiedAt)}` : ""}
+                <p className="mt-3 text-xs text-ink-700">
+                  <span className="font-semibold text-ink-800">Contribution (their own words):</span>{" "}
+                  {member.roleNote || <span className="text-ink-400 italic">{theirVerified.length === 0 ? "nothing shared — no skill of theirs was verified" : "not recorded"}</span>}
                 </p>
-              )}
-            </div>
-          ))}
-          {verifiedSignals.length === 0 && <p className="text-sm text-ink-400">No skills from this project have been verified yet.</p>}
-          {unverifiedCount > 0 && (
-            <p className="text-[11px] text-ink-400">
-              {unverifiedCount} other skill{unverifiedCount === 1 ? " was" : "s were"} not verified by the university, so {unverifiedCount === 1 ? "it isn't" : "they aren't"} shown.
-            </p>
-          )}
+
+                <h4 className="mt-4 mb-2 text-[11px] font-semibold tracking-wide text-ink-400 uppercase">Evidence behind the verified skills</h4>
+                <div className="space-y-2">
+                  {work.map((e) => (
+                    <div key={e.id} className="rounded-lg border border-ink-100 p-2.5">
+                      <span className="rounded bg-ink-50 px-1.5 py-0.5 text-[11px] font-semibold text-ink-600">{evidenceTypeLabel(e.type)}</span>{" "}
+                      <span className="text-sm font-medium text-ink-800">{e.title}</span>
+                      {e.description && <p className="mt-1 text-xs text-ink-500">{e.description}</p>}
+                      {e.link && <p className="mt-1 text-xs break-all text-teal-600">{e.link}</p>}
+                      <EvidenceFileLink evidence={e} />
+                      {e.content && <pre className="mt-2 max-h-24 overflow-hidden rounded-lg whitespace-pre-wrap [overflow-wrap:anywhere] bg-ink-50 px-2.5 py-2 font-mono text-[11px] text-ink-600">{e.content}</pre>}
+                      <EvidenceSources evidence={e} />
+                    </div>
+                  ))}
+                  {work.length === 0 && <p className="text-sm text-ink-400">No evidence has been verified for this student on this project.</p>}
+                </div>
+
+                <h4 className="mt-4 mb-2 text-[11px] font-semibold tracking-wide text-ink-400 uppercase">Verified skills</h4>
+                <div className="space-y-3">
+                  {theirVerified.map((s) => (
+                    <div key={s.id} className="rounded-lg border border-verified-500/30 p-3">
+                      <span className="text-sm font-semibold text-ink-900">
+                        {s.skill}
+                        <span className="ml-1.5 text-xs font-semibold text-verified-600">✓ Verified by {getUniversity(getStaff(s.verifiedBy ?? "")?.universityId ?? "")?.name ?? "the university"}</span>
+                      </span>
+                      {s.criteria.length > 0 && (
+                        <div className="mt-3">
+                          <CriteriaChecklist criteria={s.criteria} part="demonstrates" />
+                        </div>
+                      )}
+                      {s.aiQuotes.length > 0 && (
+                        <div className="mt-3">
+                          <p className="mb-1 text-[11px] font-semibold tracking-wide text-ink-400 uppercase">Proof in the work</p>
+                          <EvidenceQuotes quotes={s.aiQuotes} evidenceTitle={(id) => projectEvidence.find((e) => e.id === id)?.title} />
+                        </div>
+                      )}
+                      {s.evidenceIds.length > 0 && (
+                        <p className="mt-2 text-[11px] text-ink-500">
+                          <span className="font-semibold text-ink-600">Evidence:</span>{" "}
+                          {s.evidenceIds.map((id) => projectEvidence.find((e) => e.id === id)?.title).filter(Boolean).join("; ")}
+                        </p>
+                      )}
+                      {s.verifiedBy && (
+                        <p className="mt-1.5 text-[11px] text-ink-400">
+                          {getStaff(s.verifiedBy) ? `Reviewed by ${getStaff(s.verifiedBy)!.name}` : ""}
+                          {s.verifiedAt ? ` · ${formatDate(s.verifiedAt)}` : ""}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                  {theirVerified.length === 0 && <p className="text-sm text-ink-400">No skills have been verified for {person?.name.split(" ")[0]} on this project.</p>}
+                  {theirVerified.length > 0 && <p className="text-[11px] text-ink-400">Only skills the university verified are shared with you.</p>}
+                </div>
+              </section>
+            )
+          })}
         </div>
 
         <h3 className="mt-6 mb-3 text-xs font-semibold tracking-wide text-teal-600 uppercase">

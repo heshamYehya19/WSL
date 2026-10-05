@@ -4,7 +4,7 @@ import { useDemoUser } from "../../state/demoUser"
 import { useStore } from "../../state/store"
 import { EmptyState } from "../../components/ui/EmptyState"
 import { PageHero, Pills, SearchInput } from "../../components/ui/ListKit"
-import { challengeFor, skillsForProject } from "../../lib/selectors"
+import { challengeFor, teamOf } from "../../lib/selectors"
 import { formatRelative } from "../../lib/format"
 import type { ChallengeStatus } from "../../types"
 
@@ -17,7 +17,7 @@ const COLUMNS: { statuses: ChallengeStatus[]; title: string; hint: string; dot: 
 
 export default function StudentProjects() {
   const { university } = useDemoUser()
-  const { projects, challenges, evidence, skillSignals, getOrg, getStudent, getProgram, isUniversityStudent } = useStore()
+  const { projects, challenges, evidence, getOrg, getStudent, getProgram, isUniversityStudent } = useStore()
   const [program, setProgram] = useState("all")
   const [query, setQuery] = useState("")
   if (!university) return null
@@ -36,7 +36,7 @@ export default function StudentProjects() {
       <PageHero
         eyebrow="Student Projects"
         title="Every project, at a glance"
-        subtitle="Each project is one student working solo. Follow them across the board — the amber column is where your confirmation is needed."
+        subtitle="Each card is one project — a student, or a team from your university. Follow them across the board — the amber column is where your confirmation is needed."
         stats={[
           { label: "projects", value: uniProjects.length },
           { label: "in progress", value: uniProjects.filter((p) => p.status === "In Progress").length },
@@ -64,7 +64,7 @@ export default function StudentProjects() {
             <SearchInput value={query} onChange={setQuery} placeholder="Search by project, student or company…" />
           </div>
 
-          <div className="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-4 [&>*]:min-w-0">
             {COLUMNS.map((col, ci) => {
               const items = byStatus(col.statuses)
               const glow = col.needsYou && items.length > 0
@@ -101,8 +101,7 @@ export default function StudentProjects() {
                       const student = getStudent(p.studentId)
                       const challenge = challengeFor(challenges, p)
                       const evCount = evidence.filter((e) => e.projectId === p.id).length
-                      const signals = skillsForProject(skillSignals, p.id)
-                      const avg = signals.length ? Math.round(signals.reduce((sum, s) => sum + s.evidenceConfidence, 0) / signals.length) : null
+                      const team = teamOf(p)
                       const done = p.tasks.filter((t) => t.done).length
                       return (
                         <Link
@@ -116,15 +115,12 @@ export default function StudentProjects() {
                               {student?.initials}
                             </span>
                             <div className="min-w-0 flex-1">
-                              <p className="truncate text-xs font-semibold text-ink-900">{student?.name}</p>
+                              <p className="truncate text-xs font-semibold text-ink-900">{student?.name}{team.length > 1 ? ` +${team.length - 1}` : ""}</p>
                               <p className="truncate text-[10px] text-ink-400">{getProgram(student?.programId ?? "")?.name.replace("B.Sc. ", "")}</p>
                             </div>
-                            {avg !== null && (
-                              <span
-                                className={`rounded-md px-1.5 py-0.5 text-[11px] font-bold tabular-nums ${avg >= 80 ? "bg-teal-600 text-white" : avg >= 60 ? "bg-teal-100 text-teal-700" : "bg-amber-100 text-amber-600"}`}
-                                title="Average evidence confidence"
-                              >
-                                {avg}
+                            {team.length > 1 && (
+                              <span className="rounded-md bg-ink-100 px-1.5 py-0.5 text-[10px] font-semibold text-ink-600" title="Team project — each student's proof is individual">
+                                Team · {team.length}
                               </span>
                             )}
                           </div>
@@ -144,7 +140,7 @@ export default function StudentProjects() {
                           )}
                           <div className="mt-2.5 flex items-center justify-between text-[10px] text-ink-400">
                             <span>
-                              {evCount} evidence · {signals.length} signal{signals.length === 1 ? "" : "s"}
+                              {evCount} evidence item{evCount === 1 ? "" : "s"}
                             </span>
                             <span>{formatRelative(p.startedAt)}</span>
                           </div>

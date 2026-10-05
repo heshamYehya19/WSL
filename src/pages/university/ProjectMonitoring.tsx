@@ -1,19 +1,23 @@
 import { useState } from "react"
-import { EvidenceFileLink } from "../../components/ui/EvidenceFileLink"
 import { Link, useParams } from "react-router-dom"
 import { useDemoUser } from "../../state/demoUser"
 import { useStore } from "../../state/store"
 import { StatusBadge } from "../../components/ui/StatusBadge"
-import { SignalReviewCard } from "../../components/university/SignalReviewCard"
-import { challengeFor, skillsForProject } from "../../lib/selectors"
-import { formatDate } from "../../lib/format"
+import { LifecycleStepper } from "../../components/ui/LifecycleStepper"
+import { VerificationPill } from "../../components/ui/VerificationPill"
+import { EvidenceFileLink } from "../../components/ui/EvidenceFileLink"
 import { EvidenceSources } from "../../components/ui/EvidenceSources"
+import { SignalReviewCard } from "../../components/university/SignalReviewCard"
+import { challengeFor, evidenceBy, signalsBy, teamOf } from "../../lib/selectors"
+import { MissingSkillCard } from "../../components/university/MissingSkillCard"
+import { proofCounts, reviewItemFor, reviewItemReason } from "../../lib/proof"
+import { evidenceTypeLabel } from "../../lib/evidenceTypes"
+import { formatDate } from "../../lib/format"
 
 export default function ProjectMonitoring() {
   const { id } = useParams()
   const { university } = useDemoUser()
-  const { projects, challenges, evidence, skillSignals, addFeedback, confirmToCompany, reviewSignal, getOrg, getStudent, getProgram, getStaff, isUniversityStudent } =
-    useStore()
+  const { projects, challenges, evidence, skillSignals, addFeedback, confirmToCompany, reviewSignal, reviewSkill, getOrg, getStudent, getProgram, getStaff, isUniversityStudent } = useStore()
   const [note, setNote] = useState("")
   const [confirmNote, setConfirmNote] = useState("")
   const [saving, setSaving] = useState(false)
@@ -31,13 +35,16 @@ export default function ProjectMonitoring() {
 
   const org = getOrg(project.organizationId)
   const challenge = challengeFor(challenges, project)
-  const student = getStudent(project.studentId)
-  const program = student ? getProgram(student.programId) : undefined
-  const mentor = program ? getStaff(program.coordinatorId) : undefined
-  const projectEvidence = evidence.filter((e) => e.projectId === project.id)
-  const projectSignals = skillsForProject(skillSignals, project.id)
-  const allResolved = projectSignals.length > 0 && projectSignals.every((s) => s.status === "Verified" || s.status === "Rejected")
-  const readyToConfirm = project.status === "Skills Pending Verification" || project.status === "Evidence Under Review"
+  const requiredSkills = challenge?.requiredSkills ?? []
+  const owner = getStudent(project.studentId)
+  const mentor = owner ? getStaff(getProgram(owner.programId)?.coordinatorId ?? "") : undefined
+  const team = teamOf(project)
+  // The server decides whether the project can be confirmed (every student x every required skill has a current decision);
+  // this page only shows what it says.
+  const review = project.review
+  const allResolved = review?.ready ?? false
+  const openItems = review?.items.filter((i) => !i.resolved) ?? []
+  const readyToConfirm = project.status === "Skills Pending Verification" || project.status === "Evidence Under Review" || project.status === "In Progress"
   const alreadyConfirmed = project.status === "Verified" || project.status === "Completed" || project.status === "Company Feedback Received"
 
   const submitFeedback = async (e: React.FormEvent) => {
@@ -57,78 +64,157 @@ export default function ProjectMonitoring() {
   return (
     <div className="mx-auto max-w-5xl">
       <Link to="/university/projects" className="text-sm text-ink-400 hover:text-teal-600">← Back to Student Projects</Link>
-      <div className="mt-3 mb-6 flex flex-wrap items-start justify-between gap-3">
+      <div className="mt-3 mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-ink-950">{project.title}</h1>
-          <p className="mt-1 text-sm text-ink-500">{org?.name} · {challenge?.industry} · Started {formatDate(project.startedAt)}</p>
+          <p className="mt-1 text-sm text-ink-500">
+            {org?.name} · {challenge?.industry} · Started {formatDate(project.startedAt)}
+            {team.length > 1 ? ` · Team of ${team.length}` : " · Worked individually"}
+          </p>
         </div>
         <StatusBadge status={project.status} />
       </div>
+      <LifecycleStepper status={project.status} className="mb-6 rounded-2xl border border-ink-200 bg-surface px-4 py-3" />
 
-      <div className="mb-6">
-        <div className="rounded-2xl border border-ink-200 bg-surface p-5">
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-night text-xs font-bold text-teal-300">{student?.initials}</span>
-            <div>
-              <Link to={`/university/students/${project.studentId}`} className="text-sm font-semibold text-ink-900 hover:text-teal-600">{student?.name}</Link>
-              <p className="text-xs text-ink-400">{program?.name ?? student?.field} · {student?.year} · No. {student?.studentNumber}</p>
-            </div>
-          </div>
-          {project.members.length > 0 ? (
-            <p className="mt-3 text-xs text-ink-400">
-              Team project. {project.members.map((m) => `${getStudent(m.studentId)?.name ?? "Teammate"}: ${m.roleNote}`).join(" · ")}
-              {mentor ? ` Program mentor: ${mentor.name}.` : ""}
-            </p>
-          ) : (
-            <p className="mt-3 text-xs text-ink-400">Worked individually — not as part of a team.{mentor ? ` Program mentor: ${mentor.name}.` : ""}</p>
-          )}
-        </div>
-      </div>
-
-      <div className="mb-6">
-        <h3 className="mb-3 font-semibold text-ink-900">Skill Signals</h3>
-        <p className="mb-3 text-xs text-ink-500">
-          Evidence confidence indicates how strongly submitted work supports a skill signal — it does not represent proficiency. Review each one
-          individually: verify it, ask for more evidence, or reject it.
+      <div className="mb-6 rounded-xl border border-teal-500/30 bg-teal-50 px-4 py-3 text-xs text-ink-700">
+        <p className="font-semibold text-ink-900">How to read this page</p>
+        <p className="mt-1">
+          The project is shared; the proof is individual. Each student below has their own contribution, their own evidence, and their own skills — built only
+          from their evidence and decided one by one. AI analysis is supporting information. University verification is final.
         </p>
-        <div className="space-y-3">
-          {projectSignals.map((s) => (
-            <SignalReviewCard
-              key={s.id}
-              signal={s}
-              evidence={projectEvidence}
-              verifierName={s.verifiedBy ? getStaff(s.verifiedBy)?.name : undefined}
-              onReview={(decision, options) => reviewSignal(project.id, s.id, decision, options)}
-            />
-          ))}
-          {projectSignals.length === 0 && (
-            <p className="rounded-2xl border border-dashed border-ink-200 bg-surface p-6 text-center text-sm text-ink-400">
-              No skills identified yet — waiting on the student's evidence and its analysis.
-            </p>
-          )}
-        </div>
       </div>
+
+      {team.length > 1 && (
+        <nav aria-label="Jump to a student" className="mb-6 flex flex-wrap items-center gap-2 text-xs">
+          <span className="font-semibold text-ink-500">Review:</span>
+          {team.map((m) => (
+            <a key={m.studentId} href={`#student-${m.studentId}`} className="rounded-full border border-ink-200 bg-surface px-3 py-1 font-semibold text-ink-700 hover:border-teal-400 hover:text-teal-700">
+              {getStudent(m.studentId)?.name}
+            </a>
+          ))}
+        </nav>
+      )}
+
+      {team.map((member) => {
+        const person = getStudent(member.studentId)
+        const program = person ? getProgram(person.programId) : undefined
+        const theirEvidence = evidenceBy(evidence, project.id, member.studentId)
+        const theirSignals = signalsBy(skillSignals, project.id, member.studentId)
+        const counts = proofCounts(requiredSkills, theirSignals)
+        const statements = theirEvidence.filter((e) => e.type === "Contribution Statement")
+        const work = theirEvidence.filter((e) => e.type !== "Contribution Statement")
+        return (
+          <section key={member.studentId} id={`student-${member.studentId}`} className="mb-10 scroll-mt-24" aria-label={`${person?.name ?? "Student"}'s evidence and skills`}>
+            <div className="rounded-2xl border border-ink-200 bg-surface p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-night text-xs font-bold text-teal-300">{person?.initials}</span>
+                  <div>
+                    <Link to={`/university/students/${member.studentId}`} className="text-base font-semibold text-ink-900 hover:text-teal-600">{person?.name}</Link>
+                    <p className="text-xs text-ink-400">
+                      {member.isOwner ? "Started the project" : "Teammate"} · {program?.name ?? person?.field} · {person?.year} · No. {person?.studentNumber}
+                    </p>
+                  </div>
+                </div>
+                <p className="text-xs text-ink-500">
+                  {theirEvidence.length} evidence item{theirEvidence.length === 1 ? "" : "s"} · {counts.verified} verified ·{" "}
+                  {review ? `${review.items.filter((i) => i.studentId === member.studentId && !i.resolved).length} of ${requiredSkills.length} skills still need a decision` : "review complete"}
+                </p>
+              </div>
+
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <div>
+                  <p className="text-[11px] font-semibold tracking-wide text-ink-400 uppercase">What {person?.name.split(" ")[0]} says they contributed</p>
+                  <p className="mt-1 text-sm text-ink-800">
+                    {member.roleNote || <span className="text-ink-400 italic">No contribution recorded yet — ask them to record it.</span>}
+                  </p>
+                  {statements.map((s) => (
+                    <p key={s.id} className="mt-2 border-l-2 border-ink-200 pl-2.5 text-xs text-ink-600">
+                      “{s.content}”
+                      <span className="mt-0.5 block text-[11px] text-ink-400">{s.title} · the student's own account, not analyzed as work</span>
+                    </p>
+                  ))}
+                  <p className="mt-2 text-[11px] text-ink-400">A claim to check against the evidence beside it — it isn't proof by itself.</p>
+                </div>
+                <div>
+                  <p className="text-[11px] font-semibold tracking-wide text-ink-400 uppercase">Their evidence</p>
+                  <div className="mt-1 space-y-2">
+                    {work.length === 0 && <p className="text-sm text-ink-400">No work submitted yet.</p>}
+                    {work.map((e) => (
+                      <div key={e.id} className="rounded-lg border border-ink-100 p-2.5">
+                        <p className="text-xs">
+                          <span className="rounded bg-ink-50 px-1.5 py-0.5 text-[11px] font-semibold text-ink-600">{evidenceTypeLabel(e.type)}</span>{" "}
+                          <span className="font-medium text-ink-900">{e.title}</span>
+                        </p>
+                        {e.description && <p className="mt-0.5 text-[11px] text-ink-500">{e.description}</p>}
+                        {e.link && <p className="mt-0.5 text-[11px] break-all text-ink-400">{e.link}</p>}
+                        <EvidenceFileLink evidence={e} />
+                        <EvidenceSources evidence={e} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <h3 className="mt-5 mb-1 font-semibold text-ink-900">{person?.name.split(" ")[0]}'s skills</h3>
+            <p className="mb-3 text-xs text-ink-500">
+              One card per required skill, and every one needs your decision before the project can be confirmed. Review each against {person?.name.split(" ")[0]}'s own evidence: verify it, ask for more evidence, or decline to verify it — or, where WSL found nothing, acknowledge that the evidence is insufficient.
+            </p>
+            <div className="space-y-3">
+              {requiredSkills.map((skill) => {
+                const s = theirSignals.find((sig) => sig.skill === skill)
+                const item = reviewItemFor(review, member.studentId, skill)
+                if (!s) {
+                  return (
+                    <MissingSkillCard
+                      key={skill}
+                      skill={skill}
+                      firstName={person?.name.split(" ")[0] ?? "The student"}
+                      hasEvidence={theirEvidence.some((e) => e.type !== "Contribution Statement")}
+                      stale={item?.stale ?? false}
+                      onDecide={(decision, reviewerNotes) => reviewSkill(project.id, member.studentId, skill, decision, { reviewerNotes })}
+                    />
+                  )
+                }
+                const card = (
+                  <SignalReviewCard
+                    key={s.id}
+                    signal={s}
+                    evidence={theirEvidence}
+                    verifierName={s.verifiedBy ? getStaff(s.verifiedBy)?.name : undefined}
+                    stale={item?.stale ?? false}
+                    onReview={(decision, options) => reviewSignal(project.id, s.id, decision, options)}
+                  />
+                )
+                // Nothing found: there is no evidence to read through, so keep it to one line until opened — it still needs a decision.
+                if (s.suggestedLevel === "Insufficient" && s.status !== "Verified") {
+                  return (
+                    <details key={s.id} className="group rounded-2xl border border-ink-200 bg-surface">
+                      <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-2 px-4 py-3 marker:content-none">
+                        <span className="min-w-0">
+                          <span className="font-semibold text-ink-900">{skill}</span>
+                          <span className="ml-2 text-xs text-ink-500">No {skill} evidence in {person?.name.split(" ")[0]}'s submitted evidence.</span>
+                        </span>
+                        <span className="flex items-center gap-2">
+                          {item?.stale && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">New evidence</span>}
+                          <VerificationPill status={s.status} insufficient />
+                          <span className="text-[11px] font-semibold text-teal-600 group-open:hidden">Open</span>
+                        </span>
+                      </summary>
+                      <div className="border-t border-ink-100 p-3">{card}</div>
+                    </details>
+                  )
+                }
+                return card
+              })}
+            </div>
+          </section>
+        )
+      })}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="min-w-0 space-y-6 lg:col-span-2">
-          <div>
-            <h3 className="mb-3 font-semibold text-ink-900">All Evidence</h3>
-            <div className="space-y-2">
-              {projectEvidence.map((e) => (
-                <div key={e.id} className="rounded-xl border border-ink-200 bg-surface p-4">
-                  <span className="rounded-md bg-ink-50 px-2 py-0.5 text-[11px] font-semibold text-ink-600">{e.type}</span>
-                  <p className="mt-1.5 text-sm font-medium text-ink-900">{e.title}</p>
-                  <p className="text-xs text-ink-500">{e.description}</p>
-                  {e.link && <p className="mt-1 text-[11px] break-all text-ink-400">{e.link}</p>}
-                  <EvidenceFileLink evidence={e} />
-                  {e.content && <pre className="mt-2 max-h-24 overflow-hidden rounded-lg whitespace-pre-wrap [overflow-wrap:anywhere] bg-ink-50 px-2.5 py-2 font-mono text-[11px] text-ink-600">{e.content}</pre>}
-                  <EvidenceSources evidence={e} />
-                </div>
-              ))}
-              {projectEvidence.length === 0 && <p className="text-sm text-ink-400">No evidence submitted yet.</p>}
-            </div>
-          </div>
-
           <div>
             <h3 className="mb-3 font-semibold text-ink-900">Feedback</h3>
             <div className="space-y-2">
@@ -148,7 +234,7 @@ export default function ProjectMonitoring() {
                 id="mentor-feedback"
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
-                placeholder={mentor ? `Leave feedback as ${mentor.name}...` : "Leave feedback for the student..."}
+                placeholder={mentor ? `Leave feedback as ${mentor.name}...` : "Leave feedback for the team..."}
                 className="flex-1 rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-teal-400"
               />
               <button type="submit" disabled={saving || !note.trim()} className="rounded-lg bg-night px-4 py-2 text-sm font-semibold text-white hover:bg-teal-600 disabled:opacity-40">Send</button>
@@ -163,9 +249,23 @@ export default function ProjectMonitoring() {
                 <h3 className="mb-2 font-semibold text-ink-900">Confirm to Company</h3>
                 <p className="mb-3 text-xs text-ink-600">
                   {allResolved
-                    ? `Every required skill has a decision. Confirming approves this evidence for ${org?.name} to see — it does not change any verification.`
-                    : "Every required skill needs a Verify or Reject decision above before you can confirm this evidence to the company."}
+                    ? `Every student has a current decision on every required skill. Confirming approves the verified proof for ${org?.name} to see — it does not change any verification. Only verified skills are shared.`
+                    : `Every student needs a current decision on every required skill — verified, not verified, or insufficient evidence acknowledged — before you can confirm. ${openItems.length} of ${review?.items.length ?? 0} still need one.`}
                 </p>
+                {!allResolved && (
+                  <ul className="mb-3 space-y-1 text-[11px] text-ink-600">
+                    {(review?.problems ?? []).map((problem) => (
+                      <li key={problem} className="font-medium text-danger-600">{problem}</li>
+                    ))}
+                    {openItems.slice(0, 6).map((i) => (
+                      <li key={`${i.studentId}-${i.skill}`}>
+                        <a href={`#student-${i.studentId}`} className="font-semibold text-teal-700 hover:underline">{getStudent(i.studentId)?.name.split(" ")[0]} · {i.skill}</a>
+                        {" — "}{reviewItemReason(i)}
+                      </li>
+                    ))}
+                    {openItems.length > 6 && <li className="text-ink-400">and {openItems.length - 6} more</li>}
+                  </ul>
+                )}
                 <label htmlFor="confirm-note" className="sr-only">Optional note</label>
                 <input
                   id="confirm-note"

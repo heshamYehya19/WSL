@@ -5,7 +5,10 @@ import { StatTile } from "../../components/ui/Card"
 import { BarList } from "../../components/ui/BarList"
 import { Ring } from "../../components/ui/Ring"
 import { daysUntil, formatRelative } from "../../lib/format"
-import { assignmentFor, isRoutedTo, statusAtUniversity } from "../../lib/selectors"
+import { assignmentFor, evidenceBy, isRoutedTo, signalsBy, statusAtUniversity, teamOf } from "../../lib/selectors"
+import { PROOF_STATE_LABEL, skillProofState } from "../../lib/proof"
+import type { SkillProofState } from "../../lib/proof"
+import { NOT_ANALYZED_TYPES } from "../../lib/evidenceTypes"
 
 function DaysPill({ iso }: { iso: string }) {
   const d = daysUntil(iso)
@@ -27,7 +30,22 @@ export default function UniversityDashboard() {
   const uniEvidence = evidence.filter((e) => isUniversityStudent(e.studentId, university.id))
   const uniSignals = skillSignals.filter((s) => isUniversityStudent(s.studentId, university.id))
   const verifiedCount = uniSignals.filter((s) => s.status === "Verified").length
-  const participating = new Set(uniProjects.map((p) => p.studentId)).size
+  const participating = new Set(uniProjects.flatMap((p) => teamOf(p).map((m) => m.studentId)).filter((id) => isUniversityStudent(id, university.id))).size
+
+  // Operational review status — what needs a reviewer, what has been decided, and what the evidence doesn't show.
+  const byState: Record<SkillProofState, number> = { pending: 0, "more-evidence": 0, insufficient: 0, acknowledged: 0, verified: 0, "not-verified": 0 }
+  for (const s of uniSignals) byState[skillProofState(s)]++
+  // Students with evidence analyzed whose skills no reviewer has looked at yet.
+  let awaitingFirstReview = 0
+  for (const p of uniProjects) {
+    if (p.status !== "Evidence Under Review" && p.status !== "Skills Pending Verification") continue
+    for (const m of teamOf(p).filter((t) => isUniversityStudent(t.studentId, university.id))) {
+      const work = evidenceBy(evidence, p.id, m.studentId).filter((e) => !NOT_ANALYZED_TYPES.includes(e.type))
+      const theirs = signalsBy(skillSignals, p.id, m.studentId)
+      const touched = theirs.some((s) => s.status !== "Pending Verification")
+      if (work.length > 0 && theirs.some((s) => skillProofState(s) === "pending") && !touched) awaitingFirstReview++
+    }
+  }
 
   // Waiting on this university: routed to it, not yet assigned by it, and still open.
   const needsReview = challenges.filter(
@@ -107,6 +125,20 @@ export default function UniversityDashboard() {
         <StatTile label="Students Participating" value={participating} hint={`of ${roster.length} enrolled`} />
       </div>
 
+      <div className="mt-8">
+        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="font-semibold text-ink-900">Review status</h2>
+          <Link to="/university/submissions" className="text-sm font-medium text-teal-600 hover:underline">Open the review queue →</Link>
+        </div>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+          <StatTile label="Awaiting Evidence Review" value={awaitingFirstReview} hint="students nobody has reviewed yet" />
+          <StatTile label="Pending Skill Verification" value={byState.pending} hint="skills with evidence to decide" />
+          <StatTile label={PROOF_STATE_LABEL["more-evidence"]} value={byState["more-evidence"]} hint="waiting on the student" />
+          <StatTile label={PROOF_STATE_LABEL.insufficient} value={byState.insufficient} hint={byState.acknowledged > 0 ? `to acknowledge · ${byState.acknowledged} reviewed` : "skills to acknowledge"} />
+          <StatTile label="Verified Skills" value={byState.verified} hint={byState["not-verified"] > 0 ? `${byState["not-verified"]} not verified` : "by your university"} />
+        </div>
+      </div>
+
       <div className="mt-8 grid gap-6 lg:grid-cols-5">
         <div className="rounded-2xl border border-ink-200 bg-surface p-5 lg:col-span-2">
           <h2 className="font-semibold text-ink-900">At a Glance</h2>
@@ -129,7 +161,7 @@ export default function UniversityDashboard() {
         </div>
       </div>
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-2">
+      <div className="mt-8 grid gap-6 lg:grid-cols-2 [&>*]:min-w-0">
         <div>
           <div className="mb-3 flex items-center justify-between">
             <h2 className="flex items-center gap-2 font-semibold text-ink-900">

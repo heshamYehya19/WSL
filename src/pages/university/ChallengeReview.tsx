@@ -5,6 +5,7 @@ import { useStore } from "../../state/store"
 import { PageHeader } from "../../components/ui/PageHeader"
 import { StatusBadge } from "../../components/ui/StatusBadge"
 import { IllustrativeDataNote } from "../../components/ui/IllustrativeDataNote"
+import { LifecycleStepper } from "../../components/ui/LifecycleStepper"
 import { ChallengeFileList, SharedDataNotice } from "../../components/ui/ChallengeFiles"
 import { assignmentFor, statusAtUniversity } from "../../lib/selectors"
 import { daysUntil, formatDate, formatRelative } from "../../lib/format"
@@ -59,6 +60,7 @@ export default function ChallengeReview() {
       <Link to="/university/challenges" className="text-sm text-ink-400 hover:text-teal-600">← Back to Challenges</Link>
       <PageHeader eyebrow={`${org?.name} · ${challenge.industry}`} title={challenge.title} action={<StatusBadge status={status} />} />
       <IllustrativeDataNote company={org?.name} />
+      <LifecycleStepper status={status} className="mb-6 rounded-2xl border border-ink-200 bg-surface px-4 py-3" />
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-5 lg:col-span-2">
@@ -84,10 +86,12 @@ export default function ChallengeReview() {
             </ul>
           </div>
           <div className="rounded-2xl border border-ink-200 bg-surface p-5">
-            <h3 className="mb-2 text-xs font-semibold tracking-wide text-teal-600 uppercase">Data Sensitivity &amp; Expected Output</h3>
+            <h3 className="mb-2 text-xs font-semibold tracking-wide text-teal-600 uppercase">Data, Deliverables, Duration &amp; Constraints</h3>
             <p className="text-sm text-ink-700"><strong>{challenge.dataSensitivity}</strong> · {challenge.datasetAvailability}</p>
             <ChallengeFileList challenge={challenge} kind="dataset" />
-            <p className="mt-2 text-sm text-ink-700">{challenge.expectedOutput}</p>
+            <p className="mt-2 text-sm text-ink-700"><span className="font-semibold">Deliverables:</span> {challenge.expectedOutput}</p>
+            {challenge.duration && <p className="mt-1 text-sm text-ink-700"><span className="font-semibold">Duration:</span> {challenge.duration}</p>}
+            {challenge.constraints && <p className="mt-1 text-sm text-ink-700"><span className="font-semibold">Constraints:</span> {challenge.constraints}</p>}
             <p className="mt-2 text-xs text-ink-400">WSL already screened this challenge automatically for private or confidential data.</p>
             <SharedDataNotice challenge={challenge} companyName={org?.name} />
           </div>

@@ -4,6 +4,7 @@ import { useStore } from "../../state/store"
 import { useDemoUser } from "../../state/demoUser"
 import { EmptyState } from "../../components/ui/EmptyState"
 import { PageHero, Pills, SearchInput } from "../../components/ui/ListKit"
+import { contributionOf, teamOf } from "../../lib/selectors"
 import type { SkillSignal } from "../../types"
 
 const CONFIRMED_STATUSES = ["Verified", "Completed", "Company Feedback Received"]
@@ -127,7 +128,8 @@ export default function TalentDiscovery() {
           <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
             {results.map(({ student, top, verified }, i) => {
               const uni = getUniversity(student.universityId)
-              const project = projects.find((p) => confirmedProjectIds.has(p.id) && p.studentId === student.id)
+              // The project their verified proof came from — as the owner or as a teammate.
+              const project = projects.find((p) => confirmedProjectIds.has(p.id) && teamOf(p).some((m) => m.studentId === student.id))
               const open = student.availability !== "Not Available"
               const saved = company ? companyActions.some((a) => a.studentId === student.id && a.kind === "saved") : false
               const interested = company ? companyActions.some((a) => a.studentId === student.id && a.kind === "interested") : false
@@ -205,7 +207,16 @@ export default function TalentDiscovery() {
                   </div>
 
                   <div className="relative mt-auto pt-4">
-                    {project && <p className="truncate text-[11px] text-ink-400">Latest: {project.title}</p>}
+                    {project && (
+                      <>
+                        <p className="truncate text-[11px] text-ink-500">{project.title}</p>
+                        {contributionOf(project, student.id) && (
+                          <p className="mt-0.5 line-clamp-2 text-[11px] text-ink-400" title={contributionOf(project, student.id)}>
+                            Contribution: {contributionOf(project, student.id)}
+                          </p>
+                        )}
+                      </>
+                    )}
                     <div className="mt-3 flex items-center justify-between border-t border-ink-100 pt-3">
                       <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-verified-600">
                         ✓ {verified} university-verified skill{verified === 1 ? "" : "s"}

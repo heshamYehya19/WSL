@@ -30,7 +30,11 @@ const CHALLENGE_COLUMNS = `
   submission_requirements TEXT NOT NULL, -- JSON array of strings
   status                  TEXT NOT NULL,
   created_at              TEXT NOT NULL,
-  submitted_at            TEXT`
+  submitted_at            TEXT,
+  -- How long students should expect the work to take (e.g. "4–6 weeks"), and anything the
+  -- company needs them to respect (tools, data handling, scope). Both optional.
+  duration                TEXT NOT NULL DEFAULT '',
+  constraints_note        TEXT NOT NULL DEFAULT ''`
 
 const CHALLENGE_COLUMN_NAMES = CHALLENGE_COLUMNS.split("\n")
   .map((line) => line.trim().split(/\s+/)[0])
@@ -57,8 +61,10 @@ const SKILL_SIGNALS_COLUMNS = `
   -- back; no new code writes or reads them for verification purposes.
   company_rating   INTEGER CHECK (company_rating BETWEEN 0 AND 100),
   company_rated_at TEXT,
+  -- "Insufficient Evidence" is a reviewer's explicit decision (WSL found no evidence of the skill and the
+  -- university acknowledged it) — different from a signal that merely has suggested_level 'Insufficient'.
   status           TEXT NOT NULL DEFAULT 'Pending Verification'
-                     CHECK (status IN ('Pending Verification', 'Verified', 'More Evidence Requested', 'Rejected')),
+                     CHECK (status IN ('Pending Verification', 'Verified', 'More Evidence Requested', 'Rejected', 'Insufficient Evidence')),
   -- "Insufficient" is not a low tier: it means too few rubric criteria were met to
   -- claim any tier at all. See gateByCriteria in server/ml/analyze.ts.
   suggested_level  TEXT NOT NULL DEFAULT 'Foundational'
@@ -71,7 +77,9 @@ const SKILL_SIGNALS_COLUMNS = `
   verified_at      TEXT,
   reviewer_notes   TEXT,
   analyzed_at      TEXT NOT NULL,
-  UNIQUE (project_id, skill)`
+  -- A signal belongs to one student: on a team project each member has their own, built only
+  -- from that member's evidence and verified (or not) on its own.
+  UNIQUE (project_id, student_id, skill)`
 
 const SKILL_SIGNALS_COLUMN_NAMES = SKILL_SIGNALS_COLUMNS.split("\n")
   .map((line) => line.trim().split(/\s+/)[0])
@@ -185,7 +193,22 @@ CREATE TABLE IF NOT EXISTS projects (
   graded_evidence_hash TEXT,
   graded_model         TEXT,
   graded_at            TEXT,
+  -- What the project's owner says they contributed. (Other members' statements live in
+  -- project_members.role_note.) Empty until they write one.
+  owner_role_note      TEXT NOT NULL DEFAULT '',
   UNIQUE (challenge_id, student_id)
+);
+
+-- The analysis cache, per student: re-analyzing one student's unchanged evidence skips the model
+-- call, and one member's evidence never makes another member's cache stale. (The project-level
+-- graded_* columns above are deprecated; v14 copied them here.)
+CREATE TABLE IF NOT EXISTS analysis_runs (
+  project_id    TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  student_id    TEXT NOT NULL REFERENCES students(id),
+  evidence_hash TEXT NOT NULL,
+  model         TEXT NOT NULL,
+  graded_at     TEXT NOT NULL,
+  PRIMARY KEY (project_id, student_id)
 );
 
 CREATE TABLE IF NOT EXISTS project_tasks (
@@ -241,9 +264,11 @@ CREATE TABLE IF NOT EXISTS skill_signal_evidence (
   PRIMARY KEY (signal_id, evidence_id)
 );
 
--- Extra contributors on a team project. The project's own student_id (and the
--- UNIQUE(challenge_id, student_id) constraint on projects) stays the "owner" row —
--- this table only adds attribution, never a second project row for the same work.
+-- Extra members of a team project (same university as the owner). The project's own student_id
+-- (and the UNIQUE(challenge_id, student_id) constraint on projects) stays the "owner" row; the
+-- owner's own contribution statement is projects.owner_role_note. Each member's role_note is
+-- what THEY say they contributed — a claim for the reviewer, never proof. Signals, evidence and
+-- verification are per student (skill_signals.student_id, evidence.student_id).
 -- Solo projects (the default) simply have zero rows here.
 CREATE TABLE IF NOT EXISTS project_members (
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -317,6 +342,7 @@ const TABLES_IN_DROP_ORDER = [
   "skill_signals",
   "project_members",
   "company_feedback",
+  "analysis_runs",
   "evidence_files",
   "evidence",
   "feedback",
@@ -352,7 +378,7 @@ export function getDb(): DatabaseSync {
   return db
 }
 
-const SCHEMA_VERSION = 13
+const SCHEMA_VERSION = 15
 
 /**
  * Brings databases created by older versions up to date without losing their data.
@@ -401,6 +427,17 @@ const SCHEMA_VERSION = 13
  *     already graded. A model-graded note always starts "Graded by <model>", so those
  *     rows are marked 'model' — otherwise they'd wrongly read "Estimated offline" and
  *     be left unprotected the next time the model is unavailable.
+ * v14: team projects get individual proof. skill_signals is rebuilt so a signal is unique per
+ *     (project, student, skill) instead of (project, skill) — each member's skills are analyzed
+ *     from, and verified against, their own evidence. The analysis cache moves from the
+ *     project to analysis_runs (one row per student), the project owner gets an
+ *     owner_role_note beside the members' role_note, and challenges gain duration and
+ *     constraints_note. Existing signals already carry a student_id, so nothing is lost.
+ * v15: a reviewer can explicitly acknowledge "Insufficient Evidence" for a skill, so skill_signals.status
+ *     gains that value (a CHECK change, hence another rebuild), and a team member who studies at a
+ *     different university than the project's owner — possible before teams were same-university only —
+ *     is removed when they have no evidence and no signals (nothing is lost). One with work on the
+ *     project is left in place; confirming the project stays blocked until that is resolved.
  */
 function migrate(db: DatabaseSync) {
   const { user_version: version } = db.prepare("PRAGMA user_version").get() as { user_version: number }
@@ -475,7 +512,7 @@ function migrate(db: DatabaseSync) {
         FROM challenges c
         WHERE c.assigned_university_id IS NOT NULL AND c.assigned_program_id IS NOT NULL;
         CREATE TABLE challenges_v2 (${CHALLENGE_COLUMNS});
-        INSERT INTO challenges_v2 SELECT ${CHALLENGE_COLUMN_NAMES.join(", ")} FROM challenges;
+        INSERT INTO challenges_v2 (${CHALLENGE_COLUMN_NAMES.filter((n) => columns.includes(n)).join(", ")}) SELECT ${CHALLENGE_COLUMN_NAMES.filter((n) => columns.includes(n)).join(", ")} FROM challenges;
         DROP TABLE challenges;
         ALTER TABLE challenges_v2 RENAME TO challenges;
       `)
@@ -568,6 +605,54 @@ function migrate(db: DatabaseSync) {
     transaction(db, () => {
       db.exec("UPDATE skill_signals SET graded_source = 'model' WHERE graded_source = 'offline' AND ai_note LIKE 'Graded by %'")
     })
+  }
+  if (version < 14) {
+    const challengeColumns = (db.prepare("PRAGMA table_info(challenges)").all() as { name: string }[]).map((c) => c.name)
+    const projectColumns = (db.prepare("PRAGMA table_info(projects)").all() as { name: string }[]).map((c) => c.name)
+    const signalSql = (db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'skill_signals'").get() as { sql: string }).sql
+    transaction(db, () => {
+      if (!challengeColumns.includes("duration")) db.exec("ALTER TABLE challenges ADD COLUMN duration TEXT NOT NULL DEFAULT ''")
+      if (!challengeColumns.includes("constraints_note")) db.exec("ALTER TABLE challenges ADD COLUMN constraints_note TEXT NOT NULL DEFAULT ''")
+      if (!projectColumns.includes("owner_role_note")) db.exec("ALTER TABLE projects ADD COLUMN owner_role_note TEXT NOT NULL DEFAULT ''")
+      // The cache each project kept for its owner becomes that owner's analysis run.
+      db.exec(`INSERT OR IGNORE INTO analysis_runs (project_id, student_id, evidence_hash, model, graded_at)
+               SELECT id, student_id, graded_evidence_hash, graded_model, graded_at FROM projects
+               WHERE graded_evidence_hash IS NOT NULL AND graded_model IS NOT NULL AND graded_at IS NOT NULL`)
+      if (!/UNIQUE\s*\(\s*project_id\s*,\s*student_id\s*,\s*skill\s*\)/i.test(signalSql)) {
+        db.exec(`
+          CREATE TABLE skill_signals_v2 (${SKILL_SIGNALS_COLUMNS});
+          INSERT INTO skill_signals_v2 (${SKILL_SIGNALS_COLUMN_NAMES.join(", ")}) SELECT ${SKILL_SIGNALS_COLUMN_NAMES.join(", ")} FROM skill_signals;
+          DROP TABLE skill_signals;
+          ALTER TABLE skill_signals_v2 RENAME TO skill_signals;
+          CREATE INDEX IF NOT EXISTS idx_signals_project ON skill_signals (project_id);
+        `)
+      }
+    })
+    const problems = db.prepare("PRAGMA foreign_key_check").all()
+    if (problems.length > 0) throw new Error(`Database migration left broken references: ${JSON.stringify(problems)}`)
+  }
+  if (version < 15) {
+    const signalSql = (db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'skill_signals'").get() as { sql: string }).sql
+    transaction(db, () => {
+      if (!signalSql.includes("'Insufficient Evidence'")) {
+        db.exec(`
+          CREATE TABLE skill_signals_v2 (${SKILL_SIGNALS_COLUMNS});
+          INSERT INTO skill_signals_v2 (${SKILL_SIGNALS_COLUMN_NAMES.join(", ")}) SELECT ${SKILL_SIGNALS_COLUMN_NAMES.join(", ")} FROM skill_signals;
+          DROP TABLE skill_signals;
+          ALTER TABLE skill_signals_v2 RENAME TO skill_signals;
+          CREATE INDEX IF NOT EXISTS idx_signals_project ON skill_signals (project_id);
+        `)
+      }
+      db.exec(`
+        DELETE FROM project_members
+        WHERE student_id IN (SELECT id FROM students s WHERE s.university_id <> (
+                SELECT o.university_id FROM projects pr JOIN students o ON o.id = pr.student_id WHERE pr.id = project_members.project_id))
+          AND NOT EXISTS (SELECT 1 FROM evidence e WHERE e.project_id = project_members.project_id AND e.student_id = project_members.student_id)
+          AND NOT EXISTS (SELECT 1 FROM skill_signals g WHERE g.project_id = project_members.project_id AND g.student_id = project_members.student_id)
+      `)
+    })
+    const problems = db.prepare("PRAGMA foreign_key_check").all()
+    if (problems.length > 0) throw new Error(`Database migration left broken references: ${JSON.stringify(problems)}`)
   }
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`)
 }

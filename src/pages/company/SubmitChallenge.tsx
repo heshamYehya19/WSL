@@ -131,6 +131,9 @@ export default function SubmitChallenge() {
   const [industry, setIndustry] = useState(company?.industry ?? "")
   const [difficulty, setDifficulty] = useState<Difficulty>("Intermediate")
   const [learningOutcomes, setLearningOutcomes] = useState("")
+  const [deliverables, setDeliverables] = useState("")
+  const [duration, setDuration] = useState("")
+  const [constraints, setConstraints] = useState("")
   const [deadline, setDeadline] = useState("")
   const [preferredUniversityId, setPreferredUniversityId] = useState<string>("")
   const [contactId, setContactId] = useState(myContacts.find((c) => c.isPrimary)?.id ?? myContacts[0]?.id ?? "")
@@ -202,6 +205,9 @@ export default function SubmitChallenge() {
         industry,
         difficulty,
         learningOutcomes: outcomeList,
+        deliverables,
+        duration,
+        constraints,
         datasetAvailability,
         dataSensitivity,
         deadline,
@@ -331,6 +337,45 @@ export default function SubmitChallenge() {
             aria-invalid={Boolean(errors.learningOutcomes)}
           />
         </Field>
+
+        <div className="space-y-4 rounded-xl border border-ink-100 p-4">
+          <div>
+            <p className="text-sm font-medium text-ink-800">What students hand back <span className="font-normal text-ink-400">(optional)</span></p>
+            <p className="mt-0.5 text-xs text-ink-400">The more concrete this is, the better a student's work can be matched to the need you described.</p>
+          </div>
+          <Field label="Deliverables" hint="What should students deliver? e.g. a documented database, an analysis, a working dashboard." error={errors.deliverables}>
+            <textarea
+              className={inputClass}
+              rows={2}
+              value={deliverables}
+              onChange={(e) => {
+                setDeliverables(e.target.value)
+                clearError("deliverables")
+              }}
+            />
+          </Field>
+          <Field label="Duration" hint="How long the work should take, e.g. 4–6 weeks." error={errors.duration}>
+            <input
+              className={inputClass}
+              value={duration}
+              onChange={(e) => {
+                setDuration(e.target.value)
+                clearError("duration")
+              }}
+            />
+          </Field>
+          <Field label="Constraints" hint="Anything students must respect: tools, data handling, scope." error={errors.constraints}>
+            <textarea
+              className={inputClass}
+              rows={2}
+              value={constraints}
+              onChange={(e) => {
+                setConstraints(e.target.value)
+                clearError("constraints")
+              }}
+            />
+          </Field>
+        </div>
 
         <div className="space-y-4 rounded-xl border border-ink-100 p-4">
           <div>

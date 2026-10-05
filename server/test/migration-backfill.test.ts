@@ -6,7 +6,7 @@ import { join } from "node:path"
 // Builds a real database, rewinds it to schema v12 with one model-graded and one
 // offline-graded signal both stored as 'offline' (what v12's default produced), then
 // opens it again with a fresh module so migrate() runs v13 on it for real.
-describe("v13 migration", () => {
+describe("v13 and v14 migrations", () => {
   it("marks signals the model graded before v12 as model-graded, and leaves offline ones alone", async () => {
     const dir = mkdtempSync(join(tmpdir(), "wsl-migrate-"))
     process.env.WSL_DB_PATH = join(dir, "wsl.db")
@@ -30,6 +30,6 @@ describe("v13 migration", () => {
     const source = (id: string) => (reopened.prepare("SELECT graded_source FROM skill_signals WHERE id = ?").get(id) as { graded_source: string }).graded_source
     expect(source(modelRow.id)).toBe("model")
     expect(source(offlineRow.id)).toBe("offline")
-    expect((reopened.prepare("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(13)
+    expect((reopened.prepare("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(14)
   })
 })

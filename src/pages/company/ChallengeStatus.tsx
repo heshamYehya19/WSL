@@ -4,8 +4,8 @@ import { useDemoUser } from "../../state/demoUser"
 import { StatusBadge } from "../../components/ui/StatusBadge"
 import { IllustrativeDataNote } from "../../components/ui/IllustrativeDataNote"
 import { ChallengeFileList, SharedDataNotice } from "../../components/ui/ChallengeFiles"
-import { challengeUniversityIds } from "../../lib/selectors"
-import { PIPELINE_ORDER } from "../../lib/pipeline"
+import { challengeUniversityIds, teamOf } from "../../lib/selectors"
+import { LifecycleStepper } from "../../components/ui/LifecycleStepper"
 import { formatDate, formatRelative } from "../../lib/format"
 
 export default function ChallengeStatus() {
@@ -28,7 +28,6 @@ export default function ChallengeStatus() {
   const relatedProjects = projects.filter((p) => p.challengeId === challenge.id)
   const awaitingYou = relatedProjects.find((p) => p.status === "Verified" || p.status === "Completed")
   const working = relatedProjects.filter((p) => p.status === "In Progress").length
-  const currentIdx = PIPELINE_ORDER.indexOf(challenge.status)
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -43,15 +42,33 @@ export default function ChallengeStatus() {
       </div>
       <IllustrativeDataNote company={company?.name} />
 
+      <div className="mb-6 rounded-2xl border border-ink-200 bg-surface p-6">
+        <h3 className="mb-2 text-xs font-semibold tracking-wide text-teal-600 uppercase">The brief students see</h3>
+        <dl className="grid gap-3 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <dt className="text-xs font-semibold text-ink-500">Deliverables</dt>
+            <dd className="mt-0.5 text-sm text-ink-700">{challenge.expectedOutput}</dd>
+          </div>
+          <div>
+            <dt className="text-xs font-semibold text-ink-500">Duration</dt>
+            <dd className="mt-0.5 text-sm text-ink-700">{challenge.duration || "Not specified"}</dd>
+          </div>
+          <div>
+            <dt className="text-xs font-semibold text-ink-500">Required skills</dt>
+            <dd className="mt-0.5 text-sm text-ink-700">{challenge.requiredSkills.join(", ")}</dd>
+          </div>
+          {challenge.constraints && (
+            <div className="sm:col-span-2">
+              <dt className="text-xs font-semibold text-ink-500">Constraints</dt>
+              <dd className="mt-0.5 text-sm text-ink-700">{challenge.constraints}</dd>
+            </div>
+          )}
+        </dl>
+      </div>
+
       <div className="rounded-2xl border border-ink-200 bg-surface p-6">
-        <h3 className="mb-4 text-xs font-semibold tracking-wide text-teal-600 uppercase">Pipeline Progress</h3>
-        <div className="flex flex-wrap gap-2">
-          {PIPELINE_ORDER.map((s, i) => (
-            <span key={s} className={`rounded-full border px-3 py-1 text-xs font-medium ${i <= currentIdx ? "border-teal-500 bg-teal-500 text-white" : "border-ink-200 text-ink-400"}`}>
-              {s}
-            </span>
-          ))}
-        </div>
+        <h3 className="mb-4 text-xs font-semibold tracking-wide text-teal-600 uppercase">From your need to verified proof</h3>
+        <LifecycleStepper status={challenge.status} />
 
         <div className="mt-6 flex flex-wrap gap-3">
           {challenge.status === "Draft" && (
@@ -141,15 +158,16 @@ export default function ChallengeStatus() {
             {relatedProjects.map((p) => {
               const s = getStudent(p.studentId)
               const su = s ? getUniversity(s.universityId) : undefined
+              const mates = teamOf(p).slice(1).map((m) => getStudent(m.studentId)?.name).filter(Boolean)
               const canReview = p.status === "Verified" || p.status === "Completed" || p.status === "Company Feedback Received"
               return (
                 <div key={p.id} className="flex items-center justify-between rounded-lg border border-ink-100 px-4 py-2.5">
                   {canReview ? (
                     <Link to={`/company/submissions/${p.id}`} className="text-sm font-medium text-ink-800 hover:text-teal-600">
-                      {s?.name} <span className="font-normal text-ink-400">· {su?.shortName}</span> →
+                      {s?.name} <span className="font-normal text-ink-400">· {su?.shortName}{mates.length > 0 ? ` · with ${mates.join(", ")}` : ""}</span> →
                     </Link>
                   ) : (
-                    <span className="text-sm font-medium text-ink-800">{s?.name} <span className="font-normal text-ink-400">· {su?.shortName}</span></span>
+                    <span className="text-sm font-medium text-ink-800">{s?.name} <span className="font-normal text-ink-400">· {su?.shortName}{mates.length > 0 ? ` · with ${mates.join(", ")}` : ""}</span></span>
                   )}
                   <StatusBadge status={p.status} />
                 </div>
