@@ -27,7 +27,7 @@ export default function ChallengeDetails() {
   const [starting, setStarting] = useState(false)
 
   const found = challenges.find((c) => c.id === id)
-  const challenge = found && student && canStudentSee(found, student) ? found : undefined
+  const challenge = found && student && canStudentSee(found, student, projects) ? found : undefined
   // A project you started, or one a classmate started and added you to.
   const existingProject = student ? projects.find((p) => p.challengeId === id && isOnTeam(p, student.id)) : undefined
 

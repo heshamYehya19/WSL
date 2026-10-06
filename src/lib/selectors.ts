@@ -163,9 +163,14 @@ export function statusAtUniversity(challenge: Challenge, universityId: string, p
   return best
 }
 
-/** Same rule the server enforces when a student starts a project: their own university must have assigned it. */
-export function canStudentSee(challenge: Challenge, student: Student) {
-  return assignmentFor(challenge, student.universityId) !== undefined
+/**
+ * Same rule the server enforces when a student starts a project: their own university must have assigned the challenge to
+ * THEIR program (not just to the university) — or they are already on a project team for it, which keeps their access.
+ */
+export function canStudentSee(challenge: Challenge, student: Student, projects: Project[] = []) {
+  const mine = assignmentFor(challenge, student.universityId)
+  if (mine !== undefined && mine.programId === student.programId) return true
+  return projects.some((p) => p.challengeId === challenge.id && (p.studentId === student.id || p.members.some((m) => m.studentId === student.id)))
 }
 
 /** Universities shown for a challenge on company pages: who assigned it, else who it was sent to. */

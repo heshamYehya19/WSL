@@ -127,7 +127,7 @@ export default function ChallengeReview() {
                   >
                     {university.programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
-                  <p className="mt-1 text-xs text-ink-400">Opens this challenge to every student in that program — not tied to a specific course.</p>
+                  <p className="mt-1 text-xs text-ink-400">Opens this challenge to every student in that program at your university. Students in your other programs won't see it or be able to start it.</p>
                   {coordinator && <p className="mt-1 text-xs text-ink-400">Mentor: {coordinator.name}</p>}
                 </div>
                 <button

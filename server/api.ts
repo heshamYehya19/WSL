@@ -1232,11 +1232,22 @@ function canAccessChallengeFiles(db: DatabaseSync, actor: Actor, challengeId: st
     case "university":
       return c.status !== "Draft" && (!c.preferred_university_id || c.preferred_university_id === actor.id)
     case "student":
-      return !!one(
-        db,
-        "SELECT 1 FROM challenge_assignments a JOIN students s ON s.university_id = a.university_id WHERE a.challenge_id = ? AND s.id = ?",
-        challengeId,
-        actor.id,
+      // The students of the assigned program, and anyone already on a project team for the challenge.
+      return (
+        !!one(
+          db,
+          "SELECT 1 FROM challenge_assignments a JOIN students s ON s.university_id = a.university_id AND s.program_id = a.program_id WHERE a.challenge_id = ? AND s.id = ?",
+          challengeId,
+          actor.id,
+        ) ||
+        !!one(
+          db,
+          `SELECT 1 FROM projects pr WHERE pr.challenge_id = ? AND (pr.student_id = ? OR EXISTS
+             (SELECT 1 FROM project_members m WHERE m.project_id = pr.id AND m.student_id = ?))`,
+          challengeId,
+          actor.id,
+          actor.id,
+        )
       )
     default:
       return false
@@ -1480,18 +1491,26 @@ const routes: { method: string; pattern: RegExp; prepare?: (actor: Actor, body: 
       const student = requireRole(actor, "student")
       const c = one(db, "SELECT * FROM challenges WHERE id = ?", id)
       if (!c) throw new ApiError(404, "Challenge not found.")
-      const s = one(db, "SELECT s.name, s.university_id, u.short_name FROM students s JOIN universities u ON u.id = s.university_id WHERE s.id = ?", student.id)!
-      // Only challenges the student's own university assigned are open to them.
-      if (!one(db, "SELECT 1 FROM challenge_assignments WHERE challenge_id = ? AND university_id = ?", id, String(s.university_id))) {
-        throw new ApiError(403, "Your university hasn't assigned this challenge to its students.")
-      }
-      if (new Date(String(c.deadline)).getTime() < Date.now()) throw new ApiError(409, "This challenge's deadline has passed.")
+      const s = one(db, "SELECT s.name, s.university_id, s.program_id, u.short_name FROM students s JOIN universities u ON u.id = s.university_id WHERE s.id = ?", student.id)!
       const existing = one(
         db,
         `SELECT pr.id FROM projects pr WHERE pr.challenge_id = ? AND (pr.student_id = ? OR EXISTS
            (SELECT 1 FROM project_members m WHERE m.project_id = pr.id AND m.student_id = ?))`,
         id, student.id, student.id,
       )
+      // A challenge is open to the students of the program the student's own university assigned it to — not to the whole
+      // university. (A student who is already on a project team for it, e.g. a teammate from another program, keeps access.)
+      const assignment = one(
+        db,
+        "SELECT a.program_id, p.name AS program_name FROM challenge_assignments a JOIN programs p ON p.id = a.program_id WHERE a.challenge_id = ? AND a.university_id = ?",
+        id,
+        String(s.university_id),
+      )
+      if (!assignment) throw new ApiError(403, "Your university hasn't assigned this challenge to its students.")
+      if (!existing && assignment.program_id !== s.program_id) {
+        throw new ApiError(403, `Your university assigned this challenge to ${assignment.program_name} students, so it isn't open to your program.`)
+      }
+      if (new Date(String(c.deadline)).getTime() < Date.now()) throw new ApiError(409, "This challenge's deadline has passed.")
       if (existing) return { id: String(existing.id) }
 
       const projectId = newId("prj")
